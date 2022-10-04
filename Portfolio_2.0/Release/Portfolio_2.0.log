@@ -1,0 +1,6 @@
+﻿  mainwindow.cpp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 289 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  Portfolio_2.0.vcxproj -> C:\Users\brand\source\repos\Portfolio_2.0\Release\Portfolio_2.0.exe
