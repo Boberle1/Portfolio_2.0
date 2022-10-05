@@ -147,6 +147,19 @@ void GetWorkDate(wxDateTime& T, bool B)
 	return;
 }
 
+void GetForwardWorkDay(wxDateTime& T)
+{
+	if (!T.IsValid())
+		wxMessageBox("wxDateTime Param in GetForwardWorkDay() is Invalid Date!");
+
+	if (T.IsWorkDay() && !holidays.IsHoliday(T))
+		return;
+
+	T = wxDateTime(T.GetValue() + DayValue);
+	GetForwardWorkDay(T);
+	return;
+}
+
 Parser::Parser(wxString& data, bool historical)
 {
 	BeginParse(data);

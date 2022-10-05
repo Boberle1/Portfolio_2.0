@@ -65,6 +65,7 @@ struct Holidays
 };
 
 void GetWorkDate(wxDateTime& T, bool B = false);
+void GetForwardWorkDay(wxDateTime& T);
 
 enum DataType
 {

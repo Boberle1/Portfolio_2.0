@@ -42,8 +42,6 @@ public:
 	GridNode(GridView*, wxWindow*, size_t, size_t, GridNode*, GridNode*, GridNode*, GridNode*, wxString);
 	GridNode(GridView*, wxWindow*, size_t, size_t, GridNode*, GridNode*, GridNode*, GridNode*);
 	~GridNode();
-	bool SetNewVal(double, bool, bool);
-	bool SetNewVal(int);
 	bool SetNewVal(wxString);
 	void SetUP(GridNode*);
 	void SetRight(GridNode*);
@@ -89,7 +87,6 @@ class GridView : public wxGridSizer
 public:
 	GridView(wxWindow*, int);
 	~GridView();
-	void SetNewRow(wxString, double, double, double, double, double, double, double, double);
 	void SetNewRow(StockViewerData*);
 	void Cleanup();
 	void OnClickColItem(GridNode*);

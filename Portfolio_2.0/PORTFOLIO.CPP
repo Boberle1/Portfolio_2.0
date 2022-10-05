@@ -170,12 +170,12 @@ wxDateTime stock_node::GetPurchaseDate()
 	return this->m_date;
 }
 
-double stock_node::GetPurchasePrice(wxDateTime::Month start, int year)
+double stock_node::GetPurchasePrice(wxDateTime::Month start, int dayofyear, int year)
 {
 	if (this->m_date.GetYear() != year)
 		return 0.0;
 
-	if (this->m_date.GetMonth() >= start && this->m_date.GetMonth() <= wxDateTime::Month(start + 2))
+	if (this->m_date.GetMonth() >= start && this->m_date.GetDayOfYear() <= dayofyear)
 	{
 		return this->m_price_per_share;
 	}
@@ -183,17 +183,15 @@ double stock_node::GetPurchasePrice(wxDateTime::Month start, int year)
 		return 0.0;
 }
 
-double stock_node::GetPurchasePrice(int year)
+double stock_node::GetPurchasePrice(int year, int dayofyear)
 {
 	if (this->m_date.GetYear() != year)
 		return 0.0;
 
-	wxDateTime T(31, wxDateTime::Month::Dec, year);
-	double shares = this->GetShares(&T);
-	if (!shares)
-		return 0.0;
+	if(this->m_date.GetDayOfYear() <= dayofyear)
+		return this->m_price_per_share;
 
-	return this->m_price_per_share;
+	return 0.0;
 }
 
 double stock_node::GetPurchasePrice(int monday, int friday, int year)
@@ -513,21 +511,6 @@ double StockNode::GetShares()
 	return this->m_GetShares(&T);
 }
 
-double StockNode::GetPreviousClose()
-{
-	wxDateTime T = *this->m_parentclock;
-	double _shares = this->m_GetShares(&T);
-	if (shares)
-		return this->m_GetDayCostBasis(&T, Returns::DAY) / _shares;
-	else
-		return 0.0;
-}
-
-double StockNode::GetPrice()
-{
-	return this->m_GetLatestClosePrice();
-}
-
 bool StockNode::TickerMatch(wxString ticker)
 {
 	if (this->m_ticker == ticker)
@@ -549,19 +532,13 @@ bool StockNode::IsActive()
 void StockNode::Calibrate()
 {
 	wxDateTime T = *this->m_parentclock;
-	double daycostbasis = this->m_GetDayCostBasis(&T, Returns::DAY);
-	T = *this->m_parentclock;
-	double weekcostbasis = this->m_GetDayCostBasis(&T, Returns::WEEK);
-	T = *this->m_parentclock;
-	double quartercostbasis = this->m_GetDayCostBasis(&T, Returns::QUARTER);
-	T = *this->m_parentclock;
-	double yearcostbasis = this->m_GetDayCostBasis(&T, Returns::YEAR);
-	T = *this->m_parentclock;
+	double daycostbasis = this->GetDayCostBasis(&T);
+	double weekcostbasis = this->GetWeekCostBasis(&T);
+	double quartercostbasis = this->GetQuarterCostBasis(&T);
+	double yearcostbasis = this->GetYearCostBasis(&T);
 	wxDateTime initial = this->GetInitalPurchaseDate();
-	T = *this->m_parentclock;
-	double originalcostbasis = this->m_GetPurchaseCostBasis(&T);
-	T = *this->m_parentclock;
-	double marketvalue = this->m_GetMarketValue(&T, Returns::ALL_TIME);
+	double originalcostbasis = this->GetTotalCostBasis(&T);
+	double marketvalue = this->GetMarketValue(&T);
 	T = *this->m_parentclock;
 	double _shares = this->m_GetShares(&T);
 	double divshares = this->GetDividendShares();
@@ -595,6 +572,278 @@ bool StockNode::UpDate()
 	this->parser->UpDateHistoricalPrices();
 	this->parser->UpDateDiv();
 	return true;
+}
+
+bool StockNode::Historical_prices_UpToDate()
+{
+	size_t size = this->historical_prices.size();
+	if (!size)
+		return false;
+
+	wxDateTime latest = this->GetLatestMarketOpenDate();
+	if (this->historical_prices.rbegin()->date == latest)
+		return true;
+
+	return false;
+}
+
+int StockNode::m_GetStartWeekDay(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetStartWeekDay is nullptr!");
+		return 0;
+	}
+
+	if (!T->IsValid())
+	{
+		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetStartWeekDay is Invalid Date!");
+		return 0;
+	}
+
+	int day = T->GetDay();
+	int weekday = T->GetWeekDay();
+	switch (weekday)
+	{
+	case wxDateTime::WeekDay::Mon: return T->GetDayOfYear();
+	case wxDateTime::WeekDay::Tue: return T->GetDayOfYear() - 1;
+	case wxDateTime::WeekDay::Wed: return T->GetDayOfYear() - 2;
+	case wxDateTime::WeekDay::Thu: return T->GetDayOfYear() - 3;
+	case wxDateTime::WeekDay::Fri: return T->GetDayOfYear() - 4;
+	case wxDateTime::WeekDay::Sat: return T->GetDayOfYear() - 5;
+	case wxDateTime::WeekDay::Sun: return 0;
+	}
+
+	wxString wd = "";
+	wd << weekday;
+	wxFAIL_MSG("Weekday: " + wd + " matched no days in the switch statement in StockNode::m_GetStartWeekDay!");
+	return 0;
+}
+
+wxDateTime StockNode::GetLatestMarketOpenDate()
+{
+	wxDateTime T = wxDateTime::Today();
+	GetWorkDate(T);
+	return T;
+}
+
+double StockNode::GetClosePrice(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* is null in StockNode::GetClosePrice!");
+		return 0.0;
+	}
+	wxString enddate = this->historical_prices.rbegin()->date.Format(STANDARD_DATE);
+	for (size_t i = 0; i < this->historical_prices.size(); ++i)
+	{
+		wxString Tclose = T->Format(STANDARD_DATE);
+		wxString close = this->historical_prices[i].date.Format(STANDARD_DATE);
+		double closep = this->historical_prices[i].close;
+		if (this->historical_prices[i].date == *T)
+			return this->historical_prices[i].close;
+	}
+
+	return 0.0;
+}
+
+double StockNode::GetPreviousClose(wxDateTime* T)
+{
+	if (!T)
+	{
+		if (this->historical_prices.rend() == this->historical_prices.rend())
+			return 0.0;
+		auto it = this->historical_prices.rbegin();
+		++it;
+		if (it == this->historical_prices.rend())
+			return 0.0;
+		return it->close;
+	}
+
+	for (size_t i = 0; i < this->historical_prices.size(); ++i)
+	{
+		if (this->historical_prices[i].date == *T)
+		{
+			if (i > 0)
+				return this->historical_prices[--i].close;
+			else
+				return 0.0;
+		}
+	}
+
+	wxMessageBox("Date not found in StockNode::GetPreviousClose!");
+	return 0.0;
+}
+
+double StockNode::GetEarliestWeekDayClose(wxDateTime* T)
+{
+	wxDateTime date = wxDateTime::Today();
+	if (T)
+		date = *T;
+
+	date = this->GetFirstDayOfTheWeekDate(&date);
+
+	return this->GetClosePrice(&date);
+}
+
+double StockNode::GetQuarterStartClose(wxDateTime* T)
+{
+	wxDateTime date = wxDateTime::Today();
+	if (T)
+		date = *T;
+
+	date = this->GetQuarterStartDate(&date);
+	
+	return this->GetClosePrice(&date);
+}
+
+wxDateTime StockNode::GetQuarterStartDate(wxDateTime* T)
+{
+	wxDateTime date = wxDateTime::Today();
+	if (T)
+		date = *T;
+	wxString before = date.Format(STANDARD_DATE);
+	date = wxDateTime(1, GetQuarterStartMonth(date.GetMonth()), date.GetYear());
+	GetForwardWorkDay(date);
+	wxString after = date.Format(STANDARD_DATE);
+	return date;
+}
+
+double StockNode::GetYearStartClose(wxDateTime* T)
+{
+	wxDateTime date = wxDateTime::Today();
+	if (T)
+		date = *T;
+
+	date = wxDateTime(2, wxDateTime::Month::Jan, date.GetYear());
+	GetForwardWorkDay(date);
+	wxString year = date.Format(STANDARD_DATE);
+	return this->GetClosePrice(&date);
+}
+
+double StockNode::GetDayCostBasis(wxDateTime* T)
+{
+	double cost_basis = 0.0;
+	double price = this->GetPreviousClose(T);
+	double temp = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		temp = this->bought[i].GetPurchasePrice(T);
+		if (!temp)
+			cost_basis += price * this->bought[i].GetShares(T);
+		else
+			cost_basis += temp * this->bought[i].GetShares(T);
+	}
+
+	return cost_basis;
+//	case DAY: return sn->GetPurchasePrice(begin_date);
+//	case WEEK: return sn->GetPurchasePrice(this->m_GetStartWeekDay(begin_date), this->m_GetEndWeekDay(begin_date), begin_date->GetYear());
+//	case QUARTER: return sn->GetPurchasePrice(GetQuarterStartMonth(begin_date->GetMonth()), begin_date->GetYear());
+//	case YEAR: return sn->GetPurchasePrice(begin_date->GetYear());
+//	case ALL_TIME: return sn->GetPurchasePrice();
+}
+
+double StockNode::GetWeekCostBasis(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* in StockNode::GetWeekCostBasis is nullptr!");
+		return 0.0;
+	}
+
+	wxDateTime copy = *T;
+	double cost_basis = 0.0;
+	double price = this->GetEarliestWeekDayClose(&copy);
+	double temp = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		temp = this->bought[i].GetPurchasePrice(this->m_GetStartWeekDay(&copy), copy.GetDayOfYear(), copy.GetYear());
+		if (!temp)
+			cost_basis += price * this->bought[i].GetShares(&copy);
+		else
+			cost_basis += temp * this->bought[i].GetShares(&copy);
+	}
+
+	return cost_basis;
+}
+double StockNode::GetQuarterCostBasis(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* in StockNode::GetQuarterCostBasis is nullptr!");
+		return 0.0;
+	}
+
+	wxDateTime copy = *T;
+	double cost_basis = 0.0;
+	double price = this->GetQuarterStartClose(&copy);
+	double temp = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		temp = this->bought[i].GetPurchasePrice(GetQuarterStartMonth(copy.GetMonth()), copy.GetDayOfYear(), copy.GetYear());
+		if (!temp)
+			cost_basis += price * this->bought[i].GetShares(&copy);
+		else
+			cost_basis += temp * this->bought[i].GetShares(&copy);
+	}
+
+	return cost_basis;
+}
+
+double StockNode::GetYearCostBasis(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* in StockNode::GetYearCostBasis is nullptr!");
+		return 0.0;
+	}
+	
+	wxDateTime copy = *T;
+	double cost_basis = 0.0;
+	double price = this->GetYearStartClose(&copy);
+	double temp = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		temp = this->bought[i].GetPurchasePrice(copy.GetYear(), copy.GetDayOfYear());
+		if (!temp)
+			cost_basis += price * this->bought[i].GetShares(&copy);
+		else
+			cost_basis += temp * this->bought[i].GetShares(&copy);
+	}
+
+	return cost_basis;
+}
+
+double StockNode::GetTotalCostBasis(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* in StockNode::GetTotalCostBasis is nullptr!");
+		return 0.0;
+	}
+
+	wxDateTime copy = *T;
+	double cost_basis = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+		cost_basis += this->bought[i].GetPurchasePrice() * this->bought[i].GetShares(&copy);
+
+	return cost_basis;
+}
+
+double StockNode::GetMarketValue(wxDateTime* T)
+{
+	if (!T)
+	{
+		wxMessageBox("wxDateTime* in StockNode::GetMarketValue is nullptr!");
+		return 0.0;
+	}
+
+	if (*T == wxDateTime::Today())
+		return this->current_Data.marketprice * this->m_GetShares(T) + this->GetDividendShares();
+
+	wxDateTime copy = *T;
+	GetWorkDate(copy);
+	return this->GetClosePrice(&copy) * this->m_GetShares(T) + this->GetDividendShares();
 }
 
 bool StockNode::m_Purchase(long& id, wxDateTime& date, double& price_per_share, double& shares)
@@ -669,6 +918,92 @@ void StockNode::ShareDivstoLastPurchase()
 	this->purchaseDateSwitch = false;
 }
 
+double StockNode::m_GetShares(wxDateTime* date)
+{
+	double shares = 0.0;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+		shares += this->bought[i].GetShares(date);
+
+	return shares;
+}
+
+wxDateTime StockNode::GetFirstDayOfTheWeekDate(wxDateTime* date)
+{
+	wxString s_date = date->Format(STANDARD_DATE);
+	if (date->GetWeekDay() == wxDateTime::WeekDay::Mon)
+		return *date;
+
+	wxDateTime T = *date;
+	while (T.GetWeekDay() != wxDateTime::WeekDay::Mon)
+	{
+		T = T - wxDateSpan(0, 0, 0, 1);
+	}
+
+	s_date = T.Format(STANDARD_DATE);
+	return T;
+}
+
+wxDateTime* StockNode::m_GetLatestCloseDate()
+{
+	return this->historical_prices.rbegin() != this->historical_prices.rend() ? &this->historical_prices.rbegin()->date : nullptr;
+}
+
+wxDateTime* StockNode::m_GetLatestDividendDate()
+{
+	wxDateTime* latest = nullptr;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		wxDateTime* temp = this->bought[i].GetLatestDivDate();
+		if ((latest && !latest->IsValid()) || !latest)
+			latest = temp;
+		else
+		{
+			if (temp && temp->IsValid())
+			{
+				if (*latest < *temp)
+					latest = temp;
+			}
+		}
+	}
+	return latest;
+}
+
+wxDateTime StockNode::GetInitalPurchaseDate()
+{
+	wxDateTime date(wxInvalidDateTime);
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		if (!date.IsValid() || date > this->bought[i].GetPurchaseDate())
+			date = this->bought[i].GetPurchaseDate();
+	}
+
+	return date;
+}
+
+wxDateTime* StockNode::m_FindDateInHistoricalPrices(wxDateTime& date)
+{
+	for (size_t i = 0; i < this->historical_prices.size(); ++i)
+	{
+		if (this->historical_prices[i].date == date)
+			return &this->historical_prices[i].date;
+	}
+
+	return nullptr;
+}
+
+wxDateTime* StockNode::m_FindDateInHistoricaDivs(wxDateTime& date)
+{
+	wxDateTime* div_date = nullptr;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		div_date = this->bought[i].GetDividendDates(date);
+		if (div_date)
+			return div_date;
+	}
+
+	return nullptr;
+}
+
 void StockNode::SetSummaryData(SummaryData sd)
 {
 	this->UpToDate = 0;
@@ -730,9 +1065,10 @@ void StockNode::SetHistoricalData(Day_Prices day)
 	else
 		this->historical_prices.insert(&this->historical_prices[i], day);
 }
-
+/*
 double StockNode::m_GetClosePrice(wxDateTime* date)
 {
+	wxString s_date = date->Format(STANDARD_DATE);
 	for (size_t i = 0; i < this->historical_prices.size(); ++i)
 	{
 		wxString fuckdate2 = this->historical_prices[i].date.Format(STANDARD_DATE);
@@ -761,31 +1097,6 @@ double StockNode::m_GetLatestClosePrice()
 	return this->historical_prices[size - 1].close;
 }
 
-wxDateTime* StockNode::m_GetLatestCloseDate()
-{
-	return this->historical_prices.rbegin() != this->historical_prices.rend() ? &this->historical_prices.rbegin()->date : nullptr;
-}
-
-wxDateTime* StockNode::m_GetLatestDividendDate()
-{
-	wxDateTime* latest = nullptr;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		wxDateTime* temp = this->bought[i].GetLatestDivDate();
-		if ((latest && !latest->IsValid()) || !latest)
-			latest = temp;
-		else
-		{
-			if (temp && temp->IsValid())
-			{
-				if (*latest < *temp)
-					latest = temp;
-			}
-		}
-	}
-	return latest;
-}
-
 double StockNode::m_GetForwardClosePrice(wxDateTime* T)
 {
 	wxString date = T->Format(STANDARD_DATE);
@@ -799,15 +1110,6 @@ double StockNode::m_GetForwardClosePrice(wxDateTime* T)
 	}
 	wxString something = date;
 	return 0.0;
-}
-
-double StockNode::m_GetShares(wxDateTime* date)
-{
-	double shares = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-		shares += this->bought[i].GetShares(date);
-
-	return shares;
 }
 
 double StockNode::m_GetPurchasePrice(wxDateTime* date)
@@ -987,66 +1289,6 @@ wxDateTime StockNode::m_GetStartDate(Returns r, wxDateTime* date)
 	return wxDateTime(wxInvalidDateTime);
 }
 
-wxDateTime StockNode::GetInitalPurchaseDate()
-{
-	wxDateTime date(wxInvalidDateTime);
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		if (!date.IsValid() || date > this->bought[i].GetPurchaseDate())
-			date = this->bought[i].GetPurchaseDate();
-	}
-
-	return date;
-}
-
-int StockNode::m_GetStartWeekDay(wxDateTime* T)
-{
-	if (!T)
-	{
-		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetStartWeekDay is nullptr!");
-		return 0;
-	}
-
-	if (!T->IsValid())
-	{
-		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetStartWeekDay is Invalid Date!");
-		return 0;
-	}
-
-	int day = T->GetDay();
-	int weekday = T->GetWeekDay();
-	switch (weekday)
-	{
-	case wxDateTime::WeekDay::Mon: return T->GetDayOfYear();
-	case wxDateTime::WeekDay::Tue: return T->GetDayOfYear() - 1;
-	case wxDateTime::WeekDay::Wed: return T->GetDayOfYear() - 2;
-	case wxDateTime::WeekDay::Thu: return T->GetDayOfYear() - 3;
-	case wxDateTime::WeekDay::Fri: return T->GetDayOfYear() - 4;
-	case wxDateTime::WeekDay::Sat: return T->GetDayOfYear() - 5;
-	case wxDateTime::WeekDay::Sun: return 0;
-	}
-
-	wxString wd = "";
-	wd << weekday;
-	wxFAIL_MSG("Weekday: " + wd + " matched no days in the switch statement in StockNode::m_GetStartWeekDay!");
-	return 0;
-}
-
-wxDateTime StockNode::GetFirstDayOfTheWeekDate(wxDateTime* date)
-{
-	wxString s_date = date->Format(STANDARD_DATE);
-	if (date->GetWeekDay() == wxDateTime::WeekDay::Mon)
-		return *date;
-
-	wxDateTime T = *date;
-	while (T.GetWeekDay() != wxDateTime::WeekDay::Mon)
-	{	
-		T = T - wxDateSpan(0, 0, 0, 1);
-	}
-
-	return T;
-}
-
 int StockNode::m_GetEndWeekDay(wxDateTime* T)
 {
 	if (!T)
@@ -1080,31 +1322,7 @@ int StockNode::m_GetEndWeekDay(wxDateTime* T)
 	wxFAIL_MSG("Weekday: " + wd + " matched no days in the switch statement in StockNode::m_GetEndWeekDay!");
 	return 0;
 }
-
-wxDateTime* StockNode::m_FindDateInHistoricalPrices(wxDateTime& date)
-{
-	for (size_t i = 0; i < this->historical_prices.size(); ++i)
-	{
-		if (this->historical_prices[i].date == date)
-			return &this->historical_prices[i].date;
-	}
-
-	return nullptr;
-}
-
-wxDateTime* StockNode::m_FindDateInHistoricaDivs(wxDateTime& date)
-{
-	wxDateTime* div_date = nullptr;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		div_date = this->bought[i].GetDividendDates(date);
-		if (div_date)
-			return div_date;
-	}
-
-	return nullptr;
-}
-
+*/
 // Sector Functions...
 
 Sector::Sector(_Sector s, wxDateTime* date, Portfolio* P) : id(s), m_parentclock(date), m_parent(P)

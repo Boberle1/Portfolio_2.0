@@ -58,8 +58,6 @@ wxString VirtualListView::GetItemValue(const ItemData* id, long index) const
 		return id->stock->GetTicker();
 	if (this->Col[index] == SHARES)
 		return wxNumberFormatter::ToString(id->stock->GetShares(), 2);
-	if (this->Col[index] == PRICE)
-		return wxNumberFormatter::ToString(id->stock->GetPrice(), 2);
 	if (this->Col[index] == COST_BASIS)
 		return "0.0";
 	if (this->Col[index] == TOTAL_VALUE)
@@ -192,39 +190,16 @@ GridNode::~GridNode()
 
 }
 
-bool GridNode::SetNewVal(double val, bool ispercent, bool iscolor)
-{
-	if (iscolor)
-	{
-		wxColour color;
-		if (val == 0.0)
-			this->SetForegroundColour(wxColour(187, 196, 14));
-		else if (val > 0.0)
-			this->SetForegroundColour(wxColour(13, 158, 20));
-		else
-			this->SetForegroundColour(wxColour(217, 7, 28));
-	}
-	this->d_val = val;
-	this->is_percent = ispercent;
-	wxString percent = is_percent ? "%" : "";
-	this->SetLabel(wxNumberFormatter::ToString(this->d_val, 2) + percent);
-	this->Refresh();
-	this->is_empty = false;
-	return true;
-}
-
-bool GridNode::SetNewVal(int i)
-{
-	this->int_val = i;
-	this->SetLabel(wxString::Format("%i", this->int_val));
-	this->Refresh();
-	this->is_empty = false;
-	return true;
-}
-
 bool GridNode::SetNewVal(wxString val)
 {
-	
+	int i = val.find('-');
+	if (i != -1)
+	{
+		this->SetForegroundColour(wxColour(217, 7, 28));
+	}
+	else 
+		this->SetForegroundColour(wxColour(13, 158, 20));
+
 	this->t_val = val;
 	this->SetLabel(val);
 	this->Refresh();
@@ -389,37 +364,6 @@ GridView::GridView(wxWindow* w, int cols) : wxGridSizer(cols), m_parent(w)
 GridView::~GridView()
 {
 	
-}
-
-void GridView::SetNewRow(wxString ticker, double shares, double price, double previo_close, double day_gain, double week_gain, 
-	double quarter_gain, double year_gain, double total_gain)
-{
-	size_t size = this->GetCols();
-	GridNode* first = this->GetFirstEmptyRow();
-	if (!first)
-		return;
-	for (size_t i = 0; i < size; ++i)
-	{
-		switch (i)
-		{
-		case 0: first->SetNewVal(ticker); break;
-		case 1: first->SetNewVal(shares, false, false); break;
-		case 2: first->SetNewVal(price, false, false); break;
-		case 3: first->SetNewVal(previo_close, false, false); break;
-		case 4: first->SetNewVal(day_gain, true, true); break;
-		case 5: first->SetNewVal(week_gain, true, true); break;
-		case 6: first->SetNewVal(quarter_gain, true, true); break;
-		case 7: first->SetNewVal(year_gain, true, true); break;
-		case 8: first->SetNewVal(total_gain, true, true); break;
-		}
-		
-		first = first->GetRight();
-		if (first)
-			continue;
-		else 
-			break;
-
-	}
 }
 
 void GridView::SetNewRow(StockViewerData* svd)
@@ -921,11 +865,11 @@ void mainwindow::CloseEvent(wxCloseEvent& evt)
 
 void mainwindow::OnThreadCompletion(wxThreadEvent& evt)
 {
-	wxVector<StockNode*> stn = this->port.GetStockNodeItems();
-	for (size_t i = 0; i < stn.size(); ++i)
-		this->grid_view->SetNewRow(stn[i]->GetTicker(), stn[i]->GetShares(), stn[i]->GetPrice(), stn[i]->GetPreviousClose(),
-			stn[i]->GetDayReturn(), stn[i]->GetWeekReturn(), stn[i]->GetQuarterReturn(), stn[i]->GetYearReturn(), stn[i]->GetTotalReturn(true));
-	this->Refresh();
+//	wxVector<StockNode*> stn = this->port.GetStockNodeItems();
+//	for (size_t i = 0; i < stn.size(); ++i)
+//		this->grid_view->SetNewRow(stn[i]->GetTicker(), stn[i]->GetShares(), stn[i]->GetPrice(), stn[i]->GetPreviousClose(),
+//			stn[i]->GetDayReturn(), stn[i]->GetWeekReturn(), stn[i]->GetQuarterReturn(), stn[i]->GetYearReturn(), stn[i]->GetTotalReturn(true));
+//	this->Refresh();
 }
 
 void mainwindow::ClosePanelEvent(wxCloseEvent& evt)

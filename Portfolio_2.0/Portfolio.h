@@ -208,7 +208,7 @@ struct StockViewerData
 	StockViewerData(wxString t, wxString e, wxString pd, double s, double pp, double p, double pc, double dg, double wg,
 		double qg, double yg, double tg, double cb, double mv, double td)
 		: ticker(t), earnings(e), purchase_date(pd), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
-		week_gain(wg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td) {}
+		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td) {}
 	wxString GetTicker() { return this->ticker; }
 	wxString GetEarningsDate() { return this->earnings; }
 	wxString GetPurchaseDate() { return this->purchase_date; }
@@ -253,9 +253,9 @@ public:
 	bool IdMatch(long&);
 	wxDateTime GetPurchaseDate();
 	// Gets the purchase price for the quarter...
-	double GetPurchasePrice(wxDateTime::Month, int);
+	double GetPurchasePrice(wxDateTime::Month, int, int);
 	// Gets the purchase price for the year...
-	double GetPurchasePrice(int);
+	double GetPurchasePrice(int, int);
 	// gets the purchase price for the week
 	double GetPurchasePrice(int, int, int);
 	// Gets the purchase price for the day...
@@ -328,8 +328,6 @@ public:
 	bool TickerMatch(wxString);
 	wxString GetTicker();
 	double GetShares();
-	double GetPrice();
-	double GetPreviousClose();
 	SummaryData GetSummaryData() { return this->current_Data; }
 	wxString GetNextEarningsDate();
 	bool IsActive();
@@ -347,13 +345,35 @@ public:
 
 private:
 	bool UpDate();
+	bool Historical_prices_UpToDate();
+	int m_GetStartWeekDay(wxDateTime*);
+	wxDateTime GetLatestMarketOpenDate();
+	double GetClosePrice(wxDateTime*);
+	double GetPreviousClose(wxDateTime*);
+	double GetEarliestWeekDayClose(wxDateTime*);
+	double GetQuarterStartClose(wxDateTime*);
+	wxDateTime GetQuarterStartDate(wxDateTime*);
+	double GetYearStartClose(wxDateTime*);
+	double GetDayCostBasis(wxDateTime*);
+	double GetWeekCostBasis(wxDateTime*);
+	double GetQuarterCostBasis(wxDateTime*);
+	double GetYearCostBasis(wxDateTime*);
+	double GetTotalCostBasis(wxDateTime*);
+	double GetMarketValue(wxDateTime*);
 	bool m_Purchase(long&, wxDateTime&, double&, double&);
 	bool m_Sell(long&, wxDateTime&, double&, double&, stock_node*);
 	stock_node* FindLot(long&);
 	Parser* NewParser();
 	void DeleteParser();
 	void ShareDivstoLastPurchase();
-
+	double m_GetShares(wxDateTime*);
+	wxDateTime GetFirstDayOfTheWeekDate(wxDateTime*);
+	wxDateTime* m_GetLatestCloseDate();
+	wxDateTime* m_GetLatestDividendDate();
+	wxDateTime GetInitalPurchaseDate();
+	wxDateTime* m_FindDateInHistoricalPrices(wxDateTime&);
+	wxDateTime* m_FindDateInHistoricaDivs(wxDateTime&);
+	/*
 	// This function will try to match the date in historical prices and return the close date if it does
 	// if it doesnt find a match it will go back to the last date that is less than the date passed as a paramater
 	// and return that close date...
@@ -379,11 +399,11 @@ private:
 	double m_GetCostPrice(Returns, wxDateTime*);
 	wxDateTime m_GetStartDate(Returns, wxDateTime*);
 	wxDateTime GetInitalPurchaseDate();
-	int m_GetStartWeekDay(wxDateTime*);
 	wxDateTime GetFirstDayOfTheWeekDate(wxDateTime*);
 	int m_GetEndWeekDay(wxDateTime*);
 	wxDateTime* m_FindDateInHistoricalPrices(wxDateTime&);
 	wxDateTime* m_FindDateInHistoricaDivs(wxDateTime&);
+	*/
 private:
 	wxVector<stock_node> bought;
 	wxVector<Day_Prices> historical_prices;
