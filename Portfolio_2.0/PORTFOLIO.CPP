@@ -87,16 +87,987 @@ wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month m)
 	return wxDateTime::Month::Inv_Month;
 }
 
-template <typename T>
-bool IsNull(T* t, wxString msg)
+wxString inline GetSectorName(_Sector sect)
 {
-	if (!t)
+	switch (sect)
 	{
-		wxFAIL_MSG(msg);
-		return false;
+	case _Sector::BOND: return "Bonds";
+	case _Sector::LARGECAP: return "Large Cap";
+	case _Sector::MIDCAP: return "Mid Cap";
+	case _Sector::SMALLCAP: return "Small Cap";
+	case _Sector::FOREIGN: return "Foreign";
+	case _Sector::TECH: return "Tech";
+	case _Sector::REIT: return "REIT";
+	case _Sector::CRYPTO: return "CRYPTO";
+	default: return "";
+	}
+}
+
+// ItemInfo functions...
+ItemInfo::ItemInfo(wxString marketcap, wxString daygain) : market_cap(marketcap)
+{
+	if (daygain.find('%') != -1)
+		daygain = daygain.Mid(0, daygain.size() - 1);
+
+	if (!daygain.ToDouble(&this->day_return))
+		wxMessageBox("ToDouble failed in ItemInfo::ItemInfow(wxString, wxString)! String was: " + daygain);
+}
+
+ItemInfo::ItemInfo(wxString& marketcap, wxString& daygain, SectorPerformance& sp) : market_cap(marketcap)
+{
+	if (daygain.find('%') != -1)
+		daygain = daygain.Mid(0, daygain.size() - 1);
+
+	if (!daygain.ToDouble(&this->day_return))
+		wxMessageBox("ToDouble failed in ItemInfo::ItemInfow(wxString, wxString)! String was: " + daygain);
+
+	this->_SetPerformance(sp);
+	this->AddDataToVec();
+}
+
+void ItemInfo::_SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+{
+	this->_SetOverViewData(m_cap, daygain);
+	this->_SetPerformance(sp);
+	this->AddDataToVec();
+}
+
+void ItemInfo::_SetOverViewData(wxString m_cap, wxString daygain)
+{
+	this->market_cap = m_cap;
+
+	if (daygain.find('%') != -1)
+		daygain = daygain.Mid(0, daygain.size() - 1);
+
+	if (!daygain.ToDouble(&this->day_return))
+		wxMessageBox("ToDouble failed in ItemInfo::SetOverViewData(wxString, wxString)! String was: " + daygain);
+}
+
+void ItemInfo::_SetPerformance(SectorPerformance& sp)
+{
+	this->week_return = sp.week;
+	this->month_return = sp.month;
+	this->quarter_return = sp.quarter;
+	this->half_year_return = sp.half;
+	this->year_return = sp.year;
+	this->YTD_return = sp.yearToDate;
+	this->date = sp.stamp;
+}
+
+void ItemInfo::_SetPerformance(SectorPerformance& sp, double& day, wxString& m_cap, double& m_price)
+{
+	this->week_return = sp.week;
+	this->month_return = sp.month;
+	this->quarter_return = sp.quarter;
+	this->half_year_return = sp.half;
+	this->year_return = sp.year;
+	this->YTD_return = sp.yearToDate;
+	this->date = sp.stamp;
+	this->day_return = day;
+	this->market_cap = m_cap;
+	this->price = m_price;
+}
+
+void ItemInfo::_SetTimeStamp(wxDateTime& d)
+{
+	this->date = d;
+}
+
+void ItemInfo::_Write(DataStream& ds)
+{
+	ds.WriteSectorDataVector(this->vec);
+}
+
+void ItemInfo::_Read(DataStream& ds)
+{
+	ds.ReadSectorDataVector(this->vec);
+}
+
+void ItemInfo::AddDataToVec()
+{
+	if (this->vec.size())
+	{
+		this->PushBack();
+		return;
 	}
 
-	return true;
+	SectorData* data = this->IsDuplicateDate();
+	if (data)
+	{
+		if (data->date < this->date)
+			this->Replace(data);
+	}
+	else
+		this->PushBack();
+}
+
+SectorData* ItemInfo::IsDuplicateDate()
+{
+	for (auto& v : this->vec)
+	{
+		if (IswxDateEqual(v.date, this->date))
+			return &v;
+	}
+
+	return NULL;
+}
+
+bool ItemInfo::Replace(SectorData* sd)
+{
+	*sd = SectorData(this->price, this->day_return, this->week_return, this->month_return,
+			this->quarter_return, this->half_year_return, this->YTD_return, this->year_return, this->market_cap, this->date);
+}
+
+void ItemInfo::PushBack()
+{
+	this->vec.push_back(SectorData(this->price, this->day_return, this->week_return, this->month_return,
+		this->quarter_return, this->half_year_return, this->YTD_return, this->year_return, this->market_cap, this->date));
+}
+
+// SubSector class functions...
+SubSector::SubSector(ParentSector* p) : ItemInfo("", "0.0"), m_parent(p)
+{
+
+}
+
+SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString name, wxString m_cap, wxString daygain) : ItemInfo(m_cap, daygain),
+	m_parent(p), ID(ss), sectorname(name)
+{
+
+}
+
+SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString name, wxString m_cap, wxString day_gain, SectorPerformance& sp) 
+	: ItemInfo(m_cap, day_gain, sp), m_parent(p), ID(ss), sectorname(name)
+{
+
+}
+
+void SubSector::SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+{
+	this->_SetAllData(m_cap, daygain, sp);
+}
+
+void SubSector::SetOverViewData(wxString m_cap, wxString daygain)
+{
+	this->_SetOverViewData(m_cap, daygain);
+}
+
+void SubSector::SetPerformance(SectorPerformance& sp)
+{
+	this->_SetPerformance(sp);
+}
+
+void SubSector::SetParent(ParentSector* p)
+{
+	this->m_parent = p;
+}
+
+_Sub_Sector SubSector::GetSubSecID()
+{
+	return this->ID;
+}
+
+void SubSector::Read(DataStream& ds)
+{
+	ds.Read(this->sectorname);
+	ds.ReadData(this->ID);
+	this->_Read(ds);
+}
+
+void SubSector::Write(DataStream& ds)
+{
+	ds.Write(this->sectorname);
+	ds.WriteData(ID);
+	this->_Write(ds);
+}
+
+// ParentSector class functions...
+ParentSector::ParentSector(SectorClass* parent) : ItemInfo("", "0.0"), m_parent(parent)
+{
+
+}
+
+ParentSector::ParentSector(SectorClass* parent, _Sector secid, wxString URL, wxString name) : ItemInfo("", "0.0"),
+	m_parent(parent), ID(secid), url(URL), sectorName(name)
+{
+	this->url.Replace(_PERFORMANCE, _INSERTION);
+	this->m_GetSubSectorData();
+}
+
+void ParentSector::SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+{
+	this->_SetAllData(m_cap, daygain, sp);
+}
+
+void ParentSector::SetOverViewData(wxString name, wxString m_cap, wxString daygain)
+{
+	this->sectorName = name;
+	this->_SetOverViewData(m_cap, daygain);
+}
+
+bool ParentSector::SetSubSectorOverviewData(_Sub_Sector s, wxString m_cap, wxString daygain)
+{
+	for (size_t i = 0; i < this->subsecs.size(); ++i)
+	{
+		if (subsecs[i].GetSubSecID() == s)
+		{
+			subsecs[i].SetOverViewData(m_cap, daygain);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ParentSector::SetSubSectorPerformance(SectorPerformance& sp)
+{
+	wxDateTime stamp = wxDateTime::Today();
+	for (size_t i = 0; i < this->subsecs.size(); ++i)
+	{
+		if (this->subsecs[i].GetSubSecID() == this->m_parent->GetSubSectorID(this->ID, sp.name))
+		{
+			this->subsecs[i].SetPerformance(sp);
+			return;
+		}
+	}
+
+	wxFAIL_MSG("ParentSector::SetSubSectorPerformance failed in finding a match in subsecs");
+}
+
+_Sector ParentSector::GetSectorId()
+{
+	return this->ID;
+}
+
+void ParentSector::Read(DataStream& ds)
+{
+	ds.Read(this->sectorName);
+	ds.Read(this->url);
+	ds.ReadData(this->ID);
+	this->_Read(ds);
+
+	size_t size;
+	ds.ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->subsecs.push_back(SubSector(this));
+		this->subsecs.rbegin()->Read(ds);
+	}	
+}
+
+void ParentSector::Write(DataStream& ds)
+{
+	ds.Write(this->sectorName);
+	ds.Write(this->url);
+	ds.WriteData(this->ID);
+	this->_Write(ds);
+
+	size_t size = this->subsecs.size();
+	ds.ReadData(size);
+	for (auto& v : this->subsecs)
+		v.Write(ds);
+}
+
+void ParentSector::m_GetSubSectorData()
+{
+	wxString temp = this->subsecurl;
+	wxString empty = "";
+	temp.Replace(_INSERTION, this->m_GetNameToInsert());
+	temp.Replace(_INSERT_TYPE, _OVERVIEW);
+	Parser parser(empty);
+	wxVector<SectorOverview> v;
+	parser.PullFinVizOverview(temp, v);
+
+	temp = this->subsecurl;
+	temp.Replace(_INSERTION, this->m_GetNameToInsert());
+	temp.Replace(_INSERT_TYPE, _PERFORMANCE);
+	wxVector<SectorPerformance> v2;
+	parser.PullFinVizPerformance(temp, v2);
+
+	for (size_t i = 0; i < v.size(); ++i)
+		this->subsecs.push_back(SubSector(this, this->m_parent->GetSubSectorID(this->ID, v[i].name), v[i].name, v[i]._market_cap, v[i]._change));
+
+	for (auto& v_2 : v2)
+		this->SetSubSectorPerformance(v_2);
+}
+
+void ParentSector::m_GetSubSectorPerformance()
+{
+	wxString temp = this->subsecurl;
+	wxString empty = "";
+	temp.Replace(_INSERTION, this->m_GetNameToInsert());
+	temp.Replace(_INSERT_TYPE, _PERFORMANCE);
+	Parser parser(empty);
+	wxVector<SectorPerformance> v;
+	parser.PullFinVizPerformance(temp, v);
+
+	for (size_t i = 0; i < v.size(); ++i)
+		this->SetSubSectorPerformance(v[i]);
+}
+
+wxString ParentSector::m_GetNameToInsert()
+{
+	switch (this->ID)
+	{
+	case _Sector::COMMUNICATION_SERVICES: return _cOMMUNICATION_SERVICES;
+	case _Sector::CONSUMER_DESCRETIONARY: return _cONSUMER_DESCRETIONARY;
+	case _Sector::CONSUMER_STAPLES: return _cONSUMER_STAPLES;
+	case _Sector::ENERGY: return _eNERGY;
+	case _Sector::FINANCIALS: return _fINANCIAL;
+	case _Sector::HEALTH_CARE: return _hEALTH_CARE;
+	case _Sector::INDUSTRIALS: return _iNDUSTRIALS;
+	case _Sector::INFORMATION_TECHNOLOGY: return _tECHNOLOGY;
+	case _Sector::UTILITIES: return _uTILITIES;
+	case _Sector::MATERIALS: return _bASIC_MATERIALS;
+	case _Sector::REAL_ESTATE: return _rEAL_ESTATE;
+	default:
+	{
+		wxMessageBox("Sector id does not match anything in switch statement in SubSector::m_GetNameToInsert");
+		return "";
+	}
+	}
+}
+
+// SectorClass functions...
+SectorClass::SectorClass()
+{
+
+}
+
+void SectorClass::ActivateData()
+{
+	this->sec.push_back(BOND);
+	this->_sec.push_back(_BONDS);
+	this->sec.push_back(REIT);
+	this->_sec.push_back(_REIT);
+	this->sec.push_back(SMALLCAP);
+	this->_sec.push_back(_SMALLCAP);
+	this->sec.push_back(MIDCAP);
+	this->_sec.push_back(_MIDCAP);
+	this->sec.push_back(LARGECAP);
+	this->_sec.push_back(_LARGECAP);
+	this->sec.push_back(TECH);
+	this->_sec.push_back(_TECH);
+	this->sec.push_back(CRYPTO);
+	this->_sec.push_back(_CRYPTO);
+	this->sec.push_back(FOREIGN);
+	this->_sec.push_back(_FOREIGN);
+	this->sec.push_back(COMMUNICATION_SERVICES);
+	this->_sec.push_back(_COMMUNICATION_SERVICES);
+	this->sec.push_back(CONSUMER_DESCRETIONARY);
+	this->_sec.push_back(_CONSUMER_DESCRETIONARY_ALTERNATE);
+	this->sec.push_back(CONSUMER_STAPLES);
+	this->_sec.push_back(_CONSUMER_STAPLES_ALTERNATE);
+	this->sec.push_back(ENERGY);
+	this->_sec.push_back(_ENERGY);
+	this->sec.push_back(FINANCIALS);
+	this->_sec.push_back(_FINANCIALS);
+	this->sec.push_back(HEALTH_CARE);
+	this->_sec.push_back(_HEALTH_CARE);
+	this->sec.push_back(INDUSTRIALS);
+	this->_sec.push_back(_INDUSTRIALS);
+	this->sec.push_back(INFORMATION_TECHNOLOGY);
+	this->_sec.push_back(_INFORMATION_TECHNOLOGY);
+	this->sec.push_back(MATERIALS);
+	this->_sec.push_back(_MATERIALS);
+	this->sec.push_back(REAL_ESTATE);
+	this->_sec.push_back(_REAL_ESTATE);
+	this->sec.push_back(UTILITIES);
+	this->_sec.push_back(_UTILITIES);
+	this->sec.push_back(SECTOR_INVALID);
+	this->_sec.push_back(_SECTOR_INVALID);
+
+	this->communication_services.push_back(ADVERTISING_AGENCIES);
+	this->_communication_services.push_back(_ADVERTISING_AGENCIES);
+	this->communication_services.push_back(BRODCASTING);
+	this->_communication_services.push_back(_BRODCASTING);
+	this->communication_services.push_back(ELECTRONIC_GAMING_AND_MULTIMEDIA);
+	this->_communication_services.push_back(_ELECTRONIC_GAMING_AND_MULTIMEDIA);
+	this->communication_services.push_back(ENTERTAINMENT);
+	this->_communication_services.push_back(_ENTERTAINMENT);
+	this->communication_services.push_back(INTERNET_CONTENT_AND_CREATION);
+	this->_communication_services.push_back(_INTERNET_CONTENT_AND_CREATION);
+	this->communication_services.push_back(PUBLISHING);
+	this->_communication_services.push_back(_PUBLISHING);
+	this->communication_services.push_back(TELECOM_SERVICES);
+	this->_communication_services.push_back(_TELECOM_SERVICES);
+
+	this->consumer_discretionary.push_back(APPAREL_MANUFACTURING);
+	this->_consumer_discretionary.push_back(_APPAREL_MANUFACTURING);
+	this->consumer_discretionary.push_back(APPAREL_RETAIL);
+	this->_consumer_discretionary.push_back(_APPAREL_RETAIL);
+	this->consumer_discretionary.push_back(AUTO_TRUCK_AND_DEALERSHIPS);
+	this->_consumer_discretionary.push_back(_AUTO_TRUCK_AND_DEALERSHIPS);
+	this->consumer_discretionary.push_back(AUTO_MANUFACTURERS);
+	this->_consumer_discretionary.push_back(_AUTO_MANUFACTURERS);
+	this->consumer_discretionary.push_back(AUTO_PARTS);
+	this->_consumer_discretionary.push_back(_AUTO_PARTS);
+	this->consumer_discretionary.push_back(DEPARTMENT_STORES);
+	this->_consumer_discretionary.push_back(_DEPARTMENT_STORES);
+	this->consumer_discretionary.push_back(FOOTWEAR_AND_ACCESSORIES);
+	this->_consumer_discretionary.push_back(_FOOTWEAR_AND_ACCESSORIES);
+	this->consumer_discretionary.push_back(FURNISHIN_FIXTURES_AND_APPLIANCES);
+	this->_consumer_discretionary.push_back(_FURNISHIN_FIXTURES_AND_APPLIANCES);
+	this->consumer_discretionary.push_back(GAMBLING);
+	this->_consumer_discretionary.push_back(_GAMBLING);
+	this->consumer_discretionary.push_back(HOME_IMPROVMENT_RETAIL);
+	this->_consumer_discretionary.push_back(_HOME_IMPROVMENT_RETAIL);
+	this->consumer_discretionary.push_back(INTERNET_RETAIL);
+	this->_consumer_discretionary.push_back(_INTERNET_RETAIL);
+	this->consumer_discretionary.push_back(LEISURE);
+	this->_consumer_discretionary.push_back(_LEISURE);
+	this->consumer_discretionary.push_back(LODGING);
+	this->_consumer_discretionary.push_back(_LODGING);
+	this->consumer_discretionary.push_back(LUXURY_GOODS);
+	this->_consumer_discretionary.push_back(_LUXURY_GOODS);
+	this->consumer_discretionary.push_back(PACKAGING_AND_CONTAINERS);
+	this->_consumer_discretionary.push_back(_PACKAGING_AND_CONTAINERS);
+	this->consumer_discretionary.push_back(PERSONAL_SERVICES);
+	this->_consumer_discretionary.push_back(_PERSONAL_SERVICES);
+	this->consumer_discretionary.push_back(RECREATIONAL_VEHICLES);
+	this->_consumer_discretionary.push_back(_RECREATIONAL_VEHICLES);
+	this->consumer_discretionary.push_back(RESIDENTIAL_CONSTRUCTION);
+	this->_consumer_discretionary.push_back(_RESIDENTIAL_CONSTRUCTION);
+	this->consumer_discretionary.push_back(RESORTS_AND_CASINOS);
+	this->_consumer_discretionary.push_back(_RESORTS_AND_CASINOS);
+	this->consumer_discretionary.push_back(RESTAURANTS);
+	this->_consumer_discretionary.push_back(_RESTAURANTS);
+	this->consumer_discretionary.push_back(SPECIALTY_RETAIL);
+	this->_consumer_discretionary.push_back(_SPECIALTY_RETAIL);
+	this->consumer_discretionary.push_back(TEXTILE_MANUFACTURING);
+	this->_consumer_discretionary.push_back(_TEXTILE_MANUFACTURING);
+	this->consumer_discretionary.push_back(TRAVEL_SERVICES);
+	this->_consumer_discretionary.push_back(_TRAVEL_SERVICES);
+
+	this->consumer_staples.push_back(BEVERAGES_BREWERS);
+	this->_consumer_staples.push_back(_BEVERAGES_BREWERS);
+	this->consumer_staples.push_back(BEVERAGES_NON_ALCOHOLIC);
+	this->_consumer_staples.push_back(_BEVERAGES_NON_ALCOHOLIC);
+	this->consumer_staples.push_back(BEVERAGES_WINERIES_AND_DESTILLERIES);
+	this->_consumer_staples.push_back(_BEVERAGES_WINERIES_AND_DESTILLERIES);
+	this->consumer_staples.push_back(CONFECTIONERS);
+	this->_consumer_staples.push_back(_CONFECTIONERS);
+	this->consumer_staples.push_back(DISCOUNT_STORES);
+	this->_consumer_staples.push_back(_DISCOUNT_STORES);
+	this->consumer_staples.push_back(EDUCATION_AND_TRAINING_SERVICES);
+	this->_consumer_staples.push_back(_EDUCATION_AND_TRAINING_SERVICES);
+	this->consumer_staples.push_back(FARM_PRODUCTS);
+	this->_consumer_staples.push_back(_FARM_PRODUCTS);
+	this->consumer_staples.push_back(FOOD_DISTRIBUTION);
+	this->_consumer_staples.push_back(_FOOD_DISTRIBUTION);
+	this->consumer_staples.push_back(GROCERY_STORES);
+	this->_consumer_staples.push_back(_GROCERY_STORES);
+	this->consumer_staples.push_back(HOUSEHOLD_AND_PERSONAL_PRODUCTS);
+	this->_consumer_staples.push_back(_HOUSEHOLD_AND_PERSONAL_PRODUCTS);
+	this->consumer_staples.push_back(PACKEDGED_FOODS);
+	this->_consumer_staples.push_back(_PACKEDGED_FOODS);
+	this->consumer_staples.push_back(TOBACCO);
+	this->_consumer_staples.push_back(_TOBACCO);
+
+	this->energy.push_back(OIL_AND_GAS_DRILLING);
+	this->_energy.push_back(_OIL_AND_GAS_DRILLING);
+	this->energy.push_back(OIL_AND_GAS_E_AND_P);
+	this->_energy.push_back(_OIL_AND_GAS_E_AND_P);
+	this->energy.push_back(OIL_AND_GAS_EQUIPMENT_AND_SERVICES);
+	this->_energy.push_back(_OIL_AND_GAS_EQUIPMENT_AND_SERVICES);
+	this->energy.push_back(OIL_AND_GAS_INTEGRATED);
+	this->_energy.push_back(_OIL_AND_GAS_INTEGRATED);
+	this->energy.push_back(OIL_AND_GAS_MIDSTREAM);
+	this->_energy.push_back(_OIL_AND_GAS_MIDSTREAM);
+	this->energy.push_back(OIL_AND_GAS_REFINING_AND_MARKETING);
+	this->_energy.push_back(_OIL_AND_GAS_REFINING_AND_MARKETING);
+	this->energy.push_back(THERMAL_COAL);
+	this->_energy.push_back(_THERMAL_COAL);
+	this->energy.push_back(URANIUM);
+	this->_energy.push_back(_URANIUM);
+
+	this->financials.push_back(ASSET_MANAGEMENT);
+	this->_financials.push_back(_ASSET_MANAGEMENT);
+	this->financials.push_back(BANKS_DIVERSIFIED);
+	this->_financials.push_back(_BANKS_DIVERSIFIED);
+	this->financials.push_back(BANKS_REGIONAL);
+	this->_financials.push_back(_BANKS_REGIONAL);
+	this->financials.push_back(CAPITAL_MARKETS);
+	this->_financials.push_back(_CAPITAL_MARKETS);
+	this->financials.push_back(CREDIT_SERVICES);
+	this->_financials.push_back(_CREDIT_SERVICES);
+	this->financials.push_back(FINANCIAL_CONGLOMERATES);
+	this->_financials.push_back(_FINANCIAL_CONGLOMERATES);
+	this->financials.push_back(FINANCIAL_DATA_AND_STOCK_EXCHANGES);
+	this->_financials.push_back(_FINANCIAL_DATA_AND_STOCK_EXCHANGES);
+	this->financials.push_back(INSURANCE_DIVERSIFIED);
+	this->_financials.push_back(_INSURANCE_DIVERSIFIED);
+	this->financials.push_back(INSURANCE_LIFE);
+	this->_financials.push_back(_INSURANCE_LIFE);
+	this->financials.push_back(INSURANCE_PROPERTY_AND_CASUALTY);
+	this->_financials.push_back(_INSURANCE_PROPERTY_AND_CASUALTY);
+	this->financials.push_back(INSURANCE_REINSURANCE);
+	this->_financials.push_back(_INSURANCE_REINSURANCE);
+	this->financials.push_back(INSURANCE_SPECIALTY);
+	this->_financials.push_back(_INSURANCE_SPECIALTY);
+	this->financials.push_back(INSURANCE_BROKERS);
+	this->_financials.push_back(_INSURANCE_BROKERS);
+	this->financials.push_back(MORTGAGE_FINANCE);
+	this->_financials.push_back(_MORTGAGE_FINANCE);
+	this->financials.push_back(SHELL_COMPANIES);
+	this->_financials.push_back(_SHELL_COMPANIES);
+
+	this->health_care.push_back(BIOTECHNOLOGY);
+	this->_health_care.push_back(_BIOTECHNOLOGY);
+	this->health_care.push_back(DIAGNOSTICS_AND_RESEARCH);
+	this->_health_care.push_back(_DIAGNOSTICS_AND_RESEARCH);
+	this->health_care.push_back(DRUG_MANUFACTURES_GENERAL);
+	this->_health_care.push_back(_DRUG_MANUFACTURES_GENERAL);
+	this->health_care.push_back(DRUG_MANUFACTURES_SPECIALTY_AND_GENERIC);
+	this->_health_care.push_back(_DRUG_MANUFACTURES_SPECIALTY_AND_GENERIC);
+	this->health_care.push_back(HEALTH_INFORMATION_AND_SERVICES);
+	this->_health_care.push_back(_HEALTH_INFORMATION_AND_SERVICES);
+	this->health_care.push_back(HEALTH_CARE_PLANS);
+	this->_health_care.push_back(_HEALTH_CARE_PLANS);
+	this->health_care.push_back(MEDICAL_CARE_FACILITIES);
+	this->_health_care.push_back(_MEDICAL_CARE_FACILITIES);
+	this->health_care.push_back(MEDICAL_DEVICES);
+	this->_health_care.push_back(_MEDICAL_DEVICES);
+	this->health_care.push_back(MEDICAL_DISTRIBUTION);
+	this->_health_care.push_back(_MEDICAL_DISTRIBUTION);
+	this->health_care.push_back(MEDICAL_INSTRUMENTS_AND_SUPPLIES);
+	this->_health_care.push_back(_MEDICAL_INSTRUMENTS_AND_SUPPLIES);
+	this->health_care.push_back(PHARMECUTICALS_RETAILERS);
+	this->_health_care.push_back(_PHARMECUTICALS_RETAILERS);
+
+	this->industrials.push_back(AEROSPACE_AND_DEFENSE);
+	this->_industrials.push_back(_AEROSPACE_AND_DEFENSE);
+	this->industrials.push_back(AIRPORTS_AND_SERVICES);
+	this->_industrials.push_back(_AIRPORTS_AND_SERVICES);
+	this->industrials.push_back(AIRLINES);
+	this->_industrials.push_back(_AIRLINES);
+	this->industrials.push_back(BUILDING_PRODUCTS_AND_EQUIPMENT);
+	this->_industrials.push_back(_BUILDING_PRODUCTS_ANDE_EQUIPMENT);
+	this->industrials.push_back(BUSINESS_EQUIPMENT_AND_SUPPLIES);
+	this->_industrials.push_back(_BUSINESS_EQUIPMENT_AND_SUPPLIES);
+	this->industrials.push_back(CONGLOMERATES);
+	this->_industrials.push_back(_CONGLOMERATES);
+	this->industrials.push_back(CONSULTING_SERVICES);
+	this->_industrials.push_back(_CONSULTING_SERVICES);
+	this->industrials.push_back(ELECTRICAL_EQUIPMENT_AND_PARTS);
+	this->_industrials.push_back(_ELECTRICAL_EQUIPMENT_AND_PARTS);
+	this->industrials.push_back(ENGINEERING_AND_CONSTRUCTION);
+	this->_industrials.push_back(_ENGINEERING_AND_CONSTRUCTION);
+	this->industrials.push_back(INDUSTRIAL_DISTRIBUTION);
+	this->_industrials.push_back(_INDUSTRIAL_DISTRIBUTION);
+	this->industrials.push_back(FARM_AND_HEAVY_CONSTRUCTION_MACHINERY);
+	this->_industrials.push_back(_FARM_AND_HEAVY_CONSTRUCTION_MACHINERY);
+	this->industrials.push_back(INTEGRATED_FREIGHT_AND_LOGISTICS);
+	this->_industrials.push_back(_INTEGRATED_FREIGHT_AND_LOGISTICS);
+	this->industrials.push_back(MARINE_SHIPPING);
+	this->_industrials.push_back(_MARINE_SHIPPING);
+	this->industrials.push_back(METAL_FABRICATION);
+	this->_industrials.push_back(_METAL_FABRICATION);
+	this->industrials.push_back(POLLUTION_AND_TREATMENT_CONTROLS);
+	this->_industrials.push_back(_POLLUTION_AND_TREATMENT_CONTROLS);
+	this->industrials.push_back(RAILROADS);
+	this->_industrials.push_back(_RAILROADS);
+	this->industrials.push_back(RENTAL_AND_LEASING_SERVICES);
+	this->_industrials.push_back(_RENTAL_AND_LEASING_SERVICES);
+	this->industrials.push_back(SECURITY_AND_PROTECTION_SERVICES);
+	this->_industrials.push_back(_SECURITY_AND_PROTECTION_SERVICES);
+	this->industrials.push_back(SPECIALTY_BUSINESS_SERVICES);
+	this->_industrials.push_back(_SPECIALTY_BUSINESS_SERVICES);
+	this->industrials.push_back(SPECIALTY_INDUSTRIAL_MACHINERY);
+	this->_industrials.push_back(_SPECIALTY_INDUSTRIAL_MACHINERY);
+	this->industrials.push_back(STAFFING_AND_EMPLOYMENT_SERVICES);
+	this->_industrials.push_back(_STAFFING_AND_EMPLOYMENT_SERVICES);
+	this->industrials.push_back(TOOLS_AND_ACCESSORIES);
+	this->_industrials.push_back(_TOOLS_AND_ACCESSORIES);
+	this->industrials.push_back(TRUCKING);
+	this->_industrials.push_back(_TRUCKING);
+	this->industrials.push_back(WASTE_MANAGEMENT);
+	this->_industrials.push_back(_WASTE_MANAGEMENT);
+
+	this->information_technology.push_back(COMMUNICATIONS_EQUIPMENT);
+	this->_information_technology.push_back(_COMMUNICATIONS_EQUIPMENT);
+	this->information_technology.push_back(COMPUTER_HARDWARE);
+	this->_information_technology.push_back(_COMPUTER_HARDWARE);
+	this->information_technology.push_back(CONSUMER_ELECTRONICS);
+	this->_information_technology.push_back(_CONSUMER_ELECTRONICS);
+	this->information_technology.push_back(ELECTRONIC_COMPONENTS);
+	this->_information_technology.push_back(_ELECTRONIC_COMPONENTS);
+	this->information_technology.push_back(ELECTRONICS_AND_COMPUTER_DISTRIBUTION);
+	this->_information_technology.push_back(_ELECTRONICS_AND_COMPUTER_DISTRIBUTION);
+	this->information_technology.push_back(INFORMATION_TECHNOLOGY_SERVICES);
+	this->_information_technology.push_back(_INFORMATION_TECHNOLOGY_SERVICES);
+
+	this->information_technology.push_back(SCIENTIFIC_AND_TECHNICAL_INSTRUMENTS);
+	this->_information_technology.push_back(_SCIENTIFIC_AND_TECHNICAL_INSTRUMENTS);
+	this->information_technology.push_back(SEMICONDUCTOR_EQUIPMENT_AND_MATERIALS);
+	this->_information_technology.push_back(_SEMICONDUCTOR_EQUIPMENT_AND_MATERIALS);
+	this->information_technology.push_back(SEMICONDUCTORS);
+	this->_information_technology.push_back(_SEMICONDUCTORS);
+	this->information_technology.push_back(SOFTWARE_APPLICATION);
+	this->_information_technology.push_back(_SOFTWARE_APPLICATION);
+	this->information_technology.push_back(SOFTWARE_INFRASTRUCTURE);
+	this->_information_technology.push_back(_SOFTWARE_INFRASTRUCTURE);
+	this->information_technology.push_back(SOLAR);
+	this->_information_technology.push_back(_SOLAR);
+
+	this->materials.push_back(AGRICULTURE_INPUTS);
+	this->_materials.push_back(_AGRICULTURE_INPUTS);
+	this->materials.push_back(ALUMINUM);
+	this->_materials.push_back(_ALUMINUM);
+	this->materials.push_back(BUILDING_MATERIALS);
+	this->_materials.push_back(_BUILDING_MATERIALS);
+	this->materials.push_back(CHEMICALS);
+	this->_materials.push_back(_CHEMICALS);
+	this->materials.push_back(COKING_COAL);
+	this->_materials.push_back(_COKING_COAL);
+	this->materials.push_back(COPPER);
+	this->_materials.push_back(_COPPER);
+	this->materials.push_back(GOLD);
+	this->_materials.push_back(_GOLD);
+	this->materials.push_back(LUMBER_AND_WOOD_PRODUCTION);
+	this->_materials.push_back(_LUMBER_AND_WOOD_PRODUCTION);
+	this->materials.push_back(OTHER_INDUSTRIAL_METALS_AND_MINING);
+	this->_materials.push_back(_OTHER_INDUSTRIAL_METALS_AND_MINING);
+	this->materials.push_back(OTHER_PRECIOUS_METALS_AND_MINING);
+	this->_materials.push_back(_OTHER_PRECIOUS_METALS_AND_MINING);
+	this->materials.push_back(PAPER_AND_PAPER_PRODUCTS);
+	this->_materials.push_back(_PAPER_AND_PAPER_PRODUCTS);
+	this->materials.push_back(SILVER);
+	this->_materials.push_back(_SILVER);
+	this->materials.push_back(SPECIALTY_CHEMICALS);
+	this->_materials.push_back(_SPECIALTY_CHEMICALS);
+	this->materials.push_back(STEEL);
+	this->_materials.push_back(_STEEL);
+
+	this->real_estate.push_back(REAL_ESTATE_DEVELOPMENT);
+	this->_real_estate.push_back(_REAL_ESTATE_DEVELOPMENT);
+	this->real_estate.push_back(REAL_ESTATE_DIVERSIFIED);
+	this->_real_estate.push_back(_REAL_ESTATE_DIVERSIFIED);
+
+	this->real_estate.push_back(REAL_ESTATE_SERVICES);
+	this->_real_estate.push_back(_REAL_ESTATE_SERVICES);
+	this->real_estate.push_back(REIT_DIVERSIFIED);
+	this->_real_estate.push_back(_REIT_DIVERSIFIED);
+	this->real_estate.push_back(REIT_HEALTH_CARE_FACILITIES);
+	this->_real_estate.push_back(_REIT_HEALTH_CARE_FACILITIES);
+	this->real_estate.push_back(REIT_HOTEL_AND_MOTEL);
+	this->_real_estate.push_back(_REIT_HOTEL_AND_MOTEL);
+	this->real_estate.push_back(REIT_INDUSTRIAL);
+	this->_real_estate.push_back(_REIT_INDUSTRIAL);
+	this->real_estate.push_back(REIT_MORTGAGE);
+	this->_real_estate.push_back(_REIT_MORTGAGE);
+	this->real_estate.push_back(REIT_OFFICE);
+	this->_real_estate.push_back(_REIT_OFFICE);
+	this->real_estate.push_back(REIT_RESIDENTIAL);
+	this->_real_estate.push_back(_REIT_RESIDENTIAL);
+	this->real_estate.push_back(REIT_RETAIL);
+	this->_real_estate.push_back(_REIT_RETAIL);
+	this->real_estate.push_back(REAL_ESTATE_DIVERSIFIED);
+	this->_real_estate.push_back(_REIT_SPECIALTY);
+
+	this->utilities.push_back(UTILITIES_DIVERSIFIED);
+	this->_utilities.push_back(_UTILITIES_DIVERSIFIED);
+	this->utilities.push_back(UTILITIES_INDEPENDENT_POWER_PRODUCERS);
+	this->_utilities.push_back(_UTILITIES_INDEPENDENT_POWER_PRODUCERS);
+	this->utilities.push_back(UTITLITIES_REGULATED_ELECTRIC);
+	this->_utilities.push_back(_UTITLITIES_REGULATED_ELECTRIC);
+	this->utilities.push_back(UTITLITIES_REGULATED_GAS);
+	this->_utilities.push_back(_UTITLITIES_REGULATED_GAS);
+	this->utilities.push_back(UTITLITIES_REGULATED_WATER);
+	this->_utilities.push_back(_UTITLITIES_REGULATED_WATER);
+	this->utilities.push_back(UTITLITIES_RENEWABLE);
+	this->_utilities.push_back(_UTITLITIES_RENEWABLE);
+
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=communicationservices&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=consumercyclical&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=consumerdefensive&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=energy&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=financial&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=healthcare&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=industrials&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=technology&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=basicmaterials&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=realestate&v=140&o=name");
+	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=utilities&v=140&o=name");
+
+	for (size_t i = 8; i < this->sec.size() - 1; ++i)
+		this->parentsector.push_back(ParentSector(this, this->sec[i], this->m_GetURL(this->sec[i]), this->_sec[i]));
+
+	this->m_FetchSectorData();
+}
+
+wxString SectorClass::GetSectorString(_Sector s)
+{
+	for (size_t i = 0; i < this->sec.size(); ++i)
+	{
+		if (this->sec[i] == s)
+			return this->_sec[i];
+	}
+
+	wxMessageBox("Could not find a match in SectorClass::GetSectorString! Returning Invalid Sector!");
+	return _SECTOR_INVALID;
+}
+
+wxString SectorClass::GetSubSectorString(_Sector s, _Sub_Sector sub)
+{
+	switch(s)
+	{
+	case _Sector::BOND: return _ETF;
+	case _Sector::SMALLCAP: return _ETF;
+	case _Sector::MIDCAP: return _ETF;
+	case _Sector::LARGECAP: return _ETF;
+	case _Sector::TECH: return _ETF;
+	case _Sector::FOREIGN: return _ETF;
+	case _Sector::CRYPTO: return _ETF;
+	case _Sector::COMMUNICATION_SERVICES: return this->m_GetSubSector(this->communication_services, this->_communication_services, sub);
+	case _Sector::CONSUMER_DESCRETIONARY: return this->m_GetSubSector(this->consumer_discretionary, this->_consumer_discretionary, sub);
+	case _Sector::CONSUMER_STAPLES: return this->m_GetSubSector(this->consumer_staples, this->_consumer_staples, sub);
+	case _Sector::ENERGY: return this->m_GetSubSector(this->energy, this->_energy, sub);
+	case _Sector::FINANCIALS: return this->m_GetSubSector(this->financials, this->_financials, sub);
+	case _Sector::HEALTH_CARE: return this->m_GetSubSector(this->health_care, this->_health_care, sub);
+	case _Sector::INDUSTRIALS: return this->m_GetSubSector(this->industrials, this->_industrials, sub);
+	case _Sector::INFORMATION_TECHNOLOGY: return this->m_GetSubSector(this->information_technology, this->_information_technology, sub);
+	case _Sector::MATERIALS: return this->m_GetSubSector(this->materials, this->_materials, sub);
+	case _Sector::REAL_ESTATE: return this->m_GetSubSector(this->real_estate, this->_real_estate, sub);
+	case _Sector::REIT: return _ETF;
+	case _Sector::SECTOR_INVALID: return _SECTOR_INVALID;
+	case _Sector::UTILITIES: return this->m_GetSubSector(this->utilities, this->_utilities, sub);
+	}
+
+	wxFAIL_MSG("Switch failed in SectorClass::GetSubSector! Returning empty string");
+	return "";
+}
+
+_Sector SectorClass::GetSectorID(wxString s)
+{
+	for (size_t i = 0; i < this->sec.size(); ++i)
+	{
+		if (this->_sec[i] == s)
+			return this->sec[i];
+	}
+
+	wxFAIL_MSG("wxString sent to SectorClass::GetSectorID has not match! String was: " + s);
+	return SECTOR_INVALID;
+}
+
+_Sub_Sector SectorClass::GetSubSectorID(_Sector id, wxString sub)
+{
+	switch (id)
+	{
+	case _Sector::BOND: return ETF;
+	case _Sector::SMALLCAP: return ETF;
+	case _Sector::MIDCAP: return ETF;
+	case _Sector::LARGECAP: return ETF;
+	case _Sector::TECH: return ETF;
+	case _Sector::FOREIGN: return ETF;
+	case _Sector::CRYPTO: return ETF;
+	case _Sector::COMMUNICATION_SERVICES: return this->m_GetSubSectorID(this->_communication_services, this->communication_services, sub);
+	case _Sector::CONSUMER_DESCRETIONARY: return this->m_GetSubSectorID(this->_consumer_discretionary, this->consumer_discretionary, sub);
+	case _Sector::CONSUMER_STAPLES: return this->m_GetSubSectorID(this->_consumer_staples, this->consumer_staples, sub);
+	case _Sector::ENERGY: return this->m_GetSubSectorID(this->_energy, this->energy, sub);
+	case _Sector::FINANCIALS: return this->m_GetSubSectorID(this->_financials, this->financials, sub);
+	case _Sector::HEALTH_CARE: return this->m_GetSubSectorID(this->_health_care, this->health_care, sub);
+	case _Sector::INDUSTRIALS: return this->m_GetSubSectorID(this->_industrials, this->industrials, sub);
+	case _Sector::INFORMATION_TECHNOLOGY: return this->m_GetSubSectorID(this->_information_technology, this->information_technology, sub);
+	case _Sector::MATERIALS: return this->m_GetSubSectorID(this->_materials, this->materials, sub);
+	case _Sector::REAL_ESTATE: return this->m_GetSubSectorID(this->_real_estate, this->real_estate, sub);
+	case _Sector::REIT: return ETF;
+	case _Sector::SECTOR_INVALID: return SUB_SECTOR_INVALID;
+	case _Sector::UTILITIES: return this->m_GetSubSectorID(this->_utilities, this->utilities, sub);
+	}
+
+	wxFAIL_MSG("Switch failed in SectorClass::m_GetSubSectorID! Returning SUB_SECTOR_INVALID");
+	return SUB_SECTOR_INVALID;
+}
+
+const wxVector<_Sub_Sector>* SectorClass::GetSubSector(_Sector s)
+{
+	return &this->m_GetSubSectorVec(s);
+}
+
+const wxVector<wxString>* SectorClass::GetSubSectorString(_Sector s)
+{
+	return &this->m_GetSubSectorStringVec(s);
+}
+
+const wxVector<_Sector>* SectorClass::GetSector()
+{
+	return &this->sec;
+}
+
+const wxVector<wxString>* SectorClass::GetSectorString()
+{
+	return &this->_sec;
+}
+
+const ParentSector* SectorClass::GetSector(_Sector s)
+{
+	for (size_t i = 0; i < this->parentsector.size(); ++i)
+	{
+		if (this->parentsector[i].GetSectorId() == s)
+			return &this->parentsector[i];
+	}
+
+	return nullptr;
+}
+
+void SectorClass::Read()
+{
+	DataStream ds("SavedFiles/SectorClass.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+	{
+		wxFAIL_MSG("Could not read from: SavedFiles/SectorClass.bin! It does not exist! In SectorClass::Read");
+		return;
+	}
+
+	size_t size;
+	ds.ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->parentsector.push_back(ParentSector(this));
+		this->parentsector.rbegin()->Read(ds);
+	}
+}
+
+void SectorClass::Save()
+{
+	DataStream ds("SavedFiles/SectorClass.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+	{
+		wxFAIL_MSG("Could not write to: SavedFiles/SectorClass.bin! In SectorClass::Read");
+		return;
+	}
+
+	size_t size = this->parentsector.size();
+	ds.WriteData(size);
+	for (auto& v : this->parentsector)
+		v.Write(ds);
+}
+
+wxString SectorClass::m_GetSubSector(wxVector<_Sub_Sector>& v, wxVector<wxString>& sv, _Sub_Sector item)
+{
+	for (size_t i = 0; i < v.size(); ++i)
+	{
+		if (v[i] == item)
+			return sv[i];
+	}
+
+	wxFAIL_MSG("vector failed in SectorClass::m_GetSubSector private function! Returning empty string");
+	return "";
+}
+
+_Sub_Sector SectorClass::m_GetSubSectorID(wxVector<wxString>& v, wxVector<_Sub_Sector>& sub, wxString& s)
+{
+	for (size_t i = 0; i < v.size(); ++i)
+	{
+		if (v[i] == s)
+			return sub[i];
+	}
+
+	wxFAIL_MSG("vector failed in SectorClass::m_GetSubSector private function! Returning SECTOR_INVALID string is: " + s);
+	return SUB_SECTOR_INVALID;
+}
+
+wxVector<_Sub_Sector>& SectorClass::m_GetSubSectorVec(_Sector s)
+{
+	switch (s)
+	{
+	case _Sector::COMMUNICATION_SERVICES: return this->communication_services;
+	case _Sector::CONSUMER_DESCRETIONARY: return this->consumer_discretionary;
+	case _Sector::CONSUMER_STAPLES: return this->consumer_staples;
+	case _Sector::ENERGY: return this->energy;
+	case _Sector::FINANCIALS: return this->financials;
+	case _Sector::HEALTH_CARE: return this->health_care;
+	case _Sector::INDUSTRIALS: return this->industrials;
+	case _Sector::INFORMATION_TECHNOLOGY: return this->information_technology;
+	case _Sector::MATERIALS: return this->materials;
+	case _Sector::REAL_ESTATE: return this->real_estate;
+	case _Sector::UTILITIES: return this->utilities;
+    // returning empty vector...
+	default: return emptyint;
+	}
+}
+
+wxVector<wxString>& SectorClass::m_GetSubSectorStringVec(_Sector s)
+{
+	switch (s)
+	{
+	case _Sector::COMMUNICATION_SERVICES: return this->_communication_services;
+	case _Sector::CONSUMER_DESCRETIONARY: return this->_consumer_discretionary;
+	case _Sector::CONSUMER_STAPLES: return this->_consumer_staples;
+	case _Sector::ENERGY: return this->_energy;
+	case _Sector::FINANCIALS: return this->_financials;
+	case _Sector::HEALTH_CARE: return this->_health_care;
+	case _Sector::INDUSTRIALS: return this->_industrials;
+	case _Sector::INFORMATION_TECHNOLOGY: return this->_information_technology;
+	case _Sector::MATERIALS: return this->_materials;
+	case _Sector::REAL_ESTATE: return this->_real_estate;
+	case _Sector::UTILITIES: return this->_utilities;
+		// returning empty vector...
+	default: return emptystring;
+	}
+}
+
+wxString SectorClass::m_GetURL(_Sector s)
+{
+	switch (s)
+	{
+	case _Sector::COMMUNICATION_SERVICES: return this->urls[0];
+	case _Sector::CONSUMER_DESCRETIONARY: return this->urls[1];
+	case _Sector::CONSUMER_STAPLES: return this->urls[2];
+	case _Sector::ENERGY: return this->urls[3];
+	case _Sector::FINANCIALS: return this->urls[4];
+	case _Sector::HEALTH_CARE: return this->urls[5];
+	case _Sector::INDUSTRIALS: return this->urls[6];
+	case _Sector::INFORMATION_TECHNOLOGY: return this->urls[7];
+	case _Sector::MATERIALS: return this->urls[8];
+	case _Sector::REAL_ESTATE: return this->urls[9];
+	case _Sector::UTILITIES: return this->urls[10];
+		// returning empty string...
+	default: return "";
+	}
+}
+
+void SectorClass::m_SetData(SectorOverview& so, SectorPerformance& sp)
+{
+	_Sector s = this->GetSectorID(sp.name);
+	wxDateTime stamp = wxDateTime::Today();
+	for (size_t i = 0; i < this->parentsector.size(); ++i)
+	{
+		if (this->parentsector[i].GetSectorId() == s)
+		{
+			this->parentsector[i].SetOverViewData(so.name, so._market_cap, so._change);
+			this->parentsector[i]._SetPerformance(sp);
+			return;
+		}
+	}
+
+	wxFAIL_MSG("SectorClass::m_SetOverViewData failed to match in parentsector!");
+}
+
+void SectorClass::m_FetchSectorData()
+{
+	wxVector<SectorOverview> v;
+	wxVector<SectorPerformance> v2;
+	wxString empty = "";
+	Parser parser(empty);
+
+	wxString url = this->sectorurl;
+	url.Replace(_INSERTION, _OVERVIEW);
+	parser.PullFinVizOverview(url, v);
+
+	wxString url2 = this->sectorurl;
+	url2.Replace(_INSERTION, _PERFORMANCE);
+	parser.PullFinVizPerformance(url2, v2);
+
+	for (size_t i = 0; i < v.size(); ++i)
+		this->m_SetData(v[i], v2[i]);
+}
+
+static SectorClass sc;
+SectorClass& GetSectorClass()
+{
+	return sc;
 }
 
 // stock_node functions...
@@ -132,7 +1103,7 @@ double stock_node::GetCostBasis(wxDateTime* T)
 {
 	if (!T)
 	{
-		wxFAIL_MSG("wxDateTime* passed to stock_node::AveragePrice is nullptr!");
+		wxFAIL_MSG("wxDateTime* passed to stock_node::GetCostBasis is nullptr!");
 		return 0.0;
 	}
 
@@ -163,6 +1134,11 @@ bool stock_node::IdMatch(long& id)
 		return true;
 
 	return false;
+}
+
+wxString stock_node::GetTicker()
+{
+	return this->m_ticker;
 }
 
 wxDateTime stock_node::GetPurchaseDate()
@@ -308,18 +1284,82 @@ double stock_node::GetDividendShares(wxDateTime* date)
 	return d;
 }
 
+void stock_node::GetDividendVec(wxVector<Dividend>& v)
+{
+	this->FillClientDividendVec(v);
+}
+
+void stock_node::Save(DataStream& ds)
+{
+	int valid = 1;
+	int invalid = -1;
+	ds.WritewxDateTime(this->m_date);
+
+	if (this->m_reinvest_start.IsValid())
+	{
+		ds.WriteData(valid);
+		ds.WritewxDateTime(this->m_reinvest_start);
+	}
+	else
+		ds.WriteData(invalid);
+
+	ds.Write(this->m_ticker);
+	ds.WriteLong(this->m_id);
+	ds.WriteData(this->m_price_per_share);
+	ds.WriteData(this->m_shares);
+	ds.WriteData(this->m_average_sold_price);
+	ds.WriteData(this->action);
+	ds.WriteDividendVector(this->divs);
+
+	size_t size = this->sold.size();
+	ds.WriteData(size);
+	for (size_t i = 0; i < size; ++i)
+		this->sold[i].Save(ds);
+}
+
+void stock_node::Retrieve(DataStream& ds)
+{
+	int valid = 1;
+	int invalid = -1;
+	int temp;
+	ds.ReadwxDateTime(this->m_date);
+	
+	ds.ReadData(temp);
+	if (temp == valid)
+		ds.ReadwxDateTime(this->m_reinvest_start);
+
+	ds.Read(this->m_ticker);
+	ds.ReadLong(this->m_id);
+	ds.ReadData(this->m_price_per_share);
+	ds.ReadData(this->m_shares);
+	ds.ReadData(this->m_average_sold_price);
+	ds.ReadData(this->action);
+	ds.ReadDividendVector(this->divs);
+
+	size_t size;
+	ds.ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->sold.push_back(stock_node(0, this->m_ticker, wxDateTime(wxInvalidDateTime), 0.0, 0.0, Action::SELL, wxDateTime(wxInvalidDateTime)));
+		this->sold[this->sold.size() - 1].Retrieve(ds);
+	}
+}
+
 void stock_node::InsertDiv(Dividend& d)
 {
 	size_t i = 0;
 	while (i < this->divs.size() && this->divs[i].ex_Div < d.ex_Div)
 		++i;
 	if (i == this->divs.size() || i == 0)
+	{
 		this->divs.push_back(d);
+		this->divs[divs.size() - 1].id = this->m_id;
+	}
 	else
 	{
 		// check for duplicate
 		if (this->divs[i].ex_Div != d.ex_Div)
-			this->divs.insert(&this->divs[i], d);
+			this->divs.insert(&this->divs[i], d)->id = this->m_id;
 //		else
 //			wxMessageBox("stock_node::InsertDiv tried to insert a duplicate dividend!");
 	}
@@ -330,12 +1370,21 @@ double stock_node::GetPurchasePrice()
 	return this->m_price_per_share;
 }
 
+void stock_node::FillClientDividendVec(wxVector<Dividend>& v)
+{
+	for (size_t i = 0; i < this->divs.size(); ++i)
+	{
+		if (!this->divs[i].DivReinvest)
+			v.push_back(this->divs[i]);
+	}
+}
+
 double stock_node::m_GetShares(wxDateTime* T)
 {
 	double shares = this->m_shares;
 	for (size_t i = 0; i < this->sold.size(); ++i)
 	{
-		if (sold[i].m_date <= *T)
+		if (!T || sold[i].m_date <= *T)
 			shares -= sold[i].m_shares;
 	}
 
@@ -396,9 +1445,8 @@ bool StockThread::GetResult()
 
 // StockNode functions...
 StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S, bool reinvest, wxString T) 
-	: m_ticker(t), m_parentclock(p), m_grand_parent(P), m_parent(S), DivReinvest(reinvest)
+	: Return_node(&P->market_value, &S->market_value, nullptr), m_ticker(t), m_parentclock(p), m_grand_parent(P), m_parent(S), DivReinvest(reinvest)
 {
-	wxString s_date = this->m_parentclock->Format(STANDARD_DATE);
 	this->Bind(ThreadComplete, &StockNode::OnThreadComplete, this);
 	if (this->DivReinvest)
 	{
@@ -407,7 +1455,13 @@ StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S, bool re
 	}
 }
 
-StockNode::StockNode(const StockNode& sn) : m_ticker(sn.m_ticker)
+StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S)
+	: Return_node(&P->market_value, &S->market_value, nullptr), m_ticker(t), m_parentclock(p), m_grand_parent(P), m_parent(S)
+{
+	this->Bind(ThreadComplete, &StockNode::OnThreadComplete, this);
+}
+
+StockNode::StockNode(const StockNode& sn) : Return_node(sn.PortfolioMarketValue, sn.SectorMarketValue, sn.StockMarketValue), m_ticker(sn.m_ticker)
 {
 	this->historical_prices = sn.historical_prices;
 	this->bought = sn.bought;
@@ -443,22 +1497,23 @@ bool StockNode::Purchase(long id, wxString s, double price_per_share, double sha
 
 bool StockNode::InitiatePurchase(long id, wxDateTime date, double price_per_share, double shares)
 {
+	bool needsupdate = false;
 	if (this->m_Purchase(id, date, price_per_share, shares))
 	{
 		if (this->bought.size() > 1)
 		{
 			if (this->inital_purchase.IsValid() && !this->m_FindDateInHistoricalPrices(this->inital_purchase))
-				this->parser = this->NewParser();
-			else if(this->purchaseDateSwitch)
-				this->parser = this->NewParser();
+				needsupdate = true;
+			else if (this->purchaseDateSwitch)
+				needsupdate = true;;
 		}
 		else
-			this->parser = this->NewParser();
+			needsupdate = true;
 	}
 
-	if (this->parser)
+	if (needsupdate)
 	{
-		if (this->UpDate())
+		if (this->UpDate(true))
 			this->Calibrate();
 		this->m_active = 1;
 	}
@@ -466,11 +1521,11 @@ bool StockNode::InitiatePurchase(long id, wxDateTime date, double price_per_shar
 	if (this->bought.size() > 1)
 		this->ShareDivstoLastPurchase();
 
-	this->DeleteParser();
+	this->UpToDate = 1;
 	return true;
 }
 
-bool StockNode::Sell(long id, wxString s, double price_per_share, double shares)
+bool StockNode::Sell(long& id, wxDateTime& date, double& price_per_share, double& shares)
 {
 	stock_node* sn = this->FindLot(id);
 	if (!sn)
@@ -480,10 +1535,6 @@ bool StockNode::Sell(long id, wxString s, double price_per_share, double shares)
 		wxFAIL_MSG("Could not find lot number: " + lot + " in StockNode::Sell!");
 		return false;
 	}
-
-	wxDateTime date = IsValidDate(s, "Invalid or future date in StockNode::Sell!");
-	if (!date.IsValid())
-		return false;
 
 	return this->m_Sell(id, date, price_per_share, shares, sn);
 }
@@ -529,8 +1580,17 @@ bool StockNode::IsActive()
 	return this->m_active;
 }
 
-void StockNode::Calibrate()
+void StockNode::Calibrate(bool force)
 {
+	if (this->UpToDate && !force)
+		return;
+	else
+		this->UpDate(force);
+
+	this->_52weekDeviation = this->GetDeviation(260);
+	this->_90dayDeviation = this->GetDeviation(90);
+	this->_30dayDeviation = this->GetDeviation(30);
+
 	wxDateTime T = *this->m_parentclock;
 	double daycostbasis = this->GetDayCostBasis(&T);
 	double weekcostbasis = this->GetWeekCostBasis(&T);
@@ -546,31 +1606,43 @@ void StockNode::Calibrate()
 
 	this->SetNewValues(originalcostbasis, daycostbasis, weekcostbasis, quartercostbasis, yearcostbasis, marketvalue, _shares, divshares, _dividends);
 	this->UpToDate = 1;
+	double _marketprice = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.marketprice : marketvalue / this->GetShares();
+	double _previous_close = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.previousclose : this->GetPreviousClose(&T);
 
-	this->svd = StockViewerData(this->m_ticker, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
-		_shares, originalcostbasis / _shares, this->current_Data.marketprice, this->current_Data.previousclose,
+	this->svd = StockViewerData(this, this->m_ticker, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
+		_shares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
 		marketvalue, this->GetDividends());
+
+	this->UpToDate = 1;
 }
 
 void StockNode::ClockChange()
 {
 	UpToDate = 0;
+	this->Calibrate(true);
 }
 
 // StockNode private functions...
 
-bool StockNode::UpDate()
+bool StockNode::UpDate(bool force_update)
 {
-	Holidays holiday;
 	wxDateTime today = wxDateTime::Today();
-	if (this->current_Data.date != today)
+	GetWorkDate(today);
+	if (!this->current_Data.date.IsValid() || this->current_Data.date < today || force_update)
 	{
-		this->parser->UpDateAll();
+		if (!this->parser)
+			this->parser = this->NewParser();
+
+		if (force_update)
+			this->parser->UpDateSummaryData();
+		else
+			this->parser->UpDateAll();
+
+		this->DeleteParser();
+
 		return true;
 	}
-	this->parser->UpDateHistoricalPrices();
-	this->parser->UpDateDiv();
 	return true;
 }
 
@@ -585,6 +1657,44 @@ bool StockNode::Historical_prices_UpToDate()
 		return true;
 
 	return false;
+}
+
+double StockNode::GetDeviation(int days)
+{
+	Day_Prices* it = this->historical_prices.begin();
+	int size = 0;
+	if (*this->m_parentclock != wxDateTime::Today())
+		it = this->GetHistoricalIndexIter();
+
+	if (it == this->historical_prices.end())
+		return 0.0;
+
+	double total = 0.0, standardDiv = 0.0;
+	Day_Prices* index = it;
+	while (index != this->historical_prices.end() && size <= days)
+	{
+		++size;
+		total += index->close;
+		++index;
+	}
+
+	double mean = total / size;
+	index = it;
+	for (size_t i = 0; i < size; ++i)
+		standardDiv += std::pow((index->close - mean), 2);
+
+	return std::sqrt(standardDiv / (size - 1));
+}
+
+Day_Prices* StockNode::GetHistoricalIndexIter()
+{
+	for (auto it = this->historical_prices.begin(); it != this->historical_prices.end(); ++it)
+	{
+		if (it->date == *this->m_parentclock)
+			return it;
+	}
+
+	return this->historical_prices.end();
 }
 
 int StockNode::m_GetStartWeekDay(wxDateTime* T)
@@ -634,7 +1744,10 @@ double StockNode::GetClosePrice(wxDateTime* T)
 		wxMessageBox("wxDateTime* is null in StockNode::GetClosePrice!");
 		return 0.0;
 	}
-	wxString enddate = this->historical_prices.rbegin()->date.Format(STANDARD_DATE);
+
+	if (this->historical_prices.rbegin() != this->historical_prices.rend())
+		wxString enddate = this->historical_prices.rbegin()->date.Format(STANDARD_DATE);
+
 	for (size_t i = 0; i < this->historical_prices.size(); ++i)
 	{
 		wxString Tclose = T->Format(STANDARD_DATE);
@@ -651,7 +1764,7 @@ double StockNode::GetPreviousClose(wxDateTime* T)
 {
 	if (!T)
 	{
-		if (this->historical_prices.rend() == this->historical_prices.rend())
+		if (this->historical_prices.rbegin() == this->historical_prices.rend())
 			return 0.0;
 		auto it = this->historical_prices.rbegin();
 		++it;
@@ -660,9 +1773,11 @@ double StockNode::GetPreviousClose(wxDateTime* T)
 		return it->close;
 	}
 
+	wxDateTime temp = *T;
+	GetWorkDate(temp);
 	for (size_t i = 0; i < this->historical_prices.size(); ++i)
 	{
-		if (this->historical_prices[i].date == *T)
+		if (this->historical_prices[i].date == temp)
 		{
 			if (i > 0)
 				return this->historical_prices[--i].close;
@@ -724,7 +1839,11 @@ double StockNode::GetYearStartClose(wxDateTime* T)
 double StockNode::GetDayCostBasis(wxDateTime* T)
 {
 	double cost_basis = 0.0;
-	double price = this->GetPreviousClose(T);
+	double price = 0.0;
+	if (wxDateTime::Today() != *T)
+		price = this->GetPreviousClose(T);
+	else
+		price = this->GetPreviousClose(nullptr);
 	double temp = 0.0;
 	for (size_t i = 0; i < this->bought.size(); ++i)
 	{
@@ -864,6 +1983,7 @@ bool StockNode::m_Purchase(long& id, wxDateTime& date, double& price_per_share, 
 			this->purchaseDateSwitch = true;
 		}
 	}
+	this->UpToDate = 0;
 	return true;
 }
 
@@ -1039,9 +2159,70 @@ double StockNode::GetDividends()
 	return d;
 }
 
+wxVector<Dividend> StockNode::GetDividendVec()
+{
+	wxVector<Dividend> vec;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+		this->bought[i].GetDividendVec(vec);
+	
+	return vec;
+}
+
 StockViewerData* StockNode::GetStockViewerData()
 {
 	return &this->svd;
+}
+
+void StockNode::Save()
+{
+	DataStream ds("SavedFiles/" + this->m_ticker + ".bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+		return;
+
+	ds.WritewxDateTime(this->inital_purchase);
+	ds.WriteBool(this->DivReinvest);
+
+	if (this->DivReinvest)
+		ds.WritewxDateTime(this->div_reinvest_start_date);
+
+	ds.WriteSummaryData(this->current_Data);
+	ds.WriteData(this->m_beta);
+	ds.WriteData(this->m_active);
+	ds.WriteDayPricesVector(this->historical_prices);
+
+	size_t size = this->bought.size();
+	ds.WriteData(size);
+	for (size_t i = 0; i < size; ++i)
+		this->bought[i].Save(ds);
+}
+
+void StockNode::Retrieve()
+{
+	DataStream ds("SavedFiles/" + this->m_ticker + ".bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+		return;
+
+	ds.ReadwxDateTime(this->inital_purchase);
+	ds.ReadBool(this->DivReinvest);
+
+	if (this->DivReinvest)
+		ds.ReadwxDateTime(this->div_reinvest_start_date);
+
+	ds.ReadSummaryData(this->current_Data);
+	ds.ReadData(this->m_beta);
+	ds.ReadData(this->m_active);
+	ds.ReadDayPricesVector(this->historical_prices);
+
+	size_t size;
+	ds.ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->bought.push_back(stock_node(0, this->m_ticker, wxDateTime(wxInvalidDateTime), 0.0, 0.0, Action::UNDEFINED, wxDateTime(wxInvalidDateTime)));
+		this->bought[this->bought.size() - 1].Retrieve(ds);
+	}
+
+//	this->_90dayDeviation = this->GetDeviation(90);
+	this->Calibrate();
 }
 
 double StockNode::GetDividendShares()
@@ -1052,6 +2233,18 @@ double StockNode::GetDividendShares()
 		d += this->bought[i].GetDividendShares(&T);
 
 	return d;
+}
+
+wxVector<stock_node*> StockNode::GetChildren()
+{
+	wxVector<stock_node*> v;
+	for (auto& it : this->bought)
+	{
+		if (it.GetShares(NULL))
+			v.push_back(&it);
+	}
+
+	return v;
 }
 
 void StockNode::SetHistoricalData(Day_Prices day)
@@ -1065,269 +2258,13 @@ void StockNode::SetHistoricalData(Day_Prices day)
 	else
 		this->historical_prices.insert(&this->historical_prices[i], day);
 }
-/*
-double StockNode::m_GetClosePrice(wxDateTime* date)
-{
-	wxString s_date = date->Format(STANDARD_DATE);
-	for (size_t i = 0; i < this->historical_prices.size(); ++i)
-	{
-		wxString fuckdate2 = this->historical_prices[i].date.Format(STANDARD_DATE);
-		if (this->historical_prices[i].date == *date)
-			return this->historical_prices[i].close;
-	}
-	return 0.0;
-}
-double StockNode::m_GetPreviousDayClosePrice(wxDateTime* date)
-{
-	for (size_t i = 0; i < this->historical_prices.size(); ++i)
-	{
-		if (this->historical_prices[i].date == *date && i > 0)
-			return this->historical_prices[i - 1].close;
-	}
 
-	return 0.0;
-}
-
-double StockNode::m_GetLatestClosePrice()
-{
-	size_t size = this->historical_prices.size();
-	if (!size)
-		return 0.0;
-
-	return this->historical_prices[size - 1].close;
-}
-
-double StockNode::m_GetForwardClosePrice(wxDateTime* T)
-{
-	wxString date = T->Format(STANDARD_DATE);
-	for (size_t i = 0; i < this->historical_prices.size(); ++i)
-	{
-		if (this->historical_prices[i].date == *T)
-			return this->historical_prices[i].close;
-
-		if (this->historical_prices[i].date > *T)
-				return this->historical_prices[i].close;
-	}
-	wxString something = date;
-	return 0.0;
-}
-
-double StockNode::m_GetPurchasePrice(wxDateTime* date)
-{
-	wxDateTime T = *this->m_parentclock;
-	double value = 0.0;
-	double shares = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		wxDateTime purchasedate = this->bought[i].GetPurchaseDate();
-		shares += this->bought[i].GetShares(&T);
-		value = this->bought[i].GetPurchasePrice() * this->bought[i].GetShares(&T);
-	}
-
-	if (shares)
-		return value / shares;
-
-	return 0.0;
-}
-
-double StockNode::m_GetPurchaseCostBasis(wxDateTime* date)
-{
-	wxDateTime T = *this->m_parentclock;
-	double value = 0.0;
-	double shares = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		value += this->bought[i].GetPurchasePrice() * this->bought[i].GetShares(&T);
-	}
-
-	return value;
-}
-
-double StockNode::m_GetMarketValue(wxDateTime* date, Returns r)
-{
-	double marketPrice = this->m_GetMarketPrice(r, date);
-	double shares = this->m_GetShares(date) + this->GetDividendShares();
-	double d = this->m_GetMarketPrice(r, date) * shares;
-	return d;
-}
-
-double StockNode::m_GetRealizedGain(wxDateTime* date)
-{
-	double realized_gain = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-		realized_gain += this->bought[i].GetRealizedGain(date);
-
-	return realized_gain;
-}
-
-double StockNode::m_GetDayCostPricePerShare(wxDateTime* date, wxDateTime* enddate, Returns r)
-{
-	if (this->bought.size())
-		return 0.0;
-	
-	wxDateTime startdate = this->m_GetStartDate(r, date);
-	double _price = this->m_GetCostPrice(r, date);
-	double _shares = 0.0;
-	double temp = 0.0;
-	double value = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		double loopshares = 0.0;
-		_shares += loopshares = this->bought[i].GetShares(enddate);
-		temp = this->m_GetPurchasePrice(r, &bought[i], date, enddate);
-		if (!temp)
-			value += _price * loopshares;
-		else
-			value += temp * loopshares;
-	}
-	
-	double price_per_share = _shares ? value / _shares : 0.0;
-	return price_per_share;
-}
-
-double StockNode::m_GetDayCostBasis(wxDateTime* begin_date, Returns r)
-{
-	wxDateTime T = *this->m_parentclock;
-	wxDateTime startdate = this->m_GetStartDate(r, begin_date);
-	wxString fuckyou = startdate.Format(STANDARD_DATE);
-	int fuckyouday = startdate.GetWeekDay();
-	double _price = this->m_GetCostPrice(r, &startdate);
-	double temp = 0.0;
-	double cost_basis = 0.0;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		temp = this->m_GetPurchasePrice(r, &bought[i], begin_date, &T);
-		if (!temp)
-			cost_basis += _price * this->bought[i].GetShares(&T);
-		else
-			cost_basis += temp * this->bought[i].GetShares(&T);
-	}
-
-	return cost_basis;
-}
-
-double StockNode::m_GetPurchasePrice(Returns r, stock_node* sn, wxDateTime* begin_date, wxDateTime* end_date)
-{
-	switch (r)
-	{
-	case DAY: return sn->GetPurchasePrice(begin_date);
-	case WEEK: return sn->GetPurchasePrice(this->m_GetStartWeekDay(begin_date), this->m_GetEndWeekDay(begin_date), begin_date->GetYear());
-	case QUARTER: return sn->GetPurchasePrice(GetQuarterStartMonth(begin_date->GetMonth()), begin_date->GetYear());
-	case YEAR: return sn->GetPurchasePrice(begin_date->GetYear());
-	case ALL_TIME: return sn->GetPurchasePrice();
-	}
-
-	wxString R = "";
-	R << r;
-	wxFAIL_MSG("Return enum passed to StockNode::m_GetPurchasePrice did not match in the switchstatment! Return enum is: " + R);
-	return 0.0;
-}
-
-double StockNode::m_GetMarketPrice(Returns r, wxDateTime* date)
-{
-	switch (r)
-	{
-	case DAY: return this->m_GetForwardClosePrice(date);
-	case WEEK: return this->m_GetClosePrice(date);
-	case QUARTER: return this->m_GetClosePrice(date);
-	case YEAR: return this->m_GetClosePrice(date);
-	case ALL_TIME: return this->m_GetLatestClosePrice();
-	}
-
-	wxString R = "";
-	R << r;
-	wxFAIL_MSG("Return enum passed to StockNode::m_GetMarketPrice did not match in the switchstatment! Return enum is: " + R);
-	return 0.0;
-}
-
-double StockNode::m_GetCostPrice(Returns r, wxDateTime* date)
-{
-	switch (r)
-	{
-	case DAY: return this->m_GetClosePrice(date);
-	case WEEK: return this->m_GetForwardClosePrice(date);
-	case QUARTER: return this->m_GetForwardClosePrice(date);
-	case YEAR: return this->m_GetForwardClosePrice(date);
-	case ALL_TIME: return this->m_GetForwardClosePrice(date);
-	}
-
-	wxString R = "";
-	R << r;
-	wxFAIL_MSG("Return enum passed to StockNode::m_GetCostPrice did not match in the switchstatment! Return enum is: " + R);
-	return 0.0;
-}
-
-wxDateTime StockNode::m_GetStartDate(Returns r, wxDateTime* date)
-{
-	switch (r)
-	{
-	case Returns::DAY: 
-	{
-		// if date lands on saturday or a sunday, we need to call GetWorkDate and then subtract another day from it.
-		// by calling GetWorkDate again but with true as the second param it will comback with the previous day that was not a holiday
-		if (date->GetWeekDay() == wxDateTime::Sun || date->GetWeekDay() == wxDateTime::Sat)
-		{
-			GetWorkDate(*date);
-			GetWorkDate(*date, true);
-		}
-		else if (date->GetWeekDay() == wxDateTime::Mon)
-			GetWorkDate(*date, true);
-		else
-			GetWorkDate(*date);
-		wxString Date = date->Format(STANDARD_DATE);
-		return *date;//*date - wxDateSpan(0, 0, 0, 1);
-	}
-	case Returns::WEEK: return this->GetFirstDayOfTheWeekDate(date);
-	case Returns::QUARTER: return wxDateTime(1, GetQuarterStartMonth(date->GetMonth()), date->GetYear());
-	case Returns::YEAR: return wxDateTime(2, wxDateTime::Month::Jan, date->GetYear());
-	case Returns::ALL_TIME: return this->GetInitalPurchaseDate();
-	}
-
-	wxString R = "";
-	R << r;
-	wxFAIL_MSG("Return enum passed to StockNode::m_GetStartDate did not match in the switchstatment! Return enum is: " + R);
-	return wxDateTime(wxInvalidDateTime);
-}
-
-int StockNode::m_GetEndWeekDay(wxDateTime* T)
-{
-	if (!T)
-	{
-		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetEndWeekDay is nullptr!");
-		return 0;
-	}
-
-	if (!T->IsValid())
-	{
-		wxFAIL_MSG("wxDateTime* passed to StockNode::m_GetEndWeekDay is Invalid Date!");
-		return 0;
-	}
-
-	int day = T->GetDay();
-	int weekday = T->GetWeekDay();
-	int lastmonthday = T->GetLastMonthDay(T->GetMonth(), T->GetYear()).GetDay();
-	switch (weekday)
-	{
-	case wxDateTime::WeekDay::Mon: return T->GetDayOfYear() + 4;
-	case wxDateTime::WeekDay::Tue: return T->GetDayOfYear() + 3;
-	case wxDateTime::WeekDay::Wed: return T->GetDayOfYear() + 2;
-	case wxDateTime::WeekDay::Thu: return T->GetDayOfYear() + 1;
-	case wxDateTime::WeekDay::Fri: return T->GetDayOfYear();
-	case wxDateTime::WeekDay::Sat: return T->GetDayOfYear() - 1;
-	case wxDateTime::WeekDay::Sun: return 0;
-	}
-
-	wxString wd = "";
-	wd << weekday;
-	wxFAIL_MSG("Weekday: " + wd + " matched no days in the switch statement in StockNode::m_GetEndWeekDay!");
-	return 0;
-}
-*/
 // Sector Functions...
 
-Sector::Sector(_Sector s, wxDateTime* date, Portfolio* P) : id(s), m_parentclock(date), m_parent(P)
+Sector::Sector(_Sector s, wxDateTime* date, Portfolio* P) 
+	: Return_node(&P->market_value, nullptr, nullptr), id(s), m_parentclock(date), m_parent(P)
 {
-	
+	this->Sector_Name = GetSectorName(s);
 }
 
 Sector::~Sector()
@@ -1337,19 +2274,37 @@ Sector::~Sector()
 
 bool Sector::Purchase(long lot, wxString ticker, wxString date, double price, double shares, bool div_re, wxString T)
 {
-	StockNode* S = this->GetStockNode(ticker);
-	if (!S)
-		S = this->CreateStockNode(lot, ticker, div_re, T);
+	this->sn = this->GetStockNode(ticker);
+	if (!this->sn)
+		this->sn = this->CreateStockNode(lot, ticker, div_re, T);
 
-	if (!S->Purchase(lot, date, price, shares))
+	if (!this->sn->Purchase(lot, date, price, shares))
 	{
-		if (S->IsActive())
-			this->stocks.erase(S);
+		if (this->sn->IsActive())
+		{
+			this->sn = NULL;
+			this->stocks.erase(this->sn);
+		}
 		return false;
 	}
 
-	this->threads_running++;
 	return true;
+}
+
+bool Sector::Sell(long& lot, wxDateTime& d, double& shares, double& price)
+{
+	if (!this->sn)
+		wxMessageBox("this->sn is NULL in Sector::Sell!");
+
+	this->sn = this->GetStockNode(lot);
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::Sell! Returning false!");
+		return false;
+	}
+
+	bool result = this->sn->Sell(lot, d, price, shares);
+	return result;
 }
 
 bool Sector::IsId(_Sector s)
@@ -1369,10 +2324,126 @@ wxVector<StockNode*> Sector::GetStockVector()
 	return sn;
 }
 
+wxVector<stock_node*> Sector::GetAllLotData()
+{
+	wxVector<stock_node*> v;
+	return v;
+}
+
+wxVector<stock_node*> Sector::GetLotData()
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::GetLotData!");
+		wxVector<stock_node*> V;
+		return V;
+	}
+
+	return this->sn->GetChildren();
+}
+
+Pair Sector::GetPair()
+{
+	if (!this->sn)
+	{
+		wxFAIL_MSG("this->sn is NULL in Sector::GetPair()!");
+		return Pair("", 0.0);
+	}
+
+	Pair p(this->sn->GetTicker(), this->sn->GetDividends());
+	this->sn = NULL;
+	return p;
+}
+
+void Sector::Calibrate(bool datechange)
+{
+	this->Reset();
+	for (size_t i = 0; i < this->stocks.size(); ++i)
+	{
+		if (datechange)
+			this->stocks[i].ClockChange();
+		else
+			this->stocks[i].Calibrate();
+		this->AddNewValues(stocks[i].GetReturnNode());
+	}
+
+	this->ReturnCalibarate();
+	this->svd = StockViewerData(this, this->Sector_Name, "", "",
+		this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
+		this->market_value, this->dividends);
+}
+
+StockViewerData* Sector::GetStockViewerData()
+{
+	return &this->svd;
+}
+
+void Sector::CalcRatiosOfChildren()
+{
+	for (size_t i = 0; i < this->stocks.size(); ++i)
+		this->stocks[i].CalcRatios();
+
+	this->CalcRatios();
+}
+
+void Sector::Save()
+{
+	DataStream ds("SavedFiles/" + this->Sector_Name + ".bin", wxPosixPermissions::wxS_DIR_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+		return;
+
+	wxVector<wxString> v;
+	for (size_t i = 0; i < this->stocks.size(); ++i)
+	{
+		v.push_back(this->stocks[i].GetTicker());
+		this->stocks[i].Save();
+	}
+
+	ds.WriteStringwxVector(v);
+}
+
+void Sector::Retrieve()
+{
+	DataStream ds("SavedFiles/" + this->Sector_Name + ".bin", wxPosixPermissions::wxS_DIR_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+		return;
+
+	wxVector<wxString> v;
+	ds.ReadStringwxVector(v);
+	for (size_t i = 0; i < v.size(); ++i)
+	{
+		this->stocks.push_back(StockNode(v[i], this->m_parentclock, this->m_parent, this));
+		this->stocks[this->stocks.size() - 1].Retrieve();
+	}
+}
+
+void Sector::Update()
+{
+	for (size_t i = 0; i < this->stocks.size(); ++i)
+		this->stocks[i].Calibrate(true);
+}
+
 void Sector::ThreadComplete(StockNode* sn)
 {
 	this->threads_running--;
 	this->m_parent->ThreadComplete(sn);
+}
+
+bool Sector::IsChild(wxString& ticker)
+{
+	this->sn = NULL;
+	this->sn = this->GetStockNode(ticker);
+
+	return sn ? true : false;
+}
+
+bool Sector::IsChild(long& id)
+{
+	this->sn = NULL;
+	this->sn = this->GetStockNode(id);
+
+	return sn ? true : false;
 }
 
 int Sector::GetNumItems(_PortfolioType p)
@@ -1398,6 +2469,17 @@ StockNode* Sector::GetStockNode(wxString ticker)
 	return nullptr;
 }
 
+StockNode* Sector::GetStockNode(long& id)
+{
+	for (auto& v : this->stocks)
+	{
+		if (v.IdMatch(id))
+			return &v;
+	}
+
+	return NULL;
+}
+
 StockNode* Sector::CreateStockNode(long l, wxString ticker, bool div_re, wxString T)
 {
 	this->stocks.push_back(StockNode(ticker, this->m_parentclock, this->m_parent, this, div_re, T));
@@ -1411,9 +2493,19 @@ int Sector::GetStockSize()
 
 // Portfolio Functions...
 
-Portfolio::Portfolio(wxFrame* f, double money, wxDateTime* m) : m_parent(f), cash(money), m_parentclock(m)
+Portfolio::Portfolio(wxFrame* f, double money, wxDateTime* m) 
+	: Return_node(nullptr, nullptr, nullptr), m_parent(f), m_parentclock(m), dow_jones("DJI", m_parentclock, this, nullptr, false, ""),
+	nasdaq("Nasdaq", m_parentclock, this, nullptr, false, "")
 {
+	Holidays& h = GetHolidays();
+	h.Retrieve();
+//	wxString data = "";
+//	Parser parser(data);
 
+	wxString data;
+	Parser parser(data);
+	this->gainers = parser.GetStockGainers();
+	this->losers = parser.GetStockLosers();
 }
 
 bool Portfolio::Purchase(_Sector s, wxString ticker, wxString purchasedate, double price, double shares, bool div_re, wxString T)
@@ -1422,12 +2514,18 @@ bool Portfolio::Purchase(_Sector s, wxString ticker, wxString purchasedate, doub
 	wxDateTime date;
 	date.ParseDate(purchasedate);
 	if (!this->cash.RequestPurchase(lotnumber, price * shares))
+	{
+		this->DeleteLot(lotnumber);
 		return false;
+	}
 
 	if (!this->m_Purchase(lotnumber, s, ticker, purchasedate, price, shares, div_re, T))
+	{
+		this->DeleteLot(lotnumber);
 		return false;
+	}
 
-	this->threads_running++;
+	this->Calibrate();
 	return true;
 }
 
@@ -1438,6 +2536,50 @@ bool Portfolio::NewDepositSchedule(double d, int i, wxDateTime date)
 		this->cash.UpdateCash();
 
 	return result;
+}
+
+bool Portfolio::RequestSell(wxString& ticker)
+{
+	this->sec = NULL;
+	sec = this->GetSector(ticker);
+	
+	return sec ? true : false;
+}
+
+bool Portfolio::Sell(long& lot, wxDateTime& d, double& shares, double& price)
+{
+	if (!this->sec)
+		wxMessageBox("this->sec is NULL in Portfolio::Sell!");
+
+	this->sec = this->GetSector(lot);
+	if (!this->sec)
+	{
+		wxString id = "";
+		id << lot;
+		wxMessageBox("this->sec is NULL in Portfolio::Sell! lot passed to function is: " + id);
+		return false;
+	}
+
+	bool result = this->sec->Sell(lot, d, shares, price);
+	if (result)
+	{
+		this->cash.ReplaceDividends(this->sec->GetPair());
+		return true;
+	}
+
+	return false;
+}
+
+wxVector<stock_node*> Portfolio::GetLotData()
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec in Portfolio::GetLotData is NULL!");
+		wxVector<stock_node*> sn;
+		return sn;
+	}
+
+	return this->sec->GetLotData();
 }
 
 int Portfolio::GetNumItems(_PortfolioType p)
@@ -1463,6 +2605,114 @@ const wxVector<StockNode*> Portfolio::GetStockNodeItems()
 	return returnvec;
 }
 
+void Portfolio::Calibrate(bool datechange)
+{
+	this->Reset();
+	for (size_t i = 0; i < this->sectors.size(); ++i)
+	{
+		this->sectors[i].Calibrate(datechange);
+		this->AddNewValues(this->sectors[i].GetReturnNode());
+	}
+
+	for (size_t i = 0; i < this->sectors.size(); ++i)
+		this->sectors[i].CalcRatiosOfChildren();
+	
+	this->ReturnCalibarate();
+	if (this->GetFreeCash())
+		this->PortfolioPerc = this->market_value / this->GetFreeCash();
+
+	this->svd = StockViewerData(this, "Total", "", "",
+		this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
+		this->market_value, this->dividends, this->cash.GetFreeCash());
+}
+
+StockViewerData* Portfolio::GetStockViewerData()
+{
+	return &this->svd;
+}
+
+void Portfolio::Save()
+{
+	this->cash.Save();
+	DataStream ds("SavedFiles/Portfolio.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+		return;
+
+	ds.WriteLongwxVector(this->lot);
+	wxVector<_Sector> v;
+	for (size_t i = 0; i < this->sectors.size(); ++i)
+		v.push_back(sectors[i].GetID());
+
+	ds.WritewxVector(v);
+
+	for (size_t i = 0; i < this->sectors.size(); ++i)
+		this->sectors[i].Save();
+}
+
+void Portfolio::Retrieve()
+{
+	this->cash.Retrieve();
+	DataStream ds("SavedFiles/Portfolio.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+		return;
+
+	ds.ReadLongwxVector(this->lot);
+	wxVector<_Sector> v;
+	ds.ReadwxVector(v);
+
+	for (size_t i = 0; i < v.size(); ++i)
+	{
+		Sector* S = this->CreateSector(v[i]);
+		S->Retrieve();
+	}
+
+	this->Calibrate();
+}
+
+double Portfolio::GetFreeCash()
+{
+	return this->cash.GetFreeCash();
+}
+
+wxVector<DayGainersandLosers> Portfolio::GetDayGainers()
+{
+	return this->gainers;
+}
+
+wxVector<DayGainersandLosers> Portfolio::GetDayLosers()
+{
+	return this->losers;
+}
+
+SummaryData Portfolio::QuoteLookup(wxString ticker)
+{
+	Parser parser(ticker);
+	SummaryData sd =  parser.GetSummaryData();
+	sd.description = parser.GetDescription(ticker);
+	return sd;
+}
+
+bool Portfolio::AddDeposit(wxDateTime& date, double& amount)
+{
+	return this->cash.Deposit(date, amount);
+}
+
+bool Portfolio::AddWithdrawl(wxDateTime& date, double& amount)
+{
+	return this->cash.Withdrawl(date, amount);
+}
+
+void Portfolio::DateChange()
+{
+	this->Calibrate(true);
+}
+
+void Portfolio::Update()
+{
+	this->DateChange();
+}
+
 void Portfolio::ThreadComplete(StockNode* sn)
 {
 	this->threads_running--;
@@ -1475,11 +2725,11 @@ void Portfolio::ThreadComplete(StockNode* sn)
 
 long Portfolio::GetLot()
 {
-	long increment = 0;
+	long increment = 1;
 	if (!lot.size())
 	{
-		lot.push_back((long)1);
-		return (long)1;
+		lot.push_back(increment);
+		return increment;
 	}
 
 	for (size_t i = 0; i < this->lot.size(); ++i)
@@ -1496,6 +2746,20 @@ long Portfolio::GetLot()
 	return increment;
 }
 
+void Portfolio::DeleteLot(long& l)
+{
+	for (size_t i = 0; i < this->lot.size(); ++i)
+	{
+		if (lot[i] == l)
+		{
+			lot.erase(&lot[i]);
+			return;
+		}
+	}
+
+	wxMessageBox("lot failed to be erased in Portfolio::DeleteLot!");
+}
+
 bool Portfolio::m_Purchase(long lotnumber, _Sector s, wxString ticker, wxString purchasedate, double price, double shares, bool div_re, wxString T)
 {
 	Sector* S = this->GetSector(s);
@@ -1509,7 +2773,14 @@ bool Portfolio::m_Purchase(long lotnumber, _Sector s, wxString ticker, wxString 
 
 	wxDateTime date;
 	date.ParseDate(purchasedate);
-	return this->cash.Purchase(lotnumber, price * shares, date);
+	bool result = this->cash.Purchase(lotnumber, price * shares, date);
+	if (result)
+	{
+		this->cash.AddDividends(S->GetPair());
+		return true;
+	}
+
+	return result;
 }
 
 Sector* Portfolio::GetSector(_Sector s)
@@ -1521,6 +2792,28 @@ Sector* Portfolio::GetSector(_Sector s)
 	}
 
 	return nullptr;
+}
+
+Sector* Portfolio::GetSector(wxString& ticker)
+{
+	for (auto& v : this->sectors)
+	{
+		if (v.IsChild(ticker))
+			return &v;
+	}
+
+	return NULL;
+}
+
+Sector* Portfolio::GetSector(long& lot)
+{
+	for (auto& v : this->sectors)
+	{
+		if (v.IsChild(lot))
+			return &v;
+	}
+
+	return NULL;
 }
 
 Sector* Portfolio::CreateSector(_Sector s)

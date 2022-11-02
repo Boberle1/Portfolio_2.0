@@ -33,6 +33,12 @@
     <ClInclude Include="webdata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DataStream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Enums.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CashAccount.cpp">
@@ -51,6 +57,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="webdata.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DataStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

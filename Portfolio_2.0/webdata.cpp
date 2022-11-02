@@ -21,7 +21,7 @@ static size_t setdata(void* buffer, size_t size, size_t nmemb, void* param)
 	return totalsize;
 }
 
-webdata::webdata()
+webdata::webdata(bool redirect) : follow_redirect(redirect)
 {
 
 }
@@ -57,19 +57,24 @@ bool webdata::getwebdata(wxString& data)
 	if (pages == 0) {
 		return true;
 	}
-
-	CURLcode res;
+	bool result = false;
+	CURLcode res = CURLE_OK;
 	curl_global_init(CURL_GLOBAL_DEFAULT);
 	CURL* curl = curl_easy_init();
 	if (curl) {
 		--pages;
-		curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);
-		curl_easy_setopt(curl, CURLOPT_URL, url);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, setdata);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-		curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+		CURLcode URL = curl_easy_setopt(curl, CURLOPT_URL, url);
+		if (this->follow_redirect)
+			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+		CURLcode writefunc = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, setdata);
+		CURLcode write = curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+		CURLcode verbose = curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 		res = curl_easy_perform(curl);
 		curl_easy_cleanup(curl);
+
+		int index = data.find("Redirecting");
+		if (index == -1 || index > 100)
+			result = true;
 	}
 
 	if (CURLE_OK != res)
@@ -79,18 +84,39 @@ bool webdata::getwebdata(wxString& data)
 	}
 
 	curl_global_cleanup();
-	return true;
+	return result;
 }
 
 void webdata::seturl(wxString s)
 {
 	if (url)
-		DeleteURL();
+		DeleteURLs();
 	url = StringToChar(s);
 }
 
-void webdata::DeleteURL()
+void webdata::setusername(wxString s)
+{
+	if (username)
+		delete[] username;
+	username = StringToChar(s);
+}
+
+void webdata::setpassword(wxString s)
+{
+	if (password)
+		delete[] password;
+	password = StringToChar(s);
+}
+
+void webdata::DeleteURLs()
 {
 	delete[] url;
 	url = nullptr;
+	if (username)
+		delete[] username;
+	if (password)
+		delete[] password;
+
+	username = nullptr;
+	password = nullptr;
 }

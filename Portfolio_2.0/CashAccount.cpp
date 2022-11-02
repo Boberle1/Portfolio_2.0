@@ -63,14 +63,66 @@ bool DepositSchedule::IsOK()
 	return this->OK;
 }
 
+void DepositSchedule::Save(DataStream& ds)
+{
+	int invalid = -1;
+	int valid = 1;
+	ds.WritewxDateTime(this->m_startDate);
+
+	if (this->m_endDate.IsValid())
+	{
+		ds.WriteData(valid);
+		ds.WritewxDateTime(this->m_endDate);
+	}
+	else
+		ds.WriteData(invalid);
+
+	if (this->m_nextDepositDate.IsValid())
+	{
+		ds.WriteData(valid);
+		ds.WritewxDateTime(this->m_nextDepositDate);
+	}
+	else
+		ds.WriteData(invalid);
+
+	int days = this->m_days.GetDays();
+	ds.WriteData(this->m_deposit);
+	ds.WriteData(this->m_numberOfDeposits);
+	ds.WriteData(days);
+	ds.WriteBool(this->OK);
+}
+
+void DepositSchedule::Retrieve(DataStream& ds)
+{
+	int valid = 1;
+	int invalid = -1;
+	int test;
+	ds.ReadwxDateTime(this->m_startDate);
+
+	ds.ReadData(test);
+	if (test == valid)
+		ds.ReadwxDateTime(this->m_endDate);
+
+	ds.ReadData(test);
+	if (test == valid)
+		ds.ReadwxDateTime(this->m_nextDepositDate);
+
+	int days;
+	ds.ReadData(this->m_deposit);
+	ds.ReadData(this->m_numberOfDeposits);
+	ds.ReadData(days);
+	ds.ReadBool(this->OK);
+
+	this->m_days = wxDateSpan(0, 0, 0, days);
+}
+
 
 
 // public CashAccount Methods...
 
-CashAccount::CashAccount(double cash) 
+CashAccount::CashAccount() 
 {
-	wxDateTime date(1, wxDateTime::Month::Jan, 2000);
-	this->Deposit(date, cash);
+	
 }
 
 bool CashAccount::Purchase(long l, double d, wxDateTime t)
@@ -187,20 +239,73 @@ bool CashAccount::NewDepositSchedule(double d, int days, wxDateTime start, wxDat
 	return this->m_NewDepositSchedule(d, days, start, end);
 }
 
+bool CashAccount::ReplaceDividends(Pair p)
+{
+	if (!p.amount)
+		return this->m_EraseDividends(p);
+
+	return this->m_ReplaceDividends(p);
+}
+
+bool CashAccount::AddDividends(Pair p)
+{
+	return this->m_AddDividends(p);
+}
+
 void CashAccount::UpdateCash()
 {
 	this->m_ZeroCash();
 	this->m_cash = this->m_UpdateCash();
 }
 
-double CashAccount::GetFreeCash()
+const double CashAccount::GetFreeCash() const
 {
 	return this->m_cash;
 }
 
-const double* CashAccount::GetFreeCashPtr()
+const double* CashAccount::GetFreeCashPtr() const
 {
 	return &this->m_cash;
+}
+
+void CashAccount::Save()
+{
+	DataStream ds("SavedFiles/CashAccount.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+		return;
+
+	ds.WriteDepositVector(this->deposit);
+	ds.WriteWithdrawlVector(this->withdrawl);
+	ds.WritePurchaseVector(this->purchase);
+	ds.WriteCashDivVector(this->divs);
+
+	size_t size = this->schedule.size();
+	ds.WriteData(size);
+	for (size_t i = 0; i < size; ++i)
+		this->schedule[i].Save(ds);
+}
+
+void CashAccount::Retrieve()
+{
+	DataStream ds("SavedFiles/CashAccount.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+		return;
+
+	ds.ReadDepositVector(this->deposit);
+	ds.ReadWithdrawlVector(this->withdrawl);
+	ds.ReadPurchaseVector(this->purchase);
+	ds.ReadCashDivVector(this->divs);
+//	size_t waste;
+//	ds.ReadData(waste);
+	size_t size;
+	ds.ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->schedule.push_back(DepositSchedule());
+		this->schedule[this->schedule.size() - 1].Retrieve(ds);
+	}
+
+	this->UpdateCash();
 }
 
 // private CashAccount Methods...
@@ -272,6 +377,7 @@ double CashAccount::m_UpdateCash()
 	temp += this->m_AddDeposits();
 	temp += this->m_AddWithdrawls();
 	temp += this->m_AddPurchases();
+	temp += this->m_AddDividends();
 
 	return temp;
 }
@@ -313,7 +419,7 @@ double CashAccount::m_AddPurchases()
 {
 	double temp = 0.0;
 	for (size_t i = 0; i < this->purchase.size(); ++i)
-		temp += purchase[i].value;
+		temp += -(purchase[i].value);
 
 	return temp;
 }
@@ -349,4 +455,64 @@ void CashAccount::m_AddCash(double& d)
 void CashAccount::m_ZeroCash()
 {
 	this->m_cash = 0.0;
+}
+
+bool CashAccount::m_ReplaceDividends(Pair& p)
+{
+	Pair* ptr = this->m_FindDiv(p.ticker);
+	if (!ptr)
+	{
+		wxFAIL_MSG("Can't find Pair* in CashAccount::m_ReplaceDividends! Returning false.");
+		return false;
+	}
+
+	ptr->amount = p.amount;
+	this->UpdateCash();
+	return true;
+}
+
+bool CashAccount::m_AddDividends(Pair& p)
+{
+	if (this->m_FindDiv(p.ticker))
+	{
+		wxFAIL_MSG("Ticker: " + p.ticker + " is already in the dividend vector in CashAccount::m_AddDividends!");
+		return false;
+	}
+
+	this->divs.push_back(p);
+	this->UpdateCash();
+	return true;
+}
+
+double CashAccount::m_AddDividends()
+{
+	double d = 0.0;
+	for (auto& v : this->divs)
+		d += v.amount;
+
+	return d;
+}
+
+bool CashAccount::m_EraseDividends(Pair& p)
+{
+	Pair* ptr = this->m_FindDiv(p.ticker);
+	if (!ptr)
+	{
+		wxFAIL_MSG("Ticker: " + p.ticker + " does not exist in divs vector in CashAccount::m_EraseDividends! Returning false");
+		return false;
+	}
+
+	this->divs.erase(ptr);
+	return true;
+}
+
+Pair* CashAccount::m_FindDiv(wxString& s)
+{
+	for (auto& v : this->divs)
+	{
+		if (v.ticker == s)
+			return &v;
+	}
+
+	return NULL;
 }

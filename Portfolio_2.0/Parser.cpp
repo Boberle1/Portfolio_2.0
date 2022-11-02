@@ -125,7 +125,14 @@ Holiday_Pair* Holidays::Find(int y)
 	return nullptr;
 }
 
-Holidays holidays;
+// global Holidays instance
+static Holidays holidays;
+
+Holidays& GetHolidays()
+{
+	return holidays;
+}
+
 void GetWorkDate(wxDateTime& T, bool B)
 {
 	if (!T.IsValid())
@@ -159,7 +166,7 @@ void GetForwardWorkDay(wxDateTime& T)
 	GetForwardWorkDay(T);
 	return;
 }
-
+/*
 Parser::Parser(wxString& data, bool historical)
 {
 	BeginParse(data);
@@ -170,6 +177,7 @@ Parser::Parser(wxString& Data, void* sh, void (*foo)(void* sh, wxDateTime&, doub
 	BeginParse(Data);
 	ParseTable(Data, sh, foo, foo2, firstdate);
 }
+*/
 
 Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d), 
 	void (*cbs)(void* v, SummaryData), void (*cbd)(void* v, Dividend), wxString enddate) : m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), lastDivDate(ldd),
@@ -187,9 +195,285 @@ void Parser::UpDateAll()
 	this->UpDate(true, true);
 }
 
+
+Parser::Parser(wxString& data)
+{
+	if (!data.size())
+		return;
+
+	this->ticker = data;
+	this->UpDateSummaryData();
+}
+
 void Parser::UpDateSummaryData()
 {
 	this->PullWebData();
+}
+
+wxString Parser::GetDescription(wxString t)
+{
+	wxString url = "https://finance.yahoo.com/quote/TICKER/profile?p=TICKER";
+	wxString data = "";
+	url.Replace("TICKER", t);
+	webdata web;
+	web.seturl(url);
+	web.setpages(1);
+	web.getwebdata(data);
+
+	int index = data.find(this->Description);
+	if (index == -1)
+		return "";
+	index = data.find(this->paragragh_start, index);
+	if (index == -1)
+		return "";
+	
+	return "\t" + this->GetData(index, data, 1);
+}
+
+wxVector<DayGainersandLosers> Parser::GetStockGainers()
+{
+	wxString url = "https://finance.yahoo.com/gainers";
+	/*
+	find <table
+	then 
+	find <tr
+	then 
+	find href=
+	then getdata
+
+	find <td
+	then
+	getdata
+
+	find <td
+	then 
+	find regularMarketPrice
+	then
+	getdata
+
+	find <td
+	then
+	find regularMarketChange
+	then
+	getdata
+	*/
+	wxVector<DayGainersandLosers> vec;
+	DayGainersandLosers day;
+
+	int index = 0;
+	wxString data = "";
+	if (!this->PullWebData(url, data))
+		return vec;
+
+	index = data.find(this->tablestart);
+	if (index == -1)
+		return vec;
+
+	for (size_t i = 0; i < 20; ++i)
+	{
+		index = data.find(this->RowStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->href, index);
+		if (index == -1)
+			return vec;
+
+		day.ticker = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		day.longname = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->regularmarketprice, index);
+		if (index == -1)
+			return vec;
+
+		day.marketprice = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->spanstart, index);
+		if (index == -1)
+			return vec;
+
+		day.change = this->GetData(index, data, 1);
+
+		day.ToDoubles();
+		vec.push_back(day);
+	}
+
+	return vec;
+}
+
+wxVector<DayGainersandLosers> Parser::GetStockLosers()
+{
+	wxString url = "https://finance.yahoo.com/losers";
+	wxVector<DayGainersandLosers> vec;
+	DayGainersandLosers day;
+
+	int index = 0;
+	wxString data = "";
+	if (!this->PullWebData(url, data))
+		return vec;
+
+	index = data.find(this->tablestart);
+	if (index == -1)
+		return vec;
+
+	for (size_t i = 0; i < 20; ++i)
+	{
+		index = data.find(this->RowStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->href, index);
+		if (index == -1)
+			return vec;
+
+		day.ticker = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		day.longname = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->regularmarketprice, index);
+		if (index == -1)
+			return vec;
+
+		day.marketprice = this->GetData(index, data, 1);
+
+		index = data.find(this->DataStart, index);
+		if (index == -1)
+			return vec;
+
+		index = data.find(this->spanstart, index);
+		if (index == -1)
+			return vec;
+
+		day.change = this->GetData(index, data, 1);
+
+		day.ToDoubles();
+		vec.push_back(day);
+	}
+
+	return vec;
+}
+
+void Parser::PullFinVizOverview(wxString& url, wxVector<SectorOverview>& v)
+{
+	wxString data = "";
+	
+	if (!this->PullWebData(url, data))
+		return;
+
+	size_t index = 0;
+	wxString d = "0.0";
+	// throw the header row away...
+	this->GetToEndline(index, data);
+	++index;
+
+	while (index < data.size())
+	{
+		SectorOverview so;
+
+		// throw away first value;
+		this->GetValue(index, data);
+		++index;
+		so.name = this->GetValue(index, data);
+		if (so.name == "\"Furnishings" || so.name == "\"Health Care")
+		{
+			so.name += ',';
+			so.name += this->GetValue(++index, data);
+		}
+		++index;
+		so._numOfstocks = this->GetValue(index, data);
+		++index;
+		so._market_cap = this->GetValue(index, data);
+		++index;
+		so._dividend = this->GetValue(index, data);
+		if (!so._dividend.size())
+			so._dividend = "0.0";
+		++index;
+		so._PtoE = this->GetValue(index, data);
+		++index;
+		so._forward_PtoE = this->GetValue(index, data);
+		++index;
+		so._PEG = this->GetValue(index, data);
+		++index;
+		so._float_short = this->GetValue(index, data);
+		++index;
+		so._change = this->GetValue(index, data);
+		++index;
+		so._volume = this->GetValue(index, data);
+		++index;
+		if (index > data.size())
+			return;
+		so.ToDouble();
+		v.push_back(so);
+	}
+}
+
+void Parser::PullFinVizPerformance(wxString& url, wxVector<SectorPerformance>& v)
+{
+	wxString data = "";
+
+	if (!this->PullWebData(url, data))
+		return;
+
+	size_t index = 0;
+	this->GetToEndline(index, data);
+	++index;
+
+	while (true)
+	{
+		SectorPerformance sp;
+
+		// throw away first value;
+		this->GetValue(index, data);
+		++index;
+		sp.name = this->GetValue(index, data);
+		if (sp.name == "\"Furnishings" || sp.name == "\"Health Care")
+		{
+			sp.name += ',';
+			sp.name += this->GetValue(++index, data);
+		}
+		++index;
+		sp._week = this->GetValue(index, data);
+		++index;
+		sp._month = this->GetValue(index, data);
+		++index;
+		sp._quarter = this->GetValue(index, data);
+		++index;
+		sp._half = this->GetValue(index, data);
+		++index;
+		sp._year = this->GetValue(index, data);
+		++index;
+		sp._yearToDate = this->GetValue(index, data);
+		++index;
+
+		// throw the rest away, we already have it...
+		this->GetToEndline(index, data);
+		++index;
+		if (index > data.size())
+			return;
+		sp.ToDouble();
+		v.push_back(sp);
+	}
 }
 
 void Parser::UpDateHistoricalPrices()
@@ -202,21 +486,10 @@ void Parser::UpDateDiv()
 	this->UpDate(false, true);
 }
 
-wxString Parser::RetrieveHistoricalURL()
-{
-	return URL;
-}
-
 void Parser::SetLastDateAndCallBack(wxString date, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d))
 {
 	this->CallBack = cb;
 	this->lastdate = date;
-}
-
-void Parser::SetTickerAndPurchaseDate(wxString t, wxString pd)
-{
-	this->ticker = t;
-	this->purchaseDate = pd;
 }
 
 void Parser::SetSummaryDataCallBack(void (*cb)(void* v, SummaryData))
@@ -229,62 +502,6 @@ void Parser::SetLatestDividendDateAndCallBack(wxString div, void (*cb)(void* v, 
 	this->lastDivDate = div;
 	this->CallBackDiv = cb;
 }
-
-/*
-bool Parser::ParsePrices(wxString& Data, size_t& index)
-{
-	auto end = Day.rbegin();
-	if (end == Day.rend())
-		return false;
-
-	wxString test = end->first.Format("%G-%m-%d");
-	int find = Data.find(end->first.Format("%G-%m-%d"));
-	if (find == -1)
-	{
-		// CHECK TO SEE IF WE HAVE A BAD DATE...
-		auto it = Day.begin();
-		auto& iter = it;
-		for (it; it != Day.end(); ++it)
-			iter = it;
-
-		if (end->first > wxDateTime::Today().GetValue())
-		{
-			wxMessageBox("Bad date in Daymap in StockHistory::ParsePrices. Date is: " + iter->first.Format("%m/%d/%G") + " Date will be removed.");
-			Day.erase(iter);
-			auto next = Day.rbegin();
-			if (next == Day.rend())
-			{
-				wxMessageBox("Day map in Stock_History::ParsePrices is empty!");
-				return false;
-			}
-			find = Data.find(next->first.Format("%G-%m-%d"));
-			if (find == -1)
-			{
-				wxMessageBox("Could not find date in Stock_History::ParsePrices! Date is: " + next->first.Format("%m/%d/%G"));
-				Day.erase(next->first);
-				return false;
-			}
-		}
-	}
-
-	index = find;
-	GetToEndline(index, Data);
-	++index;
-
-	if (index >= Data.size())
-		return true;
-
-	for (index; index < Data.size(); ++index)
-		GetLine(index, Data);
-
-	for (auto& it : dayholder)
-		Day.insert(it);
-
-	dayholder.clear();
-
-	return true;
-}
-*/
 
 bool Parser::ParsePrices(wxString& Data, size_t& index)
 {
@@ -306,70 +523,6 @@ bool Parser::ParsePrices(wxString& Data, size_t& index)
 	return true;
 }
 
-/*
-void Parser::ParseStockHistory(wxString& Data)
-{
-	wxString key = "Date,Open,High,Low,Close,Adj Close,Volume\n";
-	int size = key.size();
-	int i = Data.find(key);
-	if (i == -1)
-	{
-		i = Data.find("Date,Open,High,Low,Close,Adj Close,Volume");
-		size = key.size();
-	}
-
-	if (i == -1)
-	{
-		wxMessageBox("Could not find index of date open close ect.");
-		return;
-	}
-
-	size_t index = i + size;
-	if (ParsePrices(Data, index))
-		return;
-
-	for (index; index < Data.size(); ++index)
-		GetLine(index, Data);
-
-	if (Day.size())
-	{
-		bool Notfound = false;
-		int counter = 0;
-		auto it = dayholder.find(Day.rbegin()->first);
-		auto iter = Day.rbegin();
-		auto& holder = iter;
-		if (it == dayholder.end())
-		{
-			wxMessageBox("dayholder map could not find date in Stock_History::ParseStockHistory! And ticker is: " + ticker + 
-				"! Date trying to find is: " + Day.rbegin()->first.Format("%m/%d/%G"));
-			Notfound = true;
-			do {
-				++iter;
-				if (iter == Day.rend() || counter > 30)
-				{
-					wxMessageBox("Could not find any matching dates in dayholder after iterating through 30 days in Days map!");
-					return;
-				}
-				++counter;
-				it = dayholder.find(iter->first);
-			} while (it == dayholder.end());
-		}
-
-		++it;
-		for (it; it != dayholder.end(); ++it)
-			Day.insert_or_assign(it->first, it->second);
-
-		if (Notfound)
-			Day.erase(holder->first);
-	}
-
-	else
-	{
-		for (auto it = dayholder.find(PurchaseDate); it != dayholder.end(); ++it)
-			Day.insert_or_assign(it->first, it->second);
-	}
-}
-*/
 void Parser::ParseStockHistory(wxString& Data)
 {
 	wxString key = "Date,Open,High,Low,Close,Adj Close,Volume\n";
@@ -647,9 +800,19 @@ void Parser::GetDivLine(size_t& index, wxString& Data)
 		return;
 	}
 
-	this->CallBackDiv(this->m_parent, Dividend(Date, div));
+	this->CallBackDiv(this->m_parent, Dividend(0, Date, div));
 }
 
+wxString Parser::GetValue(size_t& index, wxString& data)
+{
+	wxString value = "";
+	while (index < data.size() && data[index] != '\n' && data[index] != ',')
+		value += data[index++];
+
+	return value;
+}
+
+/*
 void Parser::ParseTable(wxString& Data, void* sh, void (*foo)(void*, wxDateTime&, double&, double&, double&, double&), void(*foo2)(wxDateTime&, bool B), wxString firstdate)
 {
 	int index = Data.find(firstdate);
@@ -673,14 +836,6 @@ void Parser::ParseTable(wxString& Data, void* sh, void (*foo)(void*, wxDateTime&
 		return;
 	}
 
-	/*
-	index = Data.find("<tbody", index + 6);
-	if (index == -1)
-	{
-		wxMessageBox("Cant find body start!");
-		return;
-	}
-	*/
 	int endindex = Data.find(body_end, index);
 	if (endindex == -1)
 	{
@@ -773,6 +928,7 @@ void Parser::ParseTable(wxString& Data, void* sh, void (*foo)(void*, wxDateTime&
 	Deincrement = wxDateTime();
 }
 
+
 void Parser::Switch(int& i, wxDateTime& T, double& o, double& h, double& l, double& c, double& ac, long& v, wxString& value)
 {
 	int index = value.find(',');
@@ -851,18 +1007,7 @@ void Parser::Switch(int& i, wxDateTime& T, double& o, double& h, double& l, doub
 	}
 	}
 }
-
-void Parser::GetHistoricalURL(wxString& Data)
-{
-	int index = Data.find(href, 0);
-	if (index == -1)
-	{
-		wxMessageBox("href was not found in Parser::GetHistorcalURL()");
-		return;
-	}
-
-	URL = HUE(index, Data);
-}
+*/
 
 wxString Parser::HUE(int index, wxString& Data)
 {
@@ -1127,9 +1272,20 @@ bool Parser::PullWebData()
 	web.seturl(URL);
 	if (!web.getwebdata(Data))
 		return false;
+	wxString result = "Found.Redirecting to /lookup?s=" + ticker;
+	if (result == Data)
+		return false;
 
 	this->ParseSummaryData(Data);
 	return true;
+}
+
+bool Parser::PullWebData(wxString& url, wxString& data)
+{
+	webdata web;
+	web.seturl(url);
+	web.setpages(1);
+	return web.getwebdata(data);
 }
 
 void Parser::ParseSummaryData(wxString& data)
@@ -1138,5 +1294,6 @@ void Parser::ParseSummaryData(wxString& data)
 
 	this->sumdata.date = wxDateTime::Today();
 	this->sumdata.time = wxDateTime::Now();
-	this->CallBackSummary(this->m_parent, this->GetSummaryData());
+	if (this->CallBackSummary)
+		this->CallBackSummary(this->m_parent, this->GetSummaryData());
 }
