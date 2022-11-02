@@ -85,7 +85,7 @@ public:
 private:
 	void AddDataToVec();
 	SectorData* IsDuplicateDate();
-	bool Replace(SectorData*);
+	void Replace(SectorData*);
 	void PushBack();
 protected:
 	double price = 0.0;

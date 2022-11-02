@@ -212,7 +212,7 @@ SectorData* ItemInfo::IsDuplicateDate()
 	return NULL;
 }
 
-bool ItemInfo::Replace(SectorData* sd)
+void ItemInfo::Replace(SectorData* sd)
 {
 	*sd = SectorData(this->price, this->day_return, this->week_return, this->month_return,
 			this->quarter_return, this->half_year_return, this->YTD_return, this->year_return, this->market_cap, this->date);
