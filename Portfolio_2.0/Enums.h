@@ -1,5 +1,9 @@
 #pragma once
 
+// Market close
+const wxDateTime _MarketClose(wxDateTime::wxDateTime_t(15));
+const wxDateTime _MarketOpen(wxDateTime::wxDateTime_t(8), 30);
+
 // expressions to be inserted into FizViz url ids to get different information...
 auto constexpr _INSERTION = "INSERTION";
 auto constexpr _INSERT_TYPE = "TYPE";
@@ -446,12 +450,13 @@ enum _EnterDialog
 	ENTER_DIVIDEND,
 	REMOVE_DIVIDEND, 
 	DAY_GAINERS_WIN,
-	DAY_LOSERS_WIN
+	DAY_LOSERS_WIN,
+	SUBSECTORWIN
 };
 
 enum _MenuItemIDs
 {
-	QUOTE_LOOKUP = REMOVE_DIVIDEND + 1,
+	QUOTE_LOOKUP = SUBSECTORWIN + 1,
 	ADD_DIV,
 	NEW_DEPOSIT,
 	NEW_DEPOSIT_SCHEDULE,

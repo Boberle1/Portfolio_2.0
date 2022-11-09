@@ -17,6 +17,13 @@ bool IswxDateEqual(wxDateTime& d1, wxDateTime& d2)
 		return false;
 	}
 
+	int year1 = d1.GetYear();
+	int year2 = d2.GetYear();
+	wxDateTime::Month m1 = d1.GetMonth();
+	wxDateTime::Month m2 = d2.GetMonth();
+	int day1 = d1.GetDay();
+	int day2 = d2.GetDay();
+
 	if (d1.GetYear() != d2.GetYear())
 		return false;
 	if (d1.GetMonth() != d2.GetMonth())
@@ -67,6 +74,7 @@ DataStream::DataStream(wxString filename, wxPosixPermissions per, wxFile::OpenMo
 	{
 		wxMessageBox(filename + " does not exist! Nothing can be read from it!");
 		this->ok = false;
+		return;
 	}
 
 	this->ok = true;
@@ -181,7 +189,7 @@ void DataStream::ReadTimeTm(wxDateTime::Tm& tm)
 
 void DataStream::WriteTimeTm(wxDateTime::Tm& tm)
 {
-	int year = tm.yday;
+	int year = tm.year;
 	int month = tm.mon;
 	int yday = tm.yday;
 	int day = tm.mday;
@@ -467,8 +475,9 @@ void DataStream::WriteSectorDataVector(wxVector<SectorData>& v)
 		this->WriteData(i.half_year_return);
 		this->WriteData(i.YTD_return);
 		this->WriteData(i.year_return);
-		this->Write(i.market_cap);
-		this->WritewxDateTime(i.date);
+		this->WriteData(i.market_cap);
+		wxDateTime::Tm tm = i.date.GetTm();
+		this->WriteTimeTm(tm);
 	}
 }
 
@@ -489,8 +498,10 @@ void DataStream::ReadSectorDataVector(wxVector<SectorData>& v)
 		this->ReadData(it.half_year_return);
 		this->ReadData(it.YTD_return);
 		this->ReadData(it.year_return);
-		this->Read(it.market_cap);
-		this->ReadwxDateTime(it.date);
+		this->ReadData(it.market_cap);
+		wxDateTime::Tm tm;
+		this->ReadTimeTm(tm);
+		it.date = wxDateTime(tm);
 	}
 }
 

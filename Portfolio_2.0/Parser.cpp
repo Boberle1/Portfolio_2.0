@@ -166,6 +166,18 @@ void GetForwardWorkDay(wxDateTime& T)
 	GetForwardWorkDay(T);
 	return;
 }
+
+bool IsMarketOpen()
+{
+	wxDateTime today(wxDateTime::Now());
+	if (today.IsWorkDay() && !holidays.IsHoliday(today))
+	{
+		if (_MarketOpen <= today && _MarketClose > today)
+			return true;
+	}
+
+	return false;
+}
 /*
 Parser::Parser(wxString& data, bool historical)
 {

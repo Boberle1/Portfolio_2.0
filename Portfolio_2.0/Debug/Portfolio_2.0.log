@@ -1,14 +1,2 @@
-﻿  CashAccount.cpp
-  DataStream.cpp
-  Parser.cpp
-  Portfolio.cpp
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\Portfolio.cpp(1683,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\DataStream.h(417,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\Portfolio.cpp(2662): message : see reference to function template instantiation 'void DataStream::ReadwxVector<_Sector>(wxVector<_Sector> &)' being compiled
-  PortfolioApp.cpp
-  mainwindow.cpp
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(633,24): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(1952,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(1978,24): warning C4018: '<': signed/unsigned mismatch
-  Generating Code...
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\Portfolio.cpp(219): error C4716: 'ItemInfo::Replace': must return a value
+﻿  mainwindow.cpp
+  Portfolio_2.0.vcxproj -> C:\Users\brand\source\repos\Portfolio_2.0\Debug\Portfolio_2.0.exe

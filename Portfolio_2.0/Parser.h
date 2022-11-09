@@ -67,6 +67,7 @@ struct Holidays
 Holidays& GetHolidays();
 void GetWorkDate(wxDateTime& T, bool B = false);
 void GetForwardWorkDay(wxDateTime& T);
+bool IsMarketOpen();
 
 enum DataType
 {

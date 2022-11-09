@@ -6,6 +6,7 @@
 #include "wx/event.h"
 
 constexpr auto STANDARD_DATE = "%m/%d/%G";
+constexpr auto STANDARD_TIME = "%H:%M:%S";
 constexpr auto DATE_KEY = "%G-%m-%d";
 
 constexpr auto _BONDS = "Bonds";
@@ -65,15 +66,17 @@ bool IsNull(T* t, wxString msg)
 class ItemInfo
 {
 public:
-	ItemInfo(wxString, wxString);
-	ItemInfo(wxString&, wxString&, SectorPerformance&);
-	void _SetAllData(wxString, wxString, SectorPerformance&);
-	void _SetOverViewData(wxString, wxString);
+	ItemInfo(double&, double&);
+	ItemInfo() {}
+	ItemInfo(double&, double&, SectorPerformance&);
+	void _SetAllData(double, double, SectorPerformance&);
+	void _SetOverViewData(double, double);
 	void _SetPerformance(SectorPerformance&);
-	void _SetPerformance(SectorPerformance&, double&, wxString&, double&);
+	void _SetPerformance(SectorPerformance&, double&, double&, double&);
 	void _SetTimeStamp(wxDateTime&);
 	void _Write(DataStream&);
 	void _Read(DataStream&);
+	bool IsUpToDate();
 	wxString GetDayReturnString() const { return wxNumberFormatter::ToString(this->day_return, 2) + '%'; } 
 	wxString GetWeekReturnString() const { return wxNumberFormatter::ToString(this->week_return, 2) + '%'; }
 	wxString GetMonthReturnString() const { return wxNumberFormatter::ToString(this->month_return, 2) + '%'; }
@@ -81,8 +84,9 @@ public:
 	wxString GetDayhalfyearString() const { return wxNumberFormatter::ToString(this->half_year_return, 2) + '%'; }
 	wxString GetYTDReturnString() const { return wxNumberFormatter::ToString(this->YTD_return, 2) + '%'; }
 	wxString GetYearReturnString() const { return wxNumberFormatter::ToString(this->year_return, 2) + '%'; }
-	wxString GetMarketCapString() const { return this->market_cap; }
+	wxString GetMarketCapString() const { return wxNumberFormatter::ToString(this->market_cap, 5); }
 private:
+	void Populate(SectorData&);
 	void AddDataToVec();
 	SectorData* IsDuplicateDate();
 	void Replace(SectorData*);
@@ -96,7 +100,7 @@ protected:
 	double half_year_return = 0.0;
 	double YTD_return = 0.0;
 	double year_return = 0.0;
-	wxString market_cap = "";
+	double market_cap = 0.0;
 	wxDateTime date;
 	wxVector<SectorData> vec;
 };
@@ -110,19 +114,21 @@ class SubSector : public ItemInfo
 {
 public:
 	SubSector(ParentSector*);
-	SubSector(ParentSector*, _Sub_Sector, wxString, wxString, wxString);
-	SubSector(ParentSector*, _Sub_Sector, wxString, wxString, wxString, SectorPerformance&);
-	void SetAllData(wxString, wxString, SectorPerformance&);
-	void SetOverViewData(wxString, wxString);
+	SubSector(ParentSector*, DataStream&);
+	SubSector(ParentSector*, _Sub_Sector, wxString&, double&, double&);
+	SubSector(ParentSector*, _Sub_Sector, wxString&, double&, double&, SectorPerformance&);
+	void SetAllData(wxString&, double&, double&, SectorPerformance&);
+	void SetOverViewData(wxString&, double&, double&);
 	void SetPerformance(SectorPerformance&);
 	void SetParent(ParentSector*);
 	_Sub_Sector GetSubSecID();
 	void Read(DataStream&);
 	void Write(DataStream&);
+	wxString GetSectorName() const { return this->sectorname; }
 private:
 	ParentSector* m_parent = nullptr;
 	_Sub_Sector ID = _Sub_Sector::SUB_SECTOR_INVALID;
-	wxString sectorname = _SECTOR_INVALID;
+	wxString sectorname = "";
 };
 
 // This is the parent to SubSector...
@@ -130,19 +136,22 @@ class ParentSector : public ItemInfo
 {
 public:
 	ParentSector(SectorClass*);
+	ParentSector(SectorClass*, DataStream&);
 	ParentSector(SectorClass*, _Sector, wxString, wxString);
-	void SetAllData(wxString, wxString, SectorPerformance&);
-	void SetOverViewData(wxString, wxString, wxString);
-	bool SetSubSectorOverviewData(_Sub_Sector, wxString, wxString);
+	void SetAllData(wxString&, double&, double&, SectorPerformance&);
+	bool SetSubSectorOverviewData(_Sub_Sector, wxString&, double&, double&);
 	void SetSubSectorPerformance(SectorPerformance&);
+	void SetSubSecData(wxString&, double&, double&, SectorPerformance&);
 	_Sector GetSectorId();
 	void Read(DataStream&);
 	void Write(DataStream&);
+	wxVector<SubSector>* GetSubSector() { return &this->subsecs; }
+	wxString GetSectorName() { return this->sectorName; }
 private:
 	void m_GetSubSectorData();
 	void m_GetSubSectorPerformance();
 	wxString m_GetNameToInsert();
-	wxString sectorName = _SECTOR_INVALID;
+	wxString sectorName = "";
 	wxString market_cap = "";
 	_Sector ID = _Sector::SECTOR_INVALID;
 	wxVector<SubSector> subsecs;
@@ -165,8 +174,9 @@ public:
 	const wxVector<wxString>* GetSubSectorString(_Sector);
 	const wxVector<_Sector>* GetSector();
 	const wxVector<wxString>* GetSectorString();
-	const ParentSector* GetSector(_Sector);
-	void Read();
+	ParentSector* GetSector(_Sector);
+	wxVector<SubSector>* GetSubSectorVec(_Sector);
+	bool Read();
 	void Save();
 private:
 	wxString m_GetSubSector(wxVector<_Sub_Sector>&, wxVector<wxString>&, _Sub_Sector);
@@ -176,6 +186,7 @@ private:
 	wxString m_GetURL(_Sector);
 	void m_SetData(SectorOverview&, SectorPerformance&);
 	void m_FetchSectorData();
+	bool IsUpToDate();
 private:
 	wxVector<_Sector> sec;
 	wxVector<wxString> _sec;
@@ -413,7 +424,7 @@ struct StockViewerData
 	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
 	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2) + "%"; }
 	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2) + "%"; }
-	wxString GetTotalGain(){ return wxNumberFormatter::ToString(this->total_gain * 100, 2) + "%"; }
+	wxString GetTotalGain(){ return wxNumberFormatter::ToString(this->total_gain * 100, 2); }
 	wxString GetPortfolioPerc() { return wxNumberFormatter::ToString(this->m_parent->PortfolioPerc * 100, 2) + "%"; }
 	wxString GetCostBasis(){ return wxNumberFormatter::ToString(this->cost_basis, 2); }
 	wxString GetMarketValue(){ return wxNumberFormatter::ToString(this->market_value, 2); }
@@ -481,6 +492,8 @@ public:
 	double GetDividends(wxDateTime*);
 	double GetDividendShares(wxDateTime*);
 	void GetDividendVec(wxVector<Dividend>&);
+	bool IsPendingDivReInvest();
+	bool SetReInvestShares(double&);
 	void Save(DataStream&);
 	void Retrieve(DataStream&);
 private:
@@ -496,7 +509,6 @@ private:
 	double m_average_sold_price = 0.0;
 	Action action = UNDEFINED;
 
-	
 	// Purchased stock_nodes can have multiple siblings because you can sell partial lots. Example, you sell two shares of 
 	// a four share lot and later on sell the other two shares. That would create two siblings of the same lot number....
 	wxVector<stock_node> sold;
@@ -553,18 +565,21 @@ public:
 	void SetHistoricalData(Day_Prices);
 	void SetSummaryData(SummaryData);
 	void SetDividends(Dividend);
+	bool SetReInvestShares(double&);
 	void OnThreadComplete(wxCommandEvent&);
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
 	StockViewerData* GetStockViewerData();
+	bool PendingReInvestment();
 	void Save();
 	void Retrieve();
 
 	// GetDividend Reinvestment shares...
-	double GetDividendShares();
+	double GetDividendShares(bool latest = false);
 	wxVector<stock_node*> GetChildren();
 
 private:
+	bool DistributeReInvestmentShares(double&);
 	bool UpDate(bool force_update = false);
 	bool Historical_prices_UpToDate();
 	double GetDeviation(int);
@@ -624,6 +639,7 @@ public:
 	~Sector();
 	bool Purchase(long, wxString, wxString, double, double, bool, wxString);
 	bool Sell(long&, wxDateTime&, double&, double&);
+	bool AddReInvestShares(double&);
 	bool IsId(_Sector);
 	bool IsChild(wxString&);
 	bool IsChild(long&);
@@ -663,8 +679,10 @@ class Portfolio : public Return_node
 public:
 	Portfolio(wxFrame*, double, wxDateTime*);
 	bool Purchase(_Sector, wxString, wxString, double, double, bool, wxString);
+	bool DoesTickerExist(wxString&);
 	bool RequestSell(wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
+	bool AddReInvestShares(double&);
 	wxVector<stock_node*> GetLotData();
 	bool NewDepositSchedule(double, int, wxDateTime);
 	int GetNumItems(_PortfolioType);

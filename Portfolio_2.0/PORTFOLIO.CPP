@@ -104,43 +104,28 @@ wxString inline GetSectorName(_Sector sect)
 }
 
 // ItemInfo functions...
-ItemInfo::ItemInfo(wxString marketcap, wxString daygain) : market_cap(marketcap)
+ItemInfo::ItemInfo(double& marketcap, double& daygain) : market_cap(marketcap), day_return(daygain)
 {
-	if (daygain.find('%') != -1)
-		daygain = daygain.Mid(0, daygain.size() - 1);
 
-	if (!daygain.ToDouble(&this->day_return))
-		wxMessageBox("ToDouble failed in ItemInfo::ItemInfow(wxString, wxString)! String was: " + daygain);
 }
 
-ItemInfo::ItemInfo(wxString& marketcap, wxString& daygain, SectorPerformance& sp) : market_cap(marketcap)
+ItemInfo::ItemInfo(double& marketcap, double& daygain, SectorPerformance& sp) : market_cap(marketcap), day_return(daygain)
 {
-	if (daygain.find('%') != -1)
-		daygain = daygain.Mid(0, daygain.size() - 1);
-
-	if (!daygain.ToDouble(&this->day_return))
-		wxMessageBox("ToDouble failed in ItemInfo::ItemInfow(wxString, wxString)! String was: " + daygain);
-
 	this->_SetPerformance(sp);
 	this->AddDataToVec();
 }
 
-void ItemInfo::_SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+void ItemInfo::_SetAllData(double m_cap, double daygain, SectorPerformance& sp)
 {
 	this->_SetOverViewData(m_cap, daygain);
 	this->_SetPerformance(sp);
 	this->AddDataToVec();
 }
 
-void ItemInfo::_SetOverViewData(wxString m_cap, wxString daygain)
+void ItemInfo::_SetOverViewData(double m_cap, double daygain)
 {
 	this->market_cap = m_cap;
-
-	if (daygain.find('%') != -1)
-		daygain = daygain.Mid(0, daygain.size() - 1);
-
-	if (!daygain.ToDouble(&this->day_return))
-		wxMessageBox("ToDouble failed in ItemInfo::SetOverViewData(wxString, wxString)! String was: " + daygain);
+	this->day_return = daygain;
 }
 
 void ItemInfo::_SetPerformance(SectorPerformance& sp)
@@ -154,7 +139,7 @@ void ItemInfo::_SetPerformance(SectorPerformance& sp)
 	this->date = sp.stamp;
 }
 
-void ItemInfo::_SetPerformance(SectorPerformance& sp, double& day, wxString& m_cap, double& m_price)
+void ItemInfo::_SetPerformance(SectorPerformance& sp, double& day, double& m_cap, double& m_price)
 {
 	this->week_return = sp.week;
 	this->month_return = sp.month;
@@ -181,11 +166,49 @@ void ItemInfo::_Write(DataStream& ds)
 void ItemInfo::_Read(DataStream& ds)
 {
 	ds.ReadSectorDataVector(this->vec);
+	if (this->vec.rbegin() != this->vec.rend())
+		this->Populate(*this->vec.rbegin());
+}
+
+bool ItemInfo::IsUpToDate()
+{
+	wxDateTime today = wxDateTime::Now();
+	if (this->vec.rbegin() == this->vec.rend())
+		return false;
+
+	wxDateTime lastpull = this->vec.rbegin()->date;
+	if (!lastpull.IsValid())
+	{
+		wxFAIL_MSG("lastpull in ItemInfo::IsUpToDate is invalid wxDateTime!");
+		this->vec.erase(&*this->vec.rbegin());
+		return false;
+	}
+
+	if (!IswxDateEqual(today, lastpull))
+		return false;
+
+	if ((_MarketClose.GetValue() - lastpull.GetValue()) >= 0)
+		return false;
+
+	return true;
+}
+
+void ItemInfo::Populate(SectorData& sd)
+{
+	this->price = sd.price;
+	this->day_return = sd.day_return;
+	this->week_return = sd.week_return;
+	this->month_return = sd.month_return;
+	this->quarter_return = sd.quarter_return;
+	this->half_year_return = sd.half_year_return;
+	this->year_return = sd.year_return;
+	this->YTD_return = sd.YTD_return;
+	this->date = sd.date;
 }
 
 void ItemInfo::AddDataToVec()
 {
-	if (this->vec.size())
+	if (!this->vec.size())
 	{
 		this->PushBack();
 		return;
@@ -225,30 +248,37 @@ void ItemInfo::PushBack()
 }
 
 // SubSector class functions...
-SubSector::SubSector(ParentSector* p) : ItemInfo("", "0.0"), m_parent(p)
+SubSector::SubSector(ParentSector* p) : ItemInfo(), m_parent(p)
 {
 
 }
 
-SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString name, wxString m_cap, wxString daygain) : ItemInfo(m_cap, daygain),
+SubSector::SubSector(ParentSector* parent, DataStream& ds) : ItemInfo(), m_parent(parent)
+{
+	this->Read(ds);
+}
+
+SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString& name, double& m_cap, double& daygain) : ItemInfo(m_cap, daygain),
 	m_parent(p), ID(ss), sectorname(name)
 {
 
 }
 
-SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString name, wxString m_cap, wxString day_gain, SectorPerformance& sp) 
+SubSector::SubSector(ParentSector* p, _Sub_Sector ss, wxString& name, double& m_cap, double& day_gain, SectorPerformance& sp) 
 	: ItemInfo(m_cap, day_gain, sp), m_parent(p), ID(ss), sectorname(name)
 {
 
 }
 
-void SubSector::SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+void SubSector::SetAllData(wxString& _name, double& m_cap, double& daygain, SectorPerformance& sp)
 {
+	this->sectorname = _name;
 	this->_SetAllData(m_cap, daygain, sp);
 }
 
-void SubSector::SetOverViewData(wxString m_cap, wxString daygain)
+void SubSector::SetOverViewData(wxString& _name, double& m_cap, double& daygain)
 {
+	this->sectorname = _name;
 	this->_SetOverViewData(m_cap, daygain);
 }
 
@@ -282,36 +312,36 @@ void SubSector::Write(DataStream& ds)
 }
 
 // ParentSector class functions...
-ParentSector::ParentSector(SectorClass* parent) : ItemInfo("", "0.0"), m_parent(parent)
+ParentSector::ParentSector(SectorClass* parent) : m_parent(parent)
 {
 
 }
 
-ParentSector::ParentSector(SectorClass* parent, _Sector secid, wxString URL, wxString name) : ItemInfo("", "0.0"),
+ParentSector::ParentSector(SectorClass* parent, DataStream& ds) : m_parent(parent)
+{
+	this->Read(ds);
+}
+
+ParentSector::ParentSector(SectorClass* parent, _Sector secid, wxString URL, wxString name) : 
 	m_parent(parent), ID(secid), url(URL), sectorName(name)
 {
 	this->url.Replace(_PERFORMANCE, _INSERTION);
 	this->m_GetSubSectorData();
 }
 
-void ParentSector::SetAllData(wxString m_cap, wxString daygain, SectorPerformance& sp)
+void ParentSector::SetAllData(wxString& _name, double& m_cap, double& change, SectorPerformance& sp)
 {
-	this->_SetAllData(m_cap, daygain, sp);
+	this->sectorName = _name;
+	this->_SetAllData(m_cap, change, sp);
 }
 
-void ParentSector::SetOverViewData(wxString name, wxString m_cap, wxString daygain)
-{
-	this->sectorName = name;
-	this->_SetOverViewData(m_cap, daygain);
-}
-
-bool ParentSector::SetSubSectorOverviewData(_Sub_Sector s, wxString m_cap, wxString daygain)
+bool ParentSector::SetSubSectorOverviewData(_Sub_Sector s, wxString& _name, double& m_cap, double& daygain)
 {
 	for (size_t i = 0; i < this->subsecs.size(); ++i)
 	{
 		if (subsecs[i].GetSubSecID() == s)
 		{
-			subsecs[i].SetOverViewData(m_cap, daygain);
+			subsecs[i].SetOverViewData(_name, m_cap, daygain);
 			return true;
 		}
 	}
@@ -332,6 +362,20 @@ void ParentSector::SetSubSectorPerformance(SectorPerformance& sp)
 	}
 
 	wxFAIL_MSG("ParentSector::SetSubSectorPerformance failed in finding a match in subsecs");
+}
+
+void ParentSector::SetSubSecData(wxString& name, double& m_cap, double& daychange, SectorPerformance& sp)
+{
+	for (auto& v : this->subsecs)
+	{
+		if (v.GetSubSecID() == this->m_parent->GetSubSectorID(this->ID, sp.name))
+		{
+			v.SetAllData(name, m_cap, daychange, sp);
+			return;
+		}
+	}
+
+	wxFAIL_MSG("ParentSector::SetSubSecData failed in finding a match in subsecs");
 }
 
 _Sector ParentSector::GetSectorId()
@@ -363,7 +407,7 @@ void ParentSector::Write(DataStream& ds)
 	this->_Write(ds);
 
 	size_t size = this->subsecs.size();
-	ds.ReadData(size);
+	ds.WriteData(size);
 	for (auto& v : this->subsecs)
 		v.Write(ds);
 }
@@ -385,10 +429,7 @@ void ParentSector::m_GetSubSectorData()
 	parser.PullFinVizPerformance(temp, v2);
 
 	for (size_t i = 0; i < v.size(); ++i)
-		this->subsecs.push_back(SubSector(this, this->m_parent->GetSubSectorID(this->ID, v[i].name), v[i].name, v[i]._market_cap, v[i]._change));
-
-	for (auto& v_2 : v2)
-		this->SetSubSectorPerformance(v_2);
+		this->subsecs.push_back(SubSector(this, this->m_parent->GetSubSectorID(this->ID, v[i].name), v[i].name, v[i].market_cap, v[i].change, v2[i]));
 }
 
 void ParentSector::m_GetSubSectorPerformance()
@@ -790,8 +831,11 @@ void SectorClass::ActivateData()
 	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=realestate&v=140&o=name");
 	this->urls.push_back("https://finviz.com/grp_export.ashx?g=industry&sg=utilities&v=140&o=name");
 
-	for (size_t i = 8; i < this->sec.size() - 1; ++i)
-		this->parentsector.push_back(ParentSector(this, this->sec[i], this->m_GetURL(this->sec[i]), this->_sec[i]));
+	if (!this->Read())
+	{
+		for (size_t i = 8; i < this->sec.size() - 1; ++i)
+			this->parentsector.push_back(ParentSector(this, this->sec[i], this->m_GetURL(this->sec[i]), this->_sec[i]));
+	}
 
 	this->m_FetchSectorData();
 }
@@ -840,7 +884,7 @@ wxString SectorClass::GetSubSectorString(_Sector s, _Sub_Sector sub)
 
 _Sector SectorClass::GetSectorID(wxString s)
 {
-	for (size_t i = 0; i < this->sec.size(); ++i)
+	for (size_t i = 0; i < this->_sec.size(); ++i)
 	{
 		if (this->_sec[i] == s)
 			return this->sec[i];
@@ -900,7 +944,7 @@ const wxVector<wxString>* SectorClass::GetSectorString()
 	return &this->_sec;
 }
 
-const ParentSector* SectorClass::GetSector(_Sector s)
+ParentSector* SectorClass::GetSector(_Sector s)
 {
 	for (size_t i = 0; i < this->parentsector.size(); ++i)
 	{
@@ -911,22 +955,27 @@ const ParentSector* SectorClass::GetSector(_Sector s)
 	return nullptr;
 }
 
-void SectorClass::Read()
+wxVector<SubSector>* SectorClass::GetSubSectorVec(_Sector s)
+{
+	ParentSector* ps = this->GetSector(s);
+	if (ps)
+		return ps->GetSubSector();
+
+	return NULL;
+}
+
+bool SectorClass::Read()
 {
 	DataStream ds("SavedFiles/SectorClass.bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
 	if (!ds.IsOK())
-	{
-		wxFAIL_MSG("Could not read from: SavedFiles/SectorClass.bin! It does not exist! In SectorClass::Read");
-		return;
-	}
+		return false;
 
 	size_t size;
 	ds.ReadData(size);
 	for (size_t i = 0; i < size; ++i)
-	{
-		this->parentsector.push_back(ParentSector(this));
-		this->parentsector.rbegin()->Read(ds);
-	}
+		this->parentsector.push_back(ParentSector(this, ds));
+
+	return true;
 }
 
 void SectorClass::Save()
@@ -1004,7 +1053,11 @@ wxVector<wxString>& SectorClass::m_GetSubSectorStringVec(_Sector s)
 	case _Sector::REAL_ESTATE: return this->_real_estate;
 	case _Sector::UTILITIES: return this->_utilities;
 		// returning empty vector...
-	default: return emptystring;
+	default:
+	{
+		wxFAIL_MSG("No _Sector matches in SectorClass::m_GetSubSectorStringVec!");
+		return emptystring;
+	}
 	}
 }
 
@@ -1031,13 +1084,11 @@ wxString SectorClass::m_GetURL(_Sector s)
 void SectorClass::m_SetData(SectorOverview& so, SectorPerformance& sp)
 {
 	_Sector s = this->GetSectorID(sp.name);
-	wxDateTime stamp = wxDateTime::Today();
 	for (size_t i = 0; i < this->parentsector.size(); ++i)
 	{
 		if (this->parentsector[i].GetSectorId() == s)
 		{
-			this->parentsector[i].SetOverViewData(so.name, so._market_cap, so._change);
-			this->parentsector[i]._SetPerformance(sp);
+			this->parentsector[i].SetAllData(so.name, so.market_cap, so.change, sp);
 			return;
 		}
 	}
@@ -1047,6 +1098,10 @@ void SectorClass::m_SetData(SectorOverview& so, SectorPerformance& sp)
 
 void SectorClass::m_FetchSectorData()
 {
+	// We need to check if data is up to date...
+	if (this->IsUpToDate())
+		return;
+	
 	wxVector<SectorOverview> v;
 	wxVector<SectorPerformance> v2;
 	wxString empty = "";
@@ -1062,6 +1117,18 @@ void SectorClass::m_FetchSectorData()
 
 	for (size_t i = 0; i < v.size(); ++i)
 		this->m_SetData(v[i], v2[i]);
+}
+
+bool SectorClass::IsUpToDate()
+{
+	if (this->parentsector.begin() != this->parentsector.end())
+		return this->parentsector.begin()->IsUpToDate();
+
+	else
+	{
+		wxFAIL_MSG("In SectorClass::IsUpToDate this->parentsector vec is empty!!");
+		return false;
+	}
 }
 
 static SectorClass sc;
@@ -1287,6 +1354,31 @@ double stock_node::GetDividendShares(wxDateTime* date)
 void stock_node::GetDividendVec(wxVector<Dividend>& v)
 {
 	this->FillClientDividendVec(v);
+}
+
+bool stock_node::IsPendingDivReInvest()
+{
+	for (auto& v : this->divs)
+	{
+		if (v.DivReinvest && v.IsPendingReInvestment())
+			return true;
+	}
+
+	return false;
+}
+
+bool stock_node::SetReInvestShares(double& s)
+{
+	for (auto& v : this->divs)
+	{
+		if (v.DivReinvest && v.IsPendingReInvestment())
+		{
+			v.AddReInvestmentShares(s);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void stock_node::Save(DataStream& ds)
@@ -1609,7 +1701,11 @@ void StockNode::Calibrate(bool force)
 	double _marketprice = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.marketprice : marketvalue / this->GetShares();
 	double _previous_close = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.previousclose : this->GetPreviousClose(&T);
 
-	this->svd = StockViewerData(this, this->m_ticker, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
+	// We put an astrisk next to the name if the stock is enrolled in dividend re investment
+	// and there is a pending re investment that needs to be entered by the user...
+	wxString t = !this->PendingReInvestment() ? this->m_ticker + " *" : this->m_ticker;
+
+	this->svd = StockViewerData(this, t, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
 		_shares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
 		marketvalue, this->GetDividends());
@@ -1624,6 +1720,41 @@ void StockNode::ClockChange()
 }
 
 // StockNode private functions...
+
+bool StockNode::DistributeReInvestmentShares(double& s)
+{
+	wxVector<double> ratio;
+	wxDateTime today(wxDateTime::Today());
+	double total = 0.0;
+	for (auto& v : this->bought)
+	{
+		ratio.push_back((v.GetShares(&today) + v.GetDividendShares(&today)) * this->current_Data.marketprice);
+		total += *ratio.rbegin();
+	}
+
+	// check to make sure total is not zero. If it is then there is no shares to distribute. Return false;
+	if (!total)
+	{
+		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares! Returning false!");
+		return false;
+	}
+
+	bool result = true;
+	bool endresult = true;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		if (ratio[i])
+		{
+			double rat = ratio[i] / total;
+			double val = s * rat;
+			result = this->bought[i].SetReInvestShares(val);
+			if (!result && endresult)
+				endresult = false;
+		}
+	}
+
+	return endresult;
+}
 
 bool StockNode::UpDate(bool force_update)
 {
@@ -1680,7 +1811,7 @@ double StockNode::GetDeviation(int days)
 
 	double mean = total / size;
 	index = it;
-	for (size_t i = 0; i < size; ++i)
+	for (int i = 0; i < size; ++i)
 		standardDiv += std::pow((index->close - mean), 2);
 
 	return std::sqrt(standardDiv / (size - 1));
@@ -1998,13 +2129,13 @@ bool StockNode::m_Sell(long& id, wxDateTime& date, double& price_per_share, doub
 
 stock_node* StockNode::FindLot(long& id)
 {
-	for (size_t i = 0; i < this->bought.size(); ++i)
+	for (auto& v : this->bought)
 	{
-		if (bought[i].IdMatch(id))
-			return &bought[i];
+		if (v.IdMatch(id))
+			return &v;
 	}
-
-	return nullptr;
+	
+	return NULL;
 }
 
 Parser* StockNode::NewParser()
@@ -2142,6 +2273,19 @@ void StockNode::SetDividends(Dividend d)
 	}
 }
 
+bool StockNode::SetReInvestShares(double& s)
+{
+	wxDateTime date(wxDateTime::Today());
+	double shares = this->m_GetShares(&date);
+	shares += this->GetDividendShares(true);
+	if (s > shares)
+		shares = s - shares;
+	else
+		shares = s;
+
+	return this->DistributeReInvestmentShares(s);
+}
+
 void StockNode::OnThreadComplete(wxCommandEvent&)
 {
 	this->m_parent->ThreadComplete(this);
@@ -2171,6 +2315,17 @@ wxVector<Dividend> StockNode::GetDividendVec()
 StockViewerData* StockNode::GetStockViewerData()
 {
 	return &this->svd;
+}
+
+bool StockNode::PendingReInvestment()
+{
+	for (auto& v : this->bought)
+	{
+		if (v.IsPendingDivReInvest())
+			return true;
+	}
+
+	return false;
 }
 
 void StockNode::Save()
@@ -2225,9 +2380,9 @@ void StockNode::Retrieve()
 	this->Calibrate();
 }
 
-double StockNode::GetDividendShares()
+double StockNode::GetDividendShares(bool today)
 {
-	wxDateTime T = *this->m_parentclock;
+	wxDateTime T = today ? wxDateTime::Today() : *this->m_parentclock;
 	double d = 0.0;
 	for (size_t i = 0; i < this->bought.size(); ++i)
 		d += this->bought[i].GetDividendShares(&T);
@@ -2305,6 +2460,17 @@ bool Sector::Sell(long& lot, wxDateTime& d, double& shares, double& price)
 
 	bool result = this->sn->Sell(lot, d, price, shares);
 	return result;
+}
+
+bool Sector::AddReInvestShares(double& shares)
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::AddReInvestShares!");
+		return false;
+	}
+
+	return this->sn->SetReInvestShares(shares);
 }
 
 bool Sector::IsId(_Sector s)
@@ -2538,6 +2704,11 @@ bool Portfolio::NewDepositSchedule(double d, int i, wxDateTime date)
 	return result;
 }
 
+bool Portfolio::DoesTickerExist(wxString& t)
+{
+	return this->RequestSell(t);
+}
+
 bool Portfolio::RequestSell(wxString& ticker)
 {
 	this->sec = NULL;
@@ -2568,6 +2739,17 @@ bool Portfolio::Sell(long& lot, wxDateTime& d, double& shares, double& price)
 	}
 
 	return false;
+}
+
+bool Portfolio::AddReInvestShares(double& shares)
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::AddReInvestShares!");
+		return false;
+	}
+
+	return this->sec->AddReInvestShares(shares);
 }
 
 wxVector<stock_node*> Portfolio::GetLotData()

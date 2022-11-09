@@ -69,6 +69,7 @@ public:
 	bool IsID(int);
 	bool IsMatch(wxString);
 	void OnClickEvent(wxMouseEvent&);
+	void OnRightClick(wxMouseEvent&);
 	void OnClickRowOff();
 	void OnClickColOff();
 	void OnClickItemOff();
@@ -100,6 +101,8 @@ private:
 	bool SummaryItem = false;
 };
 
+class mainwindow;
+
 class GridView : public wxGridSizer
 {
 public:
@@ -113,6 +116,7 @@ public:
 	void OnClickRowItem(GridNode*);
 	void OnClickItem(GridNode*);
 	void LayoutGrid();
+	void RightClickAlert(wxString&);
 private:
 //	wxStaticText* GetNewItem(size_t, size_t, double, bool ispercent = true);
 	void SetTitleRow();
@@ -153,7 +157,6 @@ private:
 	bool SummaryRowSet = false;
 };
 
-class mainwindow;
 
 class PortfolioWin : public wxWindow
 {
@@ -170,6 +173,9 @@ private:
 	wxTextCtrl* datepcker = nullptr;
 	wxDateTime* mainclock = nullptr;
 	wxDateTime today;
+	wxStaticText* beginParenths = nullptr;
+	wxStaticText* dollarsign = nullptr;
+	wxStaticText* endParenths = nullptr;
 	wxStaticText* todaysdate = nullptr;
 	wxStaticText* todaysdateDisplay = nullptr;
 	wxStaticText* Cash = nullptr;
@@ -180,6 +186,11 @@ private:
 	wxStaticText* MarketValueDisplay = nullptr;
 	wxStaticText* TotalReturn = nullptr;
 	wxStaticText* TotalReturnDisplay = nullptr;
+	wxStaticText* TotalReturnDollar = NULL;
+	wxStaticText* t_percent = NULL;
+	wxStaticText* t_dollar = NULL;
+	wxStaticText* t_beginparenths = NULL;
+	wxStaticText* t_endParenths = NULL;
 	wxStaticText* DayReturn = nullptr;
 	wxStaticText* DayReturnDisplay = nullptr;
 	StockViewerData* svd = nullptr;
@@ -188,8 +199,10 @@ private:
 	Portfolio* port = nullptr;
 	wxButton* updatebutton = nullptr;
 	wxColour Red = wxColour(217, 7, 28);
-	wxColour Green = wxColour(6, 84, 27);
+//	wxColour Green = wxColour(6, 84, 27);
+	wxColour Green = wxColour(16, 82, 31);
 	wxColour Blue = wxColour(36, 11, 191);
+	wxColour DarkGrey = wxColour(43, 43, 43);
 };
 
 struct PurchaseKit
@@ -232,6 +245,8 @@ public:
 	PurchaseKit GetPurchaseKit();
 	GenericKit GetGenericKit();
 	SellKit GetSellKit();
+	double GetReInvestShares();
+	wxString GetTicker();
 	wxDECLARE_EVENT_TABLE();
 private:
 	void CreateStockEntry();
@@ -241,15 +256,18 @@ private:
 	void CreateDepositScheduleWin();
 	void CreateSellStockWin();
 	void CreateAddDividendWin();
+	void CreateAddReInvestShares();
 
 	// helper func for CreateStockEntry, it creates the wxChoice controls for selecting sector and industry(subsector)...
 	void CreateChoiceControls();
 	void CreateDayGainers_LosersWin(bool gainers = true);
+	void CreateSubSectorWin();
 	void OnCheckClick(wxCommandEvent&);
 	void OnCancelDialog(wxCommandEvent&);
 	void OnCloseDialog(wxCloseEvent&);
 	void OnOkClick(wxCommandEvent&);
 	void OnSectorChoice(wxCommandEvent&);
+	void OnKeyDown(wxKeyEvent&);
 
 	// event functio for DayGainers_LosersWin...
 	void OnMouseDown(wxMouseEvent&);
@@ -260,6 +278,7 @@ private:
 	bool HandleWithdrawlOkClick();
 	bool HandleSellStockOkClick();
 	void HandleAddDividendOkClick();
+	bool HandleReInvestSharesOkClick();
 private:
 	mainwindow* m_parent = nullptr;
 	wxStaticText* s_ticker = nullptr;
@@ -296,6 +315,7 @@ private:
 	SummaryData* sumptr = nullptr;
 	GenericKit* sellkit = NULL;
 	wxVector<DayGainersandLosers>* gainers = nullptr;
+    wxVector<SubSector>* sub = NULL;
 };
 
 class SellStockWin : public wxSingleChoiceDialog
@@ -310,8 +330,13 @@ class BottomFrame : public wxWindow
 {
 public: 
 	BottomFrame(mainwindow*, wxWindowID);
+	wxDECLARE_EVENT_TABLE();
+	void OnMouseEnter(wxMouseEvent&);
+	void OnMouseLeave(wxMouseEvent&);
+	void OnMouseDown(wxMouseEvent&);
 private:
 	void Create();
+	void BindEvents(wxStaticText&);
 private:
 	mainwindow* m_parent = nullptr;
 	wxStaticText* materials = nullptr;
@@ -325,6 +350,7 @@ private:
 	wxStaticText* real_estate = nullptr;
 	wxStaticText* tech = nullptr;
 	wxStaticText* utilities = nullptr;
+	wxStaticText* textenter = NULL;
 };
 
 class mainwindow : public wxFrame
@@ -335,12 +361,17 @@ public:
 	wxFrame* PurchaseWin();
 	void DialogCancel();
 	void PurchaseDataTransfer(PurchaseKit&);
+	void ReInvestShares(double&, wxString&);
+	bool ValidateExistingTicker(wxString&);
+	void SectorClick(wxVector<SubSector>*, wxString&);
+	void RightClickGrid(wxString&);
 	// Event functions...
 	void CloseEvent(wxCloseEvent&);
 	void ClosePanelEvent(wxCloseEvent&);
 	void OnThreadCompletion(wxThreadEvent&);
 	void OnPurchaseMenu(wxCommandEvent&);
 	void OnSellMenu(wxCommandEvent&);
+	void OnReInvestSharesMenu(wxCommandEvent&);
 	void OnSave(wxCommandEvent&);
 	void OnQuoteLookup(wxCommandEvent&);
 	void OnKeyDown(wxKeyEvent&);

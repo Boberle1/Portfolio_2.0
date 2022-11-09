@@ -6,8 +6,9 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(QUOTE_LOOKUP, OnQuoteLookup)
 	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT, OnAddDeposit)
 	EVT_MENU(_MenuItemIDs::_WITHDRAWL, OnWithdrawl)
-	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT_SCHEDULE, mainwindow::OnAddDepositSchdule)
+	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT_SCHEDULE, OnAddDepositSchdule)
 	EVT_MENU(_MenuItemIDs::ADD_DIV, OnAddDividend)
+	EVT_MENU(_MenuItemIDs::ADD_DIV_SHARES, OnReInvestSharesMenu)
 	EVT_MENU(_MenuItemIDs::DAY_GAINERS_MENU, OnMarketGainers)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
 	EVT_MENU(_MenuItemIDs::_SELL_STOCK, OnSellMenu)
@@ -21,6 +22,9 @@ wxBEGIN_EVENT_TABLE(PortfolioWin, wxWindow)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(Dialog, wxDialog)
+wxEND_EVENT_TABLE()
+
+wxBEGIN_EVENT_TABLE(BottomFrame, wxWindow)
 wxEND_EVENT_TABLE()
 
 auto constexpr TICKER = "Ticker";
@@ -49,6 +53,7 @@ auto constexpr _90DAY_DEVIATION = "90Day Deviation";
 auto constexpr _30DAY_DEVIATION = "30Day Deviation";
 auto constexpr GRIDROW = 1;
 auto constexpr GRIDCOL = 2;
+auto constexpr GRIDROWHEAD = 3;
 
 void SetColor(wxWindow& w, wxColour c, bool background = true)
 {
@@ -124,7 +129,9 @@ wxString Decipherhtmlcodes(wxString& s)
 	wxString hex = "#x";
 	wxString end = ';';
 	wxString amp = "&amp;";
+	wxString oneamp = "&";
 
+	s.Replace(oneamp, "&&");
 	s.Replace(amp, "&&");
 	s.Replace("&#x27;", '\'');
 	s.Replace("#x27;", "\'");
@@ -249,6 +256,7 @@ GridNode::GridNode(GridView* gv, wxWindow* w, size_t row, size_t col, GridNode* 
 
 	if (GRIDROW == gridtype)
 	{
+		this->Bind(wxEVT_RIGHT_DOWN, &GridNode::OnRightClick, this);
 		this->textcolor = wxColour(182, 203, 242);
 		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
 		this->SetForegroundColour(this->textcolor);
@@ -406,6 +414,15 @@ void GridNode::OnClickEvent(wxMouseEvent& evt)
 				this->m_right->OnClickRowOff();
 		}
 	}
+}
+
+void GridNode::OnRightClick(wxMouseEvent& evt)
+{
+	wxString ticker = this->GetLabel();
+	int index = ticker.find(" ");
+	if (index != -1)
+		ticker = ticker.Mid(0, index);
+	this->m_grid_view->RightClickAlert(ticker);
 }
 
 void GridNode::OnClickRowOff()
@@ -588,6 +605,12 @@ void GridView::LayoutGrid()
 	this->Layout();
 }
 
+void GridView::RightClickAlert(wxString& ticker)
+{
+	mainwindow* p = (mainwindow*)this->m_parent->GetParent();
+	p->RightClickGrid(ticker);
+}
+
 // private GridView functions...
 
 void GridView::SetTitleRow()
@@ -630,7 +653,7 @@ void GridView::FillGrid()
 	{
 		if (i > 0)
 			last_row = current_row;
-		for (size_t j = 0; j < this->GetCols(); ++j)
+		for (int j = 0; j < this->GetCols(); ++j)
 		{
 //			GridNode* t = new GridNode(this->m_parent, i + 1, j, nullptr, nullptr, nullptr, nullptr);
 //			this->Add(t, 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
@@ -1032,16 +1055,13 @@ void PortfolioWin::Update()
 	this->CashDisplay->SetLabel("$" + wxNumberFormatter::ToString(this->port->GetFreeCash(), 2));
 	this->DayReturnDisplay->SetLabel(svd->GetDayGain() + " " + "($" + svd->GetDayReturn$() + ")");
 	this->AccountValueDisplay->SetLabel("$" + wxNumberFormatter::ToString(svd->market_value + port->GetFreeCash(), 2));
-	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain() + " " + "($" + svd->GetTotalReturn$() + ")");
+//	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain() + " " + "($" + svd->GetTotalReturn$() + ")");
+	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain());
+	this->TotalReturnDollar->SetLabel(svd->GetTotalReturn$());
 
-	if (this->DayReturnDisplay->GetLabelText().find('-') == -1)
-		this->DayReturnDisplay->SetForegroundColour(this->Green);
-	else
-		this->DayReturnDisplay->SetForegroundColour(this->Red);
-	if (this->TotalReturnDisplay->GetLabelText().find('-') == -1)
-		this->TotalReturnDisplay->SetForegroundColour(this->Green);
-	else
-		this->TotalReturnDisplay->SetForegroundColour(this->Red);
+	SetStaticTextColor(*this->DayReturnDisplay, this->Green, this->Red);
+	SetStaticTextColor(*this->TotalReturnDisplay, this->Green, this->Red);
+	SetStaticTextColor(*this->TotalReturnDollar, this->Green, this->Red);
 
 	this->Refresh();
 }
@@ -1065,31 +1085,69 @@ void PortfolioWin::Create()
 	this->AccountValueDisplay = new wxStaticText(panel, wxID_ANY, "$" + svd->GetTotalValue());
 	this->TotalReturn = new wxStaticText(panel, wxID_ANY, "Total Return");
 	this->TotalReturnDisplay = new wxStaticText(panel, wxID_ANY, svd->GetTotalGain());
+	this->TotalReturnDollar = new wxStaticText(panel, wxID_ANY, svd->GetTotalReturn$());
+
+	this->t_percent = new wxStaticText(panel, wxID_ANY, "%");
+	this->t_dollar = new wxStaticText(panel, wxID_ANY, "$");
+	this->t_beginparenths = new wxStaticText(panel, wxID_ANY, "(");
+	this->t_endParenths = new wxStaticText(panel, wxID_ANY, ")");
+
 	this->SetControlFonts();
+
+	wxStaticLine* line1 = new wxStaticLine(panel, wxID_ANY);
+	wxBoxSizer* line1H = new wxBoxSizer(wxHORIZONTAL);
+	line1->SetForegroundColour(wxColour(255, 255, 255));
+	line1H->Add(line1, 1, wxEXPAND);
+
+	wxStaticLine* line2 = new wxStaticLine(panel, wxID_ANY);
+	wxBoxSizer* line2H = new wxBoxSizer(wxHORIZONTAL);
+	line2->SetBackgroundColour(wxColour(255, 255, 255));
+	line2H->Add(line2, 1, wxEXPAND);
+
+	wxStaticLine* line3 = new wxStaticLine(panel, wxID_ANY);
+	wxBoxSizer* line3H = new wxBoxSizer(wxHORIZONTAL);
+	line3H->Add(line3, 1, wxEXPAND);
+
+	wxStaticLine* line4 = new wxStaticLine(panel, wxID_ANY);
+	wxBoxSizer* line4H = new wxBoxSizer(wxHORIZONTAL);
+	line4H->Add(line4, 1, wxEXPAND);
 
 	// Initialize sizers...
 	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* panelsizer = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* panelsizerH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* datepckerH = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* totaldisplayH = new wxBoxSizer(wxHORIZONTAL);
+	totaldisplayH->Add(this->TotalReturnDisplay, 0);
+	totaldisplayH->Add(this->t_percent, 0);
+	totaldisplayH->AddSpacer(5);
+	totaldisplayH->Add(this->t_beginparenths, 0);
+	totaldisplayH->Add(this->t_dollar, 0);
+	totaldisplayH->Add(this->TotalReturnDollar, 0);
+	totaldisplayH->Add(this->t_endParenths, 0);
+
 	datepckerH->Add(this->datepcker, 1, wxTOP, 10);
 	datepckerH->Add(this->updatebutton, 0, wxLEFT | wxTOP, 10);
 	main->Add(datepckerH, 0, wxALIGN_CENTER_HORIZONTAL);
 	main->Add(this->todaysdate, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
 	main->Add(this->todaysdateDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(line4H, 0, wxEXPAND | wxALL, 5);
 	main->Add(this->Cash, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
 	main->Add(this->CashDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(line1H, 0, wxEXPAND | wxALIGN_TOP | wxTOP | wxLEFT | wxRIGHT, 5);
 	main->Add(this->DayReturn, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
 	main->Add(this->DayReturnDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(line2H, 0, wxEXPAND | wxALL, 5);
 	main->Add(this->AccountValue, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
 	main->Add(this->AccountValueDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(line3H, 0, wxEXPAND | wxALL, 5);
 	main->Add(this->TotalReturn, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
-	main->Add(this->TotalReturnDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(totaldisplayH, 1, wxALIGN_LEFT | wxLEFT, 10);
 
 	panel->SetSizer(main);
 	panelsizer->Add(panel, 1, wxEXPAND);
@@ -1115,24 +1173,31 @@ void PortfolioWin::SetControlFonts()
 	this->AccountValueDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->TotalReturn->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->TotalReturnDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	this->TotalReturnDollar->SetFont(this->TotalReturnDisplay->GetFont());
+
+	this->t_percent->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	this->t_dollar->SetFont(this->t_percent->GetFont());
+	this->t_beginparenths->SetFont(this->t_percent->GetFont());
+	this->t_endParenths->SetFont(this->t_percent->GetFont());
 	
-	this->todaysdate->SetForegroundColour(this->Blue);
-	this->Cash->SetForegroundColour(this->Blue);
-	this->DayReturn->SetForegroundColour(this->Blue);
-	this->AccountValue->SetForegroundColour(this->Blue);
-	this->TotalReturn->SetForegroundColour(this->Blue);
+	this->t_dollar->SetForegroundColour(wxColour(10, 10, 10));
+	this->t_percent->SetForegroundColour(this->Blue);
+	this->t_beginparenths->SetForegroundColour(wxColour(43, 43, 43));
+	this->t_endParenths->SetForegroundColour(wxColour(43, 43, 43));
+
+
+	this->todaysdate->SetForegroundColour(this->DarkGrey);
+	this->Cash->SetForegroundColour(this->DarkGrey);
+	this->DayReturn->SetForegroundColour(this->DarkGrey);
+	this->AccountValue->SetForegroundColour(this->DarkGrey);
+	this->TotalReturn->SetForegroundColour(this->DarkGrey);
 
 	this->CashDisplay->SetForegroundColour(this->Green);
 	this->AccountValueDisplay->SetForegroundColour(this->Green);
 
-	if (this->DayReturnDisplay->GetLabelText().find('-') == -1)
-		this->DayReturnDisplay->SetForegroundColour(this->Green);
-	else
-		this->DayReturnDisplay->SetForegroundColour(this->Red);
-	if (this->TotalReturnDisplay->GetLabelText().find('-') == -1)
-		this->TotalReturnDisplay->SetForegroundColour(this->Green);
-	else
-		this->TotalReturnDisplay->SetForegroundColour(this->Red);
+	SetStaticTextColor(*this->DayReturn, this->Green, this->Red);
+	SetStaticTextColor(*this->TotalReturnDisplay, this->Green, this->Red);
+	SetStaticTextColor(*this->TotalReturnDollar, this->Green, this->Red);
 }
 
 void PortfolioWin::DateChange(wxCommandEvent& evt)
@@ -1169,7 +1234,8 @@ void PortfolioWin::DateChange(wxCommandEvent& evt)
 
 void PortfolioWin::OnUpdateButtonPress(wxCommandEvent& evt)
 {
-	this->m_parent->OnUpdate();
+	if (IsMarketOpen())
+		this->m_parent->OnUpdate();
 }
 
 
@@ -1188,8 +1254,10 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::ENTER_DEPOSIT_SCHEDULE: this->CreateDepositScheduleWin(); break;
 	case _EnterDialog::WITHDRAWL: this->CreateWithdrawlWin(); break;
 	case _EnterDialog::ENTER_DIVIDEND: this->CreateAddDividendWin(); break;
+	case _EnterDialog::DIVIDEND_SHARE_DIALOG: this->CreateAddReInvestShares(); break;
 	case _EnterDialog::DAY_GAINERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(true); break;
 	case _EnterDialog::DAY_LOSERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(false); break;
+	case _EnterDialog::SUBSECTORWIN: this->sub = reinterpret_cast<wxVector<SubSector>*>(t); this->CreateSubSectorWin(); break;
 	default: wxFAIL_MSG("_EnterDialog type does not match any types!"); this->Destroy();
 	}
 }
@@ -1228,6 +1296,16 @@ SellKit Dialog::GetSellKit()
 	return SellKit(this->datetime, this->_price, this->_shares);
 }
 
+double Dialog::GetReInvestShares()
+{
+	return this->_shares;
+}
+
+wxString Dialog::GetTicker()
+{
+	return this->_ticker;
+}
+
 void Dialog::CreateStockEntry()
 {
 	wxColour c(205, 209, 206);
@@ -1237,6 +1315,7 @@ void Dialog::CreateStockEntry()
 	this->s_ticker = new wxStaticText(this, wxID_ANY, "Enter Ticker");
 	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
 	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &this->_ticker));
+	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
 	SetColor(*this->m_ticker, c);
 
 	this->CreateChoiceControls();
@@ -1380,10 +1459,10 @@ void Dialog::CreateQuoteWin()
 		_dayreturn$->SetForegroundColour(wxColour(8, 156, 23));
 	}
 
-	wxStaticLine* stat1 = new wxStaticLine(this, wxID_ANY);
-	wxStaticLine* stat2 = new wxStaticLine(this, wxID_ANY);
-	stat1->SetForegroundColour("Black");
-	stat2->SetForegroundColour("Black");
+//	wxStaticLine* stat1 = new wxStaticLine(this, wxID_ANY);
+//	wxStaticLine* stat2 = new wxStaticLine(this, wxID_ANY);
+//	stat1->SetForegroundColour("Black");
+//	stat2->SetForegroundColour("Black");
 	
 
 	staticH->Add(new wxStaticLine(this, wxID_ANY), 1, wxEXPAND);
@@ -1428,7 +1507,6 @@ void Dialog::CreateDayGainers_LosersWin(bool gainers)
 	wxStaticText* _perchange = new wxStaticText(this, wxID_ANY, "Change%");
 	wxStaticText* _change = new wxStaticText(this, wxID_ANY, "Change");
 
-	_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	_marketprice->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	_previousclose->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
@@ -1490,6 +1568,76 @@ void Dialog::OnCheckClick(wxCommandEvent& evt)
 		this->m_reinvest_date->Enable(false);
 		this->m_reinvest_date->SetLabel("");
 	}
+}
+
+void Dialog::CreateSubSectorWin()
+{
+	SetColor(*this, wxColour(207, 208, 212));
+	wxColour green(5, 166, 10), red(201, 4, 27);
+
+	wxGridSizer* grid = new wxGridSizer(6, 5, 5);
+
+	wxStaticText* _sectorname = new wxStaticText(this, wxID_ANY, "Sector Name");
+	wxStaticText* _dayreturn = new wxStaticText(this, wxID_ANY, "Day Return");
+	wxStaticText* _weekreturn = new wxStaticText(this, wxID_ANY, "Week Return");
+	wxStaticText* _monthreturn = new wxStaticText(this, wxID_ANY, "Month Return");
+	wxStaticText* _quarterreturn = new wxStaticText(this, wxID_ANY, "Quarter Return");
+	wxStaticText* _ytdreturn = new wxStaticText(this, wxID_ANY, "YTD Return");
+
+	_sectorname->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_dayreturn->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_weekreturn->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_monthreturn->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_quarterreturn->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_ytdreturn->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+
+	grid->Add(_sectorname, 1, wxALIGN_LEFT | wxLEFT, 5);
+	grid->Add(_dayreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+	grid->Add(_weekreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+	grid->Add(_monthreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+	grid->Add(_quarterreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+	grid->Add(_ytdreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+
+	for (auto it = this->sub->begin(); it != this->sub->end(); ++it)
+	{
+		wxString sectorname = it->GetSectorName();
+		wxStaticText* ticker = new wxStaticText(this, wxID_ANY, Decipherhtmlcodes(sectorname));
+		ticker->SetForegroundColour(wxColour(17, 121, 212));
+
+		wxStaticText* dayreturn = new wxStaticText(this, wxID_ANY, it->GetDayReturnString());
+		wxStaticText* weekreturn = new wxStaticText(this, wxID_ANY, it->GetWeekReturnString());
+		wxStaticText* monthreturn = new wxStaticText(this, wxID_ANY, it->GetMonthReturnString());
+		wxStaticText* quarterreturn = new wxStaticText(this, wxID_ANY, it->GetQuarterReturnString());
+		wxStaticText* ytdreturn = new wxStaticText(this, wxID_ANY, it->GetYTDReturnString());
+
+		ticker->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+		dayreturn->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_SEMIBOLD));
+		weekreturn->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_SEMIBOLD));
+		monthreturn->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_SEMIBOLD));
+		quarterreturn->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_SEMIBOLD));
+		ytdreturn->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_SEMIBOLD));
+
+		SetStaticTextColor(*dayreturn, green, red);
+		SetStaticTextColor(*weekreturn, green, red);
+		SetStaticTextColor(*monthreturn, green, red);
+		SetStaticTextColor(*quarterreturn, green, red);
+		SetStaticTextColor(*ytdreturn, green, red);
+
+		grid->Add(ticker, 1, wxALIGN_LEFT | wxLEFT, 5);
+		grid->Add(dayreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+		grid->Add(weekreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+		grid->Add(monthreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+		grid->Add(quarterreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+		grid->Add(ytdreturn, 0, wxALIGN_LEFT | wxLEFT, 10);
+	}
+
+	this->SetSizer(grid);
+	grid->Fit(this);
+	grid->SetSizeHints(this);
+	this->Layout();
+	this->CenterOnParent();
+
+	this->ShowModal();
 }
 
 void Dialog::CreateDepositWin()
@@ -1705,6 +1853,51 @@ void Dialog::CreateAddDividendWin()
 //	this->ShowModal();
 }
 
+void Dialog::CreateAddReInvestShares()
+{
+	wxColour c(205, 209, 206);
+	SetColor(*this, wxColour(157, 157, 163));
+
+	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* bottomH = new wxBoxSizer(wxHORIZONTAL);
+
+	this->s_ticker = new wxStaticText(this, wxID_ANY, "Enter Ticker:");
+	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
+	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_EMPTY, &this->_ticker));
+	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
+	SetColor(*this->m_ticker, c);
+
+	this->s_shares = new wxStaticText(this, wxID_ANY, "Shares:");
+	this->m_shares = new wxTextCtrl(this, wxID_ANY);
+	this->m_shares->SetValidator(wxFloatingPointValidator<double>(&this->_shares, wxNumValidatorStyle::wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY));
+	SetColor(*this->m_shares, c);
+
+	wxButton* ok = new wxButton(this, wxID_OK, "OK");
+	wxButton* cancel = new wxButton(this, wxID_CANCEL, "CANCEL");
+
+	ok->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
+	cancel->Bind(wxEVT_BUTTON, &Dialog::OnCancelDialog, this);
+
+	topH->Add(s_ticker, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+	topH->Add(m_ticker, 0, wxALIGN_CENTER_VERTICAL);
+	topH->AddSpacer(30);
+	topH->Add(s_shares, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+	topH->Add(m_shares, 0, wxALIGN_CENTER_VERTICAL);
+
+	bottomH->Add(ok, 0, wxRIGHT, 10);
+	bottomH->Add(cancel, 0);
+
+	mainV->Add(topH, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
+	mainV->Add(bottomH, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
+
+	this->SetSizer(mainV);
+	mainV->Fit(this);
+	mainV->SetSizeHints(this);
+	this->Layout();
+	this->CenterOnParent();
+}
+
 void Dialog::CreateChoiceControls()
 {
 	// Create choice controls...
@@ -1737,8 +1930,8 @@ void Dialog::OnCancelDialog(wxCommandEvent& evt)
 
 void Dialog::OnCloseDialog(wxCloseEvent& evt)
 {
-	this->Destroy();
 	m_parent->DialogCancel();
+	this->Destroy();
 }
 
 void Dialog::OnOkClick(wxCommandEvent& evt)
@@ -1772,6 +1965,13 @@ void Dialog::OnOkClick(wxCommandEvent& evt)
 		break;
 	}
 	case _EnterDialog::ENTER_DIVIDEND: this->HandleAddDividendOkClick(); break;
+	case _EnterDialog::DIVIDEND_SHARE_DIALOG: 
+	{
+		if (!this->HandleReInvestSharesOkClick())
+			return;
+		evt.Skip();
+		break;
+	}
 	case _EnterDialog::WITHDRAWL: 
 	{
 		if (this->HandleWithdrawlOkClick())
@@ -1794,7 +1994,8 @@ void Dialog::OnSectorChoice(wxCommandEvent& evt)
 		return;
 	}
 
-	const wxVector<wxString>* sub = GetSectorClass().GetSubSectorString(_Sector(this->choice->GetSelection() + *GetSectorClass().GetSector()->begin() + 8));
+//	const wxVector<wxString>* sub = GetSectorClass().GetSubSectorString(_Sector(this->choice->GetSelection() + *GetSectorClass().GetSector()->begin() + 8));
+	const wxVector<wxString>* sub = GetSectorClass().GetSubSectorString(_Sector(type));
 	this->subSector->Clear();
 
 	if (!sub->size())
@@ -1804,6 +2005,20 @@ void Dialog::OnSectorChoice(wxCommandEvent& evt)
 		this->subSector->Append(sub->at(i));
 
 	this->subSector->SetStringSelection(*sub->begin());
+}
+
+void Dialog::OnKeyDown(wxKeyEvent& evt)
+{
+	int n = evt.GetKeyCode();
+	wxTextEntry* t = NULL;
+	if (this->m_ticker)
+	{
+		wxTextValidator* text = (wxTextValidator*)this->m_ticker->GetValidator();
+		t = text ? text->GetTextEntry() : NULL;
+	}
+	if (t)
+		t->ForceUpper();
+	evt.Skip();
 }
 
 void Dialog::OnMouseDown(wxMouseEvent& evt)
@@ -1917,6 +2132,23 @@ void Dialog::HandleAddDividendOkClick()
 
 }
 
+bool Dialog::HandleReInvestSharesOkClick()
+{
+	if (!this->_shares)
+	{
+		wxMessageBox("You cannot enter zero shares!");
+		return false;
+	}
+
+	if (!this->m_parent->ValidateExistingTicker(this->_ticker))
+	{
+		wxMessageBox(this->_ticker + " does not exist!");
+		return false;
+	}
+
+	return true;
+}
+
 // SellStockWin functions...
 SellStockWin::SellStockWin(mainwindow* m, wxWindowID id, wxString msg, wxString caption, wxArrayString string) : 
 	wxSingleChoiceDialog(m, msg, caption, string), m_parent(m)
@@ -1925,9 +2157,76 @@ SellStockWin::SellStockWin(mainwindow* m, wxWindowID id, wxString msg, wxString 
 }
 
 // BottomFrame functions...
-BottomFrame::BottomFrame(mainwindow* m, wxWindowID id) : wxWindow(m, id)
+BottomFrame::BottomFrame(mainwindow* m, wxWindowID id) : wxWindow(m, id), m_parent(m)
 {
 	this->Create();
+}
+
+void BottomFrame::OnMouseEnter(wxMouseEvent& evt)
+{
+	this->textenter = NULL;
+	switch (evt.GetId())
+	{
+	case _Sector::MATERIALS: textenter = this->materials; break;
+	case _Sector::COMMUNICATION_SERVICES: textenter = this->comm_services; break;
+	case _Sector::CONSUMER_DESCRETIONARY: textenter = this->cons_cycl; break;
+	case _Sector::CONSUMER_STAPLES: textenter = this->cons_def; break;
+	case _Sector::ENERGY: textenter = this->energy; break;
+	case _Sector::FINANCIALS: textenter = this->finance; break;
+	case _Sector::HEALTH_CARE: textenter = this->healthcare; break;
+	case _Sector::INDUSTRIALS: textenter = this->industrial; break;
+	case _Sector::REAL_ESTATE: textenter = this->real_estate; break;
+	case _Sector::INFORMATION_TECHNOLOGY: textenter = this->tech; break;
+	case _Sector::UTILITIES: textenter = this->utilities; break;
+	}
+	if (this->textenter)
+	{
+		this->textenter->SetBackgroundColour(wxColour(179, 4, 27));
+		this->textenter->Refresh();
+	}
+}
+
+void BottomFrame::OnMouseLeave(wxMouseEvent& evt)
+{
+	if (this->textenter)
+	{
+		this->textenter->SetBackgroundColour(this->GetBackgroundColour());
+		this->textenter->Refresh();
+	}
+	this->textenter = NULL;
+}
+
+void BottomFrame::OnMouseDown(wxMouseEvent& evt)
+{
+	int id = evt.GetId();
+	SectorClass& sc = GetSectorClass();
+	ParentSector* ps = sc.GetSector(_Sector(id));
+	wxString name = ps ? ps->GetSectorName() : "Sector";
+
+	wxVector<SubSector>* v = NULL;
+	switch (evt.GetId())
+	{
+	case _Sector::MATERIALS: v = sc.GetSubSectorVec(_Sector::MATERIALS);  break;
+	case _Sector::COMMUNICATION_SERVICES: v = sc.GetSubSectorVec(_Sector::COMMUNICATION_SERVICES); break;
+	case _Sector::CONSUMER_DESCRETIONARY: v = sc.GetSubSectorVec(_Sector::CONSUMER_DESCRETIONARY); break;
+	case _Sector::CONSUMER_STAPLES: v = sc.GetSubSectorVec(_Sector::CONSUMER_STAPLES); break;
+	case _Sector::ENERGY: v = sc.GetSubSectorVec(_Sector::ENERGY); break;
+	case _Sector::FINANCIALS: v = sc.GetSubSectorVec(_Sector::FINANCIALS); break;
+	case _Sector::HEALTH_CARE: v = sc.GetSubSectorVec(_Sector::HEALTH_CARE); break;
+	case _Sector::INDUSTRIALS: v = sc.GetSubSectorVec(_Sector::INDUSTRIALS); break;
+	case _Sector::REAL_ESTATE: v = sc.GetSubSectorVec(_Sector::REAL_ESTATE); break;
+	case _Sector::INFORMATION_TECHNOLOGY: v = sc.GetSubSectorVec(_Sector::INFORMATION_TECHNOLOGY); break;
+	case _Sector::UTILITIES: v = sc.GetSubSectorVec(_Sector::UTILITIES); break;
+	}
+
+	if (v != NULL)
+		this->m_parent->SectorClick(v, name);
+	else
+	{
+		wxString Id = "";
+		Id << id;
+		wxFAIL_MSG("Switch failed in BottomFrame::OnMouseDown! No matching number for: " + Id);
+	}
 }
 
 void BottomFrame::Create()
@@ -1942,14 +2241,26 @@ void BottomFrame::Create()
 	this->healthcare = new wxStaticText(this, _Sector::HEALTH_CARE, "Healthcare");
 	this->industrial = new wxStaticText(this, _Sector::INDUSTRIALS, "Industrials");
 	this->real_estate = new wxStaticText(this, _Sector::REAL_ESTATE, "Real Estate");
-	this->tech = new wxStaticText(this, _Sector::TECH, "Technology");
+	this->tech = new wxStaticText(this, _Sector::INFORMATION_TECHNOLOGY, "Technology");
 	this->utilities = new wxStaticText(this, _Sector::UTILITIES, "Utilities");
+
+	this->BindEvents(*this->materials);
+	this->BindEvents(*this->comm_services);
+	this->BindEvents(*this->cons_cycl);
+	this->BindEvents(*this->cons_def);
+	this->BindEvents(*this->energy);
+	this->BindEvents(*this->finance);
+	this->BindEvents(*this->healthcare);
+	this->BindEvents(*this->industrial);
+	this->BindEvents(*this->real_estate);
+	this->BindEvents(*this->tech);
+	this->BindEvents(*this->utilities);
 
 	int size = 5;
 	int sectors = 11;
 	wxBoxSizer* mainH = new wxBoxSizer(wxHORIZONTAL);
 
-	for (size_t j = 0; j < sectors; ++j)
+	for (int j = 0; j < sectors; ++j)
 	{
 		_Sector s = _Sector::SECTOR_INVALID;
 		wxString _sector = "";
@@ -1975,7 +2286,7 @@ void BottomFrame::Create()
 		wxBoxSizer* b = new wxBoxSizer(wxHORIZONTAL);
 		text->SetFont(text->GetFont().MakeBold());
 		ver->Add(text, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 5);
-		for (size_t i = 0; i < size; ++i)
+		for (int i = 0; i < size; ++i)
 		{
 			wxString something = "";
 			wxString data = "";
@@ -2002,6 +2313,13 @@ void BottomFrame::Create()
 
 	this->SetSizer(mainH);
 	this->Layout();
+}
+
+void BottomFrame::BindEvents(wxStaticText& t)
+{
+	t.Bind(wxEVT_ENTER_WINDOW, &BottomFrame::OnMouseEnter, this);
+	t.Bind(wxEVT_LEAVE_WINDOW, &BottomFrame::OnMouseLeave, this);
+	t.Bind(wxEVT_LEFT_DOWN, &BottomFrame::OnMouseDown, this);
 }
 
 // mainwindow functions...
@@ -2053,7 +2371,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	wxBoxSizer* top = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
 	top->Add(this->portwin, 1, wxEXPAND);
-	top->Add(this->grid_panel, 3, wxEXPAND);
+	top->Add(this->grid_panel, 5, wxEXPAND);
 	main->Add(top, 3, wxEXPAND);
 	main->Add(bottom_frame, 1, wxEXPAND);
 	this->SetSizer(main);
@@ -2083,6 +2401,26 @@ void mainwindow::PurchaseDataTransfer(PurchaseKit& kit)
 	this->port.Purchase(kit.m_sect, kit.m_ticker, kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
 	this->dialog = nullptr;
 	this->UpdateGridView();
+}
+
+void mainwindow::ReInvestShares(double& d, wxString& t)
+{
+
+}
+
+bool mainwindow::ValidateExistingTicker(wxString& t)
+{
+	return this->port.DoesTickerExist(t);
+}
+
+void mainwindow::SectorClick(wxVector<SubSector>* v, wxString& name)
+{
+	this->dialog = new Dialog(_EnterDialog::SUBSECTORWIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, name, v);
+}
+
+void mainwindow::RightClickGrid(wxString& ticker)
+{
+
 }
 
 void mainwindow::CloseEvent(wxCloseEvent& evt)
@@ -2176,6 +2514,19 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 	}
 }
 
+void mainwindow::OnReInvestSharesMenu(wxCommandEvent& evt)
+{
+	wxString filler = "";
+	this->dialog = new Dialog(_EnterDialog::DIVIDEND_SHARE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Dividend ReInvestment Shares", &filler);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		double shares = dialog->GetReInvestShares();
+		wxString ticker = dialog->GetTicker();
+		if (!this->port.AddReInvestShares(shares))
+			wxMessageBox("Unsuccessful in adding shares to " + ticker);
+	}
+}
+
 void mainwindow::OnSave(wxCommandEvent& evt)
 {
 	this->SaveFile();
@@ -2212,7 +2563,8 @@ void mainwindow::OnKeyDown(wxKeyEvent& evt)
 		t = this->quote->GetTextValidator()->GetTextEntry();
 	else if (this->sell)
 		t = this->sell->GetTextValidator()->GetTextEntry();
-	t->ForceUpper();
+	if (t)
+		t->ForceUpper();
 	evt.Skip();
 }
 
@@ -2358,6 +2710,8 @@ void mainwindow::UpdateGridView()
 void mainwindow::SaveFile()
 {
 	this->port.Save();
+	SectorClass& sc = GetSectorClass();
+	sc.Save();
 }
 
 void mainwindow::RetrieveFile()

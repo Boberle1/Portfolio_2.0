@@ -10,7 +10,7 @@ auto constexpr NA = "NotFound";
 
 void SetStaticTextColor(wxStaticText&, wxColour, wxColour);
 
-// Function that compares to wxDateTimes and discards the time,
+// Function that compares two wxDateTimes and discards the time,
 // So if they are the same year, month, day, regardless of time this will return true
 // Otherwise false...
 bool IswxDateEqual(wxDateTime&, wxDateTime&);
@@ -48,6 +48,10 @@ struct Dividend
 	void SetDivReinvestOn()
 	{
 		this->DivReinvest = true;
+	}
+	void AddReInvestmentShares(double& shares)
+	{
+		this->re_invest_shares = shares;
 	}
 
 	long id;
@@ -141,7 +145,7 @@ struct DayGainersandLosers
 struct SectorData
 {
 	SectorData() {}
-	SectorData(double& p, double& dr, double& wr, double& mr, double& qr, double& hyr, double& ytdr, double& yr, wxString& mc, wxDateTime& d)
+	SectorData(double& p, double& dr, double& wr, double& mr, double& qr, double& hyr, double& ytdr, double& yr, double& mc, wxDateTime& d)
 		: price(p), day_return(dr), week_return(wr), month_return(mr), quarter_return(qr), half_year_return(hyr), YTD_return(ytdr),
 		year_return(yr), market_cap(mc), date(d) {}
 
@@ -153,7 +157,7 @@ struct SectorData
 	double half_year_return = 0.0;
 	double YTD_return = 0.0;
 	double year_return = 0.0;
-	wxString market_cap = "";
+	double market_cap = 0.0;
 	wxDateTime date;
 };
 
@@ -226,7 +230,7 @@ struct SectorPerformance
 	{
 		this->ToDouble();
 	}
-	SectorPerformance() {}
+	SectorPerformance() : stamp(wxDateTime::Now()) {}
 	wxString name = "";
 	wxString _week = "";
 	wxString _month = "";
@@ -414,7 +418,7 @@ void DataStream::ReadwxVector(wxVector<T>& v)
 	int length;
 	this->ReadData(length);
 
-	for (size_t i = 0; i < length; ++i)
+	for (int i = 0; i < length; ++i)
 	{
 		T t;
 		this->ReadData(t);
