@@ -422,8 +422,7 @@ void GridNode::OnRightClick(wxMouseEvent& evt)
 	int index = ticker.find(" ");
 	if (index != -1)
 		ticker = ticker.Mid(0, index);
-	if (ticker == "")
-		this->m_grid_view->RightClickAlert(ticker);
+	this->m_grid_view->RightClickAlert(ticker);
 }
 
 void GridNode::OnClickRowOff()
