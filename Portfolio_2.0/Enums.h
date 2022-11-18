@@ -232,11 +232,11 @@ enum Returns
 enum _Sector
 {
 	BOND = ALL_TIME + 1,
-	REIT,
+//	REIT,
 	SMALLCAP,
 	MIDCAP,
 	LARGECAP,
-	TECH,
+//	TECH,
 	CRYPTO,
 	FOREIGN,
 	COMMUNICATION_SERVICES,
@@ -464,10 +464,18 @@ enum _MenuItemIDs
 	_SELL_STOCK,
 	ADD_DIV_SHARES,
 	DAY_GAINERS_MENU,
-	DAY_LOSERS_MENU
+	DAY_LOSERS_MENU,
+
+	//popup menu ids...
+	P_QUOTE,
+	P_ADD_DIV,
+	P_REMOVE_DIV,
+	P_SELL_STOCK, 
+	P_STOCK_PURCHASE,
+	P_GET_OHLC        // Get Open,High,Low,Close
 };
 
 enum _PortfolioWin
 {
-	DATEPCKER = DAY_LOSERS_MENU
+	DATEPCKER = P_GET_OHLC + 1
 };

@@ -9,6 +9,12 @@ void SetStaticTextColor(wxStaticText& T, wxColour green, wxColour red)
 		T.SetForegroundColour(green);
 }
 
+bool IsStringPositive(wxString& s)
+{
+	int index = s.find('-');
+	return index;
+}
+
 bool IswxDateEqual(wxDateTime& d1, wxDateTime& d2)
 {
 	if (!d1.IsValid() || !d2.IsValid())

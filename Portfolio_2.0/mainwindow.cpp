@@ -12,6 +12,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::DAY_GAINERS_MENU, OnMarketGainers)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
 	EVT_MENU(_MenuItemIDs::_SELL_STOCK, OnSellMenu)
+	EVT_MENU(_MenuItemIDs::P_SELL_STOCK, OnSellPopupClick)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(GridNode, wxStaticText)
@@ -38,6 +39,11 @@ auto constexpr WEEK_GAIN = "Week Gain";
 auto constexpr QUARTER_GAIN = "Quarter Gain";
 auto constexpr YEAR_GAIN = "Year Gain";
 auto constexpr TOTAL_GAIN = "Total Gain";
+auto constexpr DAY_GAIN$ = "Day Gain $";
+auto constexpr WEEK_GAIN$ = "Week Gain $";
+auto constexpr QUARTER_GAIN$ = "Quarter Gain $";
+auto constexpr YEAR_GAIN$ = "Year Gain $";
+auto constexpr TOTAL_GAIN$ = "Total Gain $";
 auto constexpr PURCHASE_DATE = "Purchase Date";
 auto constexpr PURCHASE_PRICE = "Purchase Price";
 auto constexpr _MARKET_VALUE = "Market Value";
@@ -276,6 +282,21 @@ GridNode::~GridNode()
 
 }
 
+bool GridNode::CopyText(const GridNode& gn)
+{
+	this->t_val = gn.t_val;
+	this->SetLabel(gn.GetLabel());
+	this->SetFont(gn.GetFont());
+	if (gn.SummaryItem)
+		this->SummaryItem = true;
+	
+	this->SetBackgroundColour(gn.GetBackgroundColour());
+	this->SetForegroundColour(gn.GetForegroundColour());
+
+	this->Refresh();
+	return true;
+}
+
 bool GridNode::SetNewVal(gridpair gp, bool total_row)
 {
 	if (total_row)
@@ -293,12 +314,10 @@ bool GridNode::SetNewVal(gridpair gp, bool total_row)
 
 	if (gp.valcolor && this->textcolor != wxColour(182, 203, 242) && this->textcolor != wxColour(213, 220, 227))
 	{
-		int i = gp.val.find('-');
-		if (i != -1)
-			this->textcolor = wxColour(217, 7, 28); 
+		if(IsStringPositive(gp.val))
+			this->textcolor = wxColour(13, 158, 20);
 		else
-			this->textcolor = wxColour(13, 158, 20); 
-		
+			this->textcolor = wxColour(217, 7, 28);
 		this->SetForegroundColour(this->textcolor);
 	}
 	else if (this->textcolor != wxColour(182, 203, 242) && this->textcolor != wxColour(213, 220, 227))
@@ -356,6 +375,15 @@ GridNode* GridNode::GetLeft()
 bool GridNode::IsEmpty()
 {
 	return this->is_empty;
+}
+
+bool GridNode::Clear()
+{
+	this->SetLabel("");
+	this->t_val = "";
+	this->SetBackgroundColour(this->normal);
+	this->Refresh();
+	return true;
 }
 
 bool GridNode::IsID(int id)
@@ -418,11 +446,17 @@ void GridNode::OnClickEvent(wxMouseEvent& evt)
 
 void GridNode::OnRightClick(wxMouseEvent& evt)
 {
+	evt.SetEventObject(this);
+	wxCoord x, y;
+	evt.GetPosition(&x, &y);
+	x += this->GetScreenPosition().x;
+	y = this->GetScreenPosition().y - (2 * y);
+	wxPoint p(x, y);
 	wxString ticker = this->GetLabel();
 	int index = ticker.find(" ");
 	if (index != -1)
 		ticker = ticker.Mid(0, index);
-	this->m_grid_view->RightClickAlert(ticker);
+	this->m_grid_view->RightClickAlert(ticker, p);
 }
 
 void GridNode::OnClickRowOff()
@@ -605,10 +639,28 @@ void GridView::LayoutGrid()
 	this->Layout();
 }
 
-void GridView::RightClickAlert(wxString& ticker)
+void GridView::RightClickAlert(wxString& ticker, wxPoint& point)
 {
+	this->rightclick_ticker = ticker;
 	mainwindow* p = (mainwindow*)this->m_parent->GetParent();
-	p->RightClickGrid(ticker);
+	p->RightClickGrid(ticker, point);
+}
+
+wxString GridView::GetRightClickTicker()
+{
+	return this->rightclick_ticker;
+}
+
+bool GridView::RemoveRow(wxString& t)
+{
+	GridNode* match = this->GetFirstMatch(t);
+	if (!match)
+		return false;
+
+	this->RemoveRow(match);
+	mainwindow* m = (mainwindow*)this->m_parent;
+	this->LayoutGrid();
+	return true;
 }
 
 // private GridView functions...
@@ -717,7 +769,7 @@ gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
 	if (collabel == _PREVIOUS_CLOSE)
 		return gridpair(svd->GetPreviousClose(), false);
 	if (collabel == DAY_GAIN)
-		return gridpair(svd->GetDayGain(), true);
+		return gridpair(svd->GetDayGain() + "%", true);
 	if (collabel == WEEK_GAIN)
 		return gridpair(svd->GetWeekGain(), true);
 	if (collabel == QUARTER_GAIN)
@@ -725,7 +777,19 @@ gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
 	if (collabel == YEAR_GAIN)
 		return gridpair(svd->GetYearGain(), true);
 	if (collabel == TOTAL_GAIN)
-		return gridpair(svd->GetTotalGain(), true);
+		return gridpair(svd->GetTotalGain() + "%", true);
+	
+	if (collabel == DAY_GAIN$)
+		return gridpair("$" + svd->GetDayReturn$(), true);
+	if (collabel == WEEK_GAIN$)
+		return gridpair("$" + svd->GetWeekReturn$(), true);
+	if (collabel == QUARTER_GAIN$)
+		return gridpair("$" + svd->GetQuarterReturn$(), true);
+	if (collabel == YEAR_GAIN$)
+		return gridpair("$" + svd->GetYearReturn$(), true);
+	if (collabel == TOTAL_GAIN$)
+		return gridpair("$" + svd->GetTotalReturn$(), true);
+	
 	if (collabel == COST_BASIS)
 		return gridpair(svd->GetCostBasis(), false);
 	if (collabel == _MARKET_VALUE)
@@ -738,6 +802,8 @@ gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
 		return gridpair(svd->GetEarningsDate(), false);
 	if (collabel == PURCHASE_DATE)
 		return gridpair(svd->GetPurchaseDate(), false);
+	if (collabel == _SECTOR)
+		return gridpair(svd->GetSectorName(), false);
 	if (collabel == PORTFOLIO_PERC)
 		return gridpair(svd->GetPortfolioPerc(), false);
 	if (collabel == _52WEEK_DEVIATION)
@@ -763,17 +829,22 @@ wxString GridView::GetColTitle(size_t col)
 	case 7: return QUARTER_GAIN;
 	case 8: return YEAR_GAIN;
 	case 9: return TOTAL_GAIN;
-	case 10: return COST_BASIS;
-	case 11: return _MARKET_VALUE;
-	case 12: return PURCHASE_PRICE;
-	case 13: return TOTAL_DIVIDENDS;
-	case 14: return EARNINGS_DATE;
-	case 15: return PURCHASE_DATE;
-	case 16: return PORTFOLIO_PERC;
-	case 17: return _52WEEK_DEVIATION;
-	case 18: return _90DAY_DEVIATION;
-	case 19: return _30DAY_DEVIATION;
-	case 20: return "";
+	case 10: return DAY_GAIN$;
+	case 11: return WEEK_GAIN$;
+	case 12: return QUARTER_GAIN$;
+	case 13: return YEAR_GAIN$;
+	case 14: return TOTAL_GAIN$;
+	case 15: return COST_BASIS;
+	case 16: return _MARKET_VALUE;
+	case 17: return TOTAL_DIVIDENDS;
+	case 18: return EARNINGS_DATE;
+	case 19: return PURCHASE_DATE;
+	case 20: return _SECTOR;
+	case 21: return PORTFOLIO_PERC;
+	case 22: return _52WEEK_DEVIATION;
+	case 23: return _90DAY_DEVIATION;
+	case 24: return _30DAY_DEVIATION;
+	case 25: return "";
 	}
 
 	return "";
@@ -815,10 +886,10 @@ GridNode* GridView::GetFirstMatch(wxString s)
 			next = next->GetDown();
 		}
 		else
-			return nullptr;
+			return NULL;
 	}
 
-	return nullptr;
+	return NULL;
 }
 
 GridNode* GridView::GetFarthestRight(GridNode* g)
@@ -974,6 +1045,57 @@ GridNode* GridView::GetDown(GridNode* g, size_t i, size_t start)
 	return g;
 }
 
+void GridView::RemoveRow(GridNode* g)
+{
+	GridNode* remove = g;
+	GridNode* down = this->GetDown(g, 1);
+	if (down == remove)
+	{
+		// Reached end of grid...
+		this->ClearRow(remove);
+		return;
+	}
+
+	// we need to move the row below it up to the row we are removing...
+	GridNode* next = down;
+	GridNode* temp = next;
+	while ((next && temp) && (!next->IsEmpty() && !temp->IsEmpty()))
+	{
+		this->MoveRowUp(next);
+		next = temp->GetDown();
+		if (!next->IsEmpty())
+			temp = next;
+	}
+	this->ClearRow(temp);
+}
+
+void GridView::MoveRowUp(GridNode* gn)
+{
+	GridNode* down = gn;
+	GridNode* up = gn->GetUP();
+	if (!up)
+	{
+		wxFAIL_MSG("GridView::MoveRowUp gn->GetUp is nullptr!");
+		return;
+	}
+
+	while (gn && up)
+	{
+		up->CopyText(*down);
+		down = down->GetRight();
+		up = up->GetRight();
+	}
+}
+
+void GridView::ClearRow(GridNode* gn)
+{
+	while (gn)
+	{
+		gn->Clear();
+		gn = gn->GetRight();
+	}
+}
+
 void GridView::DeleteRow(GridNode* g)
 {
 	if (!g)
@@ -1053,7 +1175,8 @@ void PortfolioWin::Update()
 {
 	StockViewerData* svd = port->GetStockViewerData();
 	this->CashDisplay->SetLabel("$" + wxNumberFormatter::ToString(this->port->GetFreeCash(), 2));
-	this->DayReturnDisplay->SetLabel(svd->GetDayGain() + " " + "($" + svd->GetDayReturn$() + ")");
+	this->DayReturnDisplay->SetLabel(svd->GetDayGain());
+	this->DayReturnDollar->SetLabel(svd->GetDayReturn$());
 	this->AccountValueDisplay->SetLabel("$" + wxNumberFormatter::ToString(svd->market_value + port->GetFreeCash(), 2));
 //	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain() + " " + "($" + svd->GetTotalReturn$() + ")");
 	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain());
@@ -1081,6 +1204,7 @@ void PortfolioWin::Create()
 	this->CashDisplay = new wxStaticText(panel, wxID_ANY, "$" + wxNumberFormatter::ToString(this->port->GetFreeCash(), 2));
 	this->DayReturn = new wxStaticText(panel, wxID_ANY, "Day Return");
 	this->DayReturnDisplay = new wxStaticText(panel, wxID_ANY, svd->GetDayGain());
+	this->DayReturnDollar = new wxStaticText(panel, wxID_ANY, svd->GetDayReturn$());
 	this->AccountValue = new wxStaticText(panel, wxID_ANY, "Account Value");
 	this->AccountValueDisplay = new wxStaticText(panel, wxID_ANY, "$" + svd->GetTotalValue());
 	this->TotalReturn = new wxStaticText(panel, wxID_ANY, "Total Return");
@@ -1091,6 +1215,11 @@ void PortfolioWin::Create()
 	this->t_dollar = new wxStaticText(panel, wxID_ANY, "$");
 	this->t_beginparenths = new wxStaticText(panel, wxID_ANY, "(");
 	this->t_endParenths = new wxStaticText(panel, wxID_ANY, ")");
+
+	this->d_percent = new wxStaticText(panel, wxID_ANY, "%");
+	this->d_dollar = new wxStaticText(panel, wxID_ANY, "$");
+	this->d_beginparenths = new wxStaticText(panel, wxID_ANY, "(");
+	this->d_endParenths = new wxStaticText(panel, wxID_ANY, ")");
 
 	this->SetControlFonts();
 
@@ -1118,6 +1247,8 @@ void PortfolioWin::Create()
 	wxBoxSizer* panelsizerH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* datepckerH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* totaldisplayH = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* daydisplayH = new wxBoxSizer(wxHORIZONTAL);
+
 	totaldisplayH->Add(this->TotalReturnDisplay, 0);
 	totaldisplayH->Add(this->t_percent, 0);
 	totaldisplayH->AddSpacer(5);
@@ -1125,6 +1256,14 @@ void PortfolioWin::Create()
 	totaldisplayH->Add(this->t_dollar, 0);
 	totaldisplayH->Add(this->TotalReturnDollar, 0);
 	totaldisplayH->Add(this->t_endParenths, 0);
+
+	daydisplayH->Add(this->DayReturnDisplay, 0);
+	daydisplayH->Add(this->d_percent, 0);
+	daydisplayH->AddSpacer(5);
+	daydisplayH->Add(this->d_beginparenths, 0);
+	daydisplayH->Add(this->d_dollar, 0);
+	daydisplayH->Add(this->DayReturnDollar, 0);
+	daydisplayH->Add(this->d_endParenths, 0);
 
 	datepckerH->Add(this->datepcker, 1, wxTOP, 10);
 	datepckerH->Add(this->updatebutton, 0, wxLEFT | wxTOP, 10);
@@ -1139,7 +1278,7 @@ void PortfolioWin::Create()
 	main->Add(line1H, 0, wxEXPAND | wxALIGN_TOP | wxTOP | wxLEFT | wxRIGHT, 5);
 	main->Add(this->DayReturn, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
-	main->Add(this->DayReturnDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->Add(daydisplayH, 1, wxALIGN_LEFT | wxLEFT, 10);
 	main->Add(line2H, 0, wxEXPAND | wxALL, 5);
 	main->Add(this->AccountValue, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
@@ -1169,6 +1308,7 @@ void PortfolioWin::SetControlFonts()
 	this->CashDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->DayReturn->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->DayReturnDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	this->DayReturnDollar->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->AccountValue->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->AccountValueDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->TotalReturn->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
@@ -1179,12 +1319,21 @@ void PortfolioWin::SetControlFonts()
 	this->t_dollar->SetFont(this->t_percent->GetFont());
 	this->t_beginparenths->SetFont(this->t_percent->GetFont());
 	this->t_endParenths->SetFont(this->t_percent->GetFont());
-	
-	this->t_dollar->SetForegroundColour(wxColour(10, 10, 10));
-	this->t_percent->SetForegroundColour(this->Blue);
-	this->t_beginparenths->SetForegroundColour(wxColour(43, 43, 43));
-	this->t_endParenths->SetForegroundColour(wxColour(43, 43, 43));
 
+	this->d_percent->SetFont(this->t_percent->GetFont());
+	this->d_dollar->SetFont(this->t_percent->GetFont());
+	this->d_beginparenths->SetFont(this->t_percent->GetFont());
+	this->d_endParenths->SetFont(this->t_percent->GetFont());
+
+	this->d_dollar->SetForegroundColour(this->parenths);
+	this->d_percent->SetForegroundColour(this->percents);
+	this->d_beginparenths->SetForegroundColour(this->parenths);
+	this->d_endParenths->SetForegroundColour(this->parenths);
+	
+	this->t_dollar->SetForegroundColour(this->parenths);
+	this->t_percent->SetForegroundColour(this->percents);
+	this->t_beginparenths->SetForegroundColour(this->parenths);
+	this->t_endParenths->SetForegroundColour(this->parenths);
 
 	this->todaysdate->SetForegroundColour(this->DarkGrey);
 	this->Cash->SetForegroundColour(this->DarkGrey);
@@ -1195,7 +1344,8 @@ void PortfolioWin::SetControlFonts()
 	this->CashDisplay->SetForegroundColour(this->Green);
 	this->AccountValueDisplay->SetForegroundColour(this->Green);
 
-	SetStaticTextColor(*this->DayReturn, this->Green, this->Red);
+	SetStaticTextColor(*this->DayReturnDisplay, this->Green, this->Red);
+	SetStaticTextColor(*this->DayReturnDollar, this->Green, this->Red);
 	SetStaticTextColor(*this->TotalReturnDisplay, this->Green, this->Red);
 	SetStaticTextColor(*this->TotalReturnDollar, this->Green, this->Red);
 }
@@ -1214,7 +1364,7 @@ void PortfolioWin::DateChange(wxCommandEvent& evt)
 		return;
 	}
 
-	if (test >= wxDateTime::Today())
+	if (test > wxDateTime::Today())
 	{
 		this->datepcker->SetLabelText(wxDateTime::Today().Format(STANDARD_DATE));
 		this->datepcker->Refresh();
@@ -1261,21 +1411,7 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	default: wxFAIL_MSG("_EnterDialog type does not match any types!"); this->Destroy();
 	}
 }
-/*
-Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, wxSize s, wxString msg, SummaryData sum) 
-	: wxDialog(parent, id, msg, p, s), m_parent(parent), m_type(type), sd(sum)
-{
 
-	this->Bind(wxEVT_CLOSE_WINDOW, &Dialog::OnCloseDialog, this);
-	this->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
-
-	switch (type)
-	{
-	case QUOTE_WIN: this->CreateQuoteWin(); break;
-	default: wxFAIL_MSG("_EnterDialog type does not match any types!"); this->Destroy();
-	}
-}
-*/
 PurchaseKit Dialog::GetPurchaseKit()
 {
 	wxString selection = this->choice->GetStringSelection();
@@ -1575,7 +1711,8 @@ void Dialog::CreateSubSectorWin()
 	SetColor(*this, wxColour(207, 208, 212));
 	wxColour green(5, 166, 10), red(201, 4, 27);
 
-	wxGridSizer* grid = new wxGridSizer(6, 5, 5);
+//	wxGridSizer* grid = new wxGridSizer(6, 5, 5);
+	wxGridSizer* grid = new wxGridSizer(6, wxSize(4, 4));
 
 	wxStaticText* _sectorname = new wxStaticText(this, wxID_ANY, "Sector Name");
 	wxStaticText* _dayreturn = new wxStaticText(this, wxID_ANY, "Day Return");
@@ -1913,9 +2050,9 @@ void Dialog::CreateChoiceControls()
 	for (size_t i = 0; i < scptrs->size() - 1; ++i)
 		this->choice->Append(scptrs->at(i));
 
-	this->choice->SetStringSelection(scptrs->at(8 + 7));
+	this->choice->SetStringSelection(scptrs->at(8 + 5));
 
-	const wxVector<wxString>* subvec = GetSectorClass().GetSubSectorString(scptr->at(8 + 7));
+	const wxVector<wxString>* subvec = GetSectorClass().GetSubSectorString(scptr->at(8 + 5));
 	for (size_t i = 0; i < subvec->size(); ++i)
 		this->subSector->Append(subvec->at(i));
 
@@ -2330,6 +2467,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	SectorClass& sc = GetSectorClass();
 	sc.ActivateData();
 
+	this->CreatePopupMenu();
 	wxMenuBar* bar = new wxMenuBar();
 	wxMenu* m = new wxMenu();
 	wxMenu* stock = new wxMenu();
@@ -2381,7 +2519,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 
 mainwindow::~mainwindow()
 {
-	
+	this->DeletePopupMenu();
 }
 
 wxFrame* mainwindow::PurchaseWin()
@@ -2418,9 +2556,11 @@ void mainwindow::SectorClick(wxVector<SubSector>* v, wxString& name)
 	this->dialog = new Dialog(_EnterDialog::SUBSECTORWIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, name, v);
 }
 
-void mainwindow::RightClickGrid(wxString& ticker)
+void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
 {
-
+	this->p_sell->SetItemLabel("Sell " + ticker);
+	this->p_buy->SetItemLabel("Purchase " + ticker);
+	bool result = PopupMenu(this->popup, p);
 }
 
 void mainwindow::CloseEvent(wxCloseEvent& evt)
@@ -2450,6 +2590,62 @@ void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 	}
 }
 
+stock_node* mainwindow::LotSelectionWindow(wxString& ticker)
+{
+	wxVector<stock_node*> sn = this->port.GetLotData();
+	if (!sn.size())
+	{
+		if (this->sell->ShowModal())
+		{
+			this->sell->Destroy();
+			this->sell = NULL;
+		}
+		return NULL;
+	}
+	wxArrayString string;
+	wxDateTime T = wxDateTime::Today();
+	for (auto& v : sn)
+	{
+		wxString s = " Lot: " + wxNumberFormatter::ToString(v->GetLotNumber()) + "  Purchase Date: " + v->GetPurchaseDate().Format(STANDARD_DATE) + "  Purchase Price: " +
+			wxNumberFormatter::ToString(v->GetPurchasePrice(), 5) + "  Shares: " + wxNumberFormatter::ToString(v->GetShares(NULL), 5) + "  Costbasis: " +
+			wxNumberFormatter::ToString(v->GetCostBasis(&T), 2);
+		string.push_back(s);
+	}
+
+	this->sellstock = new SellStockWin(this, wxID_ANY, "Pick lot to sell", ticker, string);
+	stock_node* stock_n = NULL;
+	if (this->sellstock->ShowModal() == wxID_OK)
+	{
+		int selection = this->sellstock->GetSelection();
+		stock_n = sn[selection];
+		this->sellstock->Destroy();
+	}
+	else
+	{
+		this->sellstock->Destroy();
+		return NULL;
+	}
+
+	return stock_n;
+}
+
+void mainwindow::UserEnterSellDataWin(stock_node* stock_n)
+{
+	wxString ticker = stock_n->GetTicker();
+	long lot = stock_n->GetLotNumber();
+	wxDateTime date = stock_n->GetPurchaseDate();
+	double shares = stock_n->GetShares(NULL);
+	GenericKit kit(date, shares);
+	this->dialog = new Dialog(_EnterDialog::SELL_STOCK, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, ticker, &kit);
+
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		SellKit kit = this->dialog->GetSellKit();
+		kit.id = lot;
+		this->port.Sell(lot, kit.date, kit.m_shares, kit.m_price);
+	}
+}
+
 void mainwindow::OnSellMenu(wxCommandEvent& evt)
 {
 	this->sell = new wxTextEntryDialog(this, "Enter Ticker Symbol");
@@ -2463,6 +2659,13 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 			return;
 	} while (!this->port.RequestSell(user));
 	
+	stock_node* stock_n = this->LotSelectionWindow(user);
+	if (!stock_n)
+		return;
+
+	this->UserEnterSellDataWin(stock_n);
+
+	/*
 	wxVector<stock_node*> sn = this->port.GetLotData();
 	if (!sn.size())
 	{
@@ -2481,14 +2684,6 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 			wxNumberFormatter::ToString(v->GetPurchasePrice(), 5) + "  Shares: " + wxNumberFormatter::ToString(v->GetShares(NULL), 5) + "  Costbasis: " + 
 			wxNumberFormatter::ToString(v->GetCostBasis(&T), 2);
 		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
-		string.push_back(s);
 	}
 
 	this->sellstock = new SellStockWin(this, wxID_ANY, "Pick lot to sell", user, string);
@@ -2498,6 +2693,11 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 		int selection = this->sellstock->GetSelection();
 		stock_n = sn[selection];
 		this->sellstock->Destroy();
+	}
+	else
+	{
+		this->sellstock->Destroy();
+		return;
 	}
 
 	long lot = stock_n->GetLotNumber();
@@ -2512,6 +2712,23 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 		kit.id = lot;
 		this->port.Sell(lot, kit.date, kit.m_shares, kit.m_price);
 	}
+	*/
+}
+
+void mainwindow::OnSellPopupClick(wxCommandEvent&)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+	if (!this->port.RequestSell(ticker))
+	{
+		wxMessageBox("Something went wrong! " + ticker + " cannot be sold or any other action!");
+		return;
+	}
+
+	stock_node* sn = this->LotSelectionWindow(ticker);
+	if (!sn)
+		return;
+
+	this->UserEnterSellDataWin(sn);
 }
 
 void mainwindow::OnReInvestSharesMenu(wxCommandEvent& evt)
@@ -2628,6 +2845,11 @@ void mainwindow::OnAddDepositSchdule(wxCommandEvent& evt)
 
 }
 
+void mainwindow::OnRightClick(wxMouseEvent& evt)
+{
+	int ca = 1;
+}
+
 void mainwindow::OnDateChange()
 {
 	this->port.DateChange();
@@ -2657,17 +2879,11 @@ wxScrolled<wxPanel>* mainwindow::GetRightWin()
 	wxScrolled<wxPanel>* P = new wxScrolled<wxPanel>(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
 	P->SetScrollbars(5, 5, 50, 50);
 	P->EnableScrolling(true, true);
-//	wxPanel* w = new wxPanel(scrolled, wxID_ANY);
-	P->SetBackgroundColour(wxColour(0, 0, 0));
-	this->grid_view = new GridView(P, 20);
-	this->UpdateGridView();
-	/*
-	wxVector<StockNode*> stn = this->port.GetStockNodeItems();
-	for (size_t i = 0; i < stn.size(); ++i)
-		this->grid_view->SetNewRow(stn[i]->GetStockViewerData());
 
-	this->grid_view->SetNewRow(this->port.GetStockViewerData(), true);
-	*/
+	P->SetBackgroundColour(wxColour(0, 0, 0));
+	this->grid_view = new GridView(P, 25);
+	this->UpdateGridView();
+	
 	P->SetSizer(grid_view);
 	return P;
 }
@@ -2717,4 +2933,33 @@ void mainwindow::SaveFile()
 void mainwindow::RetrieveFile()
 {
 	this->port.Retrieve();
+}
+
+void mainwindow::DeletePopupMenu()
+{
+	delete this->popup;
+//	delete this->p_sell;
+//	delete this->p_buy;
+//	delete this->p_quote;
+//	delete this->p_add_div;
+//	delete this->p_remove_div;
+//	delete this->p_ohlc;
+}
+
+void mainwindow::CreatePopupMenu()
+{
+	this->popup = new wxMenu();
+	this->p_sell = new wxMenuItem(popup, _MenuItemIDs::P_SELL_STOCK, "Sell");
+	this->p_buy = new wxMenuItem(popup, _MenuItemIDs::P_STOCK_PURCHASE, "Purchase");
+	this->p_quote = new wxMenuItem(popup, _MenuItemIDs::P_QUOTE, "Quote Lookup");
+	this->p_add_div = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV, "Add Dividend");
+	this->p_remove_div = new wxMenuItem(popup, _MenuItemIDs::P_REMOVE_DIV, "Remove Dividend");
+	this->p_ohlc = new wxMenuItem(popup, _MenuItemIDs::P_GET_OHLC, "Open High Low Close");
+
+	this->popup->Append(this->p_buy);
+	this->popup->Append(this->p_sell);
+	this->popup->Append(this->p_quote);
+	this->popup->Append(this->p_add_div);
+	this->popup->Append(this->p_remove_div);
+	this->popup->Append(this->p_ohlc);
 }

@@ -9,6 +9,7 @@
 auto constexpr NA = "NotFound";
 
 void SetStaticTextColor(wxStaticText&, wxColour, wxColour);
+bool IsStringPositive(wxString&);
 
 // Function that compares two wxDateTimes and discards the time,
 // So if they are the same year, month, day, regardless of time this will return true

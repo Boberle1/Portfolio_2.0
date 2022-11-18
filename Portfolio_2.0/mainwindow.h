@@ -56,6 +56,7 @@ class GridNode : public wxStaticText
 public:
 	GridNode(GridView*, wxWindow*, size_t, size_t, GridNode*, GridNode*, GridNode*, GridNode*, wxString, int);
 	~GridNode();
+	bool CopyText(const GridNode&);
 	bool SetNewVal(gridpair, bool total_row = false);
 	void SetUP(GridNode*);
 	void SetRight(GridNode*);
@@ -66,6 +67,7 @@ public:
 	GridNode* GetDown();
 	GridNode* GetLeft();
 	bool IsEmpty();
+	bool Clear();
 	bool IsID(int);
 	bool IsMatch(wxString);
 	void OnClickEvent(wxMouseEvent&);
@@ -83,19 +85,21 @@ private:
 	GridNode* m_right = nullptr;
 	GridNode* m_down = nullptr;
 	GridNode* m_left = nullptr;
-	bool is_double = false;
-	bool is_int = false;
-	bool is_percent = false;
 	bool is_empty = true;
 	wxString t_val = "";
-	double d_val = 0.0;
-	int int_val = 0;
 	size_t m_row = 0;
 	size_t m_col = 0;
+
+	// Background Colours...
 	wxColour normal = wxColour(13, 10, 36);
 	wxColour summaryitem = wxColour(21, 41, 46);
 	wxColour onclick;
+
+	//Foreground Colours...
+	wxColour red = wxColour(217, 7, 28);
+	wxColour green = wxColour(13, 158, 20);
 	wxColour textcolor;
+
 	wxWindow* m_parent = nullptr;
 	GridView* m_grid_view = nullptr;
 	bool SummaryItem = false;
@@ -116,7 +120,9 @@ public:
 	void OnClickRowItem(GridNode*);
 	void OnClickItem(GridNode*);
 	void LayoutGrid();
-	void RightClickAlert(wxString&);
+	void RightClickAlert(wxString&, wxPoint&);
+	wxString GetRightClickTicker();
+	bool RemoveRow(wxString&);
 private:
 //	wxStaticText* GetNewItem(size_t, size_t, double, bool ispercent = true);
 	void SetTitleRow();
@@ -137,6 +143,9 @@ private:
 	GridNode* GetDown(GridNode*, size_t, size_t start = 0);
 
 private:
+	void RemoveRow(GridNode*);
+	void MoveRowUp(GridNode*);
+	void ClearRow(GridNode*);
 	void DeleteRow(GridNode*);
 	GridNode* FindItem(GridNode*, int);
 	void HighlightRow(GridNode*);
@@ -155,6 +164,7 @@ private:
 	GridNode* clicked_node = nullptr;
 	GridNode* summaryrow = nullptr;
 	bool SummaryRowSet = false;
+	wxString rightclick_ticker = "";
 };
 
 
@@ -193,6 +203,11 @@ private:
 	wxStaticText* t_endParenths = NULL;
 	wxStaticText* DayReturn = nullptr;
 	wxStaticText* DayReturnDisplay = nullptr;
+	wxStaticText* DayReturnDollar = NULL;
+	wxStaticText* d_percent = NULL;
+	wxStaticText* d_dollar = NULL;
+	wxStaticText* d_beginparenths = NULL;
+	wxStaticText* d_endParenths = NULL;
 	StockViewerData* svd = nullptr;
 	mainwindow* m_parent = nullptr;
 	wxPanel* panel = nullptr;
@@ -203,6 +218,8 @@ private:
 	wxColour Green = wxColour(16, 82, 31);
 	wxColour Blue = wxColour(36, 11, 191);
 	wxColour DarkGrey = wxColour(43, 43, 43);
+	wxColour parenths = wxColour(40, 40, 84);
+	wxColour percents = wxColour(73, 73, 74);
 };
 
 struct PurchaseKit
@@ -364,13 +381,21 @@ public:
 	void ReInvestShares(double&, wxString&);
 	bool ValidateExistingTicker(wxString&);
 	void SectorClick(wxVector<SubSector>*, wxString&);
-	void RightClickGrid(wxString&);
+	void RightClickGrid(wxString&, wxPoint&);
 	// Event functions...
 	void CloseEvent(wxCloseEvent&);
 	void ClosePanelEvent(wxCloseEvent&);
 	void OnThreadCompletion(wxThreadEvent&);
 	void OnPurchaseMenu(wxCommandEvent&);
+
+	//Helper functions for OnSellMenu...
+	stock_node* LotSelectionWindow(wxString&);
+	void UserEnterSellDataWin(stock_node*);
 	void OnSellMenu(wxCommandEvent&);
+	// End of helper functions for OnSellMenu..
+
+	void OnSellPopupClick(wxCommandEvent&);
+
 	void OnReInvestSharesMenu(wxCommandEvent&);
 	void OnSave(wxCommandEvent&);
 	void OnQuoteLookup(wxCommandEvent&);
@@ -381,6 +406,7 @@ public:
 	void OnMarketGainers(wxCommandEvent&);
 	void OnMarketLosers(wxCommandEvent&);
 	void OnAddDepositSchdule(wxCommandEvent&);
+	void OnRightClick(wxMouseEvent& evt);
 
 	//function called by PortfolioWin when user pressed enter after typing in a date...
 	void OnDateChange();
@@ -395,6 +421,8 @@ private:
 	void UpdateGridView();
 	void SaveFile();
 	void RetrieveFile();
+	void DeletePopupMenu();
+	void CreatePopupMenu();
 private:
 	wxScrolled<wxPanel>* grid_panel = NULL;
 	wxScrolledWindow* scrolled = nullptr;
@@ -410,5 +438,14 @@ private:
 	Portfolio port;
 	webdata data;
 	wxDateTime main_clock;
+
+	//Popup Menu Items...
+	wxMenuItem* p_sell = NULL;
+	wxMenuItem* p_buy = NULL;
+	wxMenuItem* p_quote = NULL;
+	wxMenuItem* p_add_div = NULL;
+	wxMenuItem* p_remove_div = NULL;
+	wxMenuItem* p_ohlc = NULL;
+	wxMenu* popup = NULL;
 };
 

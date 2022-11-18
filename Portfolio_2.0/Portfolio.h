@@ -28,6 +28,7 @@ wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month);
 wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month);
 wxString inline GetSectorName(_Sector);
 
+/*
 _Sector inline GetStringToSector(wxString s)
 {
 	if (s == _BONDS)
@@ -48,6 +49,7 @@ _Sector inline GetStringToSector(wxString s)
 	wxMessageBox("Error string passed to GetStringToSector does not match any sectors!");
 	return _Sector::SECTOR_INVALID;
 }
+*/
 
 // Global function to check if a ptr is null...
 template <typename T>
@@ -409,18 +411,26 @@ public:
 struct StockViewerData
 {
 	StockViewerData(){}
-	StockViewerData(Return_node* r, wxString t, wxString e, wxString pd, double s, double pp, double p, double pc, double dg, double wg,
+	StockViewerData(Return_node* r, wxString t, wxString e, wxString pd, _Sector S, double s, double pp, double p, double pc, double dg, double wg,
 		double qg, double yg, double tg, double cb, double mv, double td, double cash = 0.0)
-		: m_parent(r), ticker(t), earnings(e), purchase_date(pd), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
-		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash) {}
+		: m_parent(r), ticker(t), earnings(e), purchase_date(pd), sec(S), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
+		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash) 
+	{
+		if (S != _Sector::SECTOR_INVALID)
+		{
+			SectorClass& sc = GetSectorClass();
+			this->SectorName = sc.GetSectorString(sec);
+		}
+	}
 	wxString GetTicker() { return this->ticker; }
 	wxString GetEarningsDate() { return this->earnings; }
 	wxString GetPurchaseDate() { return this->purchase_date; }
+	wxString GetSectorName() { return this->SectorName; }
 	wxString GetShares() { return wxNumberFormatter::ToString(this->shares, 2); }
 	wxString GetPurchasePrice() { return wxNumberFormatter::ToString(this->purchase_price, 2); }
 	wxString GetPrice(){ return wxNumberFormatter::ToString(this->price, 2); }
 	wxString GetPreviousClose(){ return wxNumberFormatter::ToString(this->previous_close, 2); }
-	wxString GetDayGain(){ return wxNumberFormatter::ToString(this->day_gain * 100, 2) + "%"; }
+	wxString GetDayGain(){ return wxNumberFormatter::ToString(this->day_gain * 100, 2); }
 	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
 	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2) + "%"; }
 	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2) + "%"; }
@@ -444,6 +454,8 @@ struct StockViewerData
 	wxString ticker = "";
 	wxString earnings = "";
 	wxString purchase_date = "";
+	wxString SectorName = "";
+	_Sector sec = _Sector::SECTOR_INVALID;
 	double shares = 0.0;
 	double purchase_price = 0.0;
 	double price = 0.0;
@@ -567,6 +579,7 @@ public:
 	void SetDividends(Dividend);
 	bool SetReInvestShares(double&);
 	void OnThreadComplete(wxCommandEvent&);
+	Day_Prices* GetDayPricesOfLastMarketOpen();
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
 	StockViewerData* GetStockViewerData();
@@ -630,6 +643,7 @@ private:
 	wxDateTime div_reinvest_start_date;
 	stock_node* lastPurchase = nullptr;
 	bool purchaseDateSwitch = false;
+	_Sector sectorID = _Sector::SECTOR_INVALID;
 };
 
 class Sector : public Return_node
@@ -720,7 +734,7 @@ private:
 	CashAccount cash;
 	int threads_running = 0;
 	StockViewerData svd;
-	StockNode nasdaq;
-	StockNode dow_jones;
+//	StockNode nasdaq;
+//	StockNode dow_jones;
 	wxString url = "https://datahub.io/core/nyse-other-listings/r/0.html";
 };

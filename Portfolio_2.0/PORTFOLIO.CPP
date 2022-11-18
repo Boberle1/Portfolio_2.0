@@ -87,6 +87,7 @@ wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month m)
 	return wxDateTime::Month::Inv_Month;
 }
 
+/*
 wxString inline GetSectorName(_Sector sect)
 {
 	switch (sect)
@@ -102,6 +103,7 @@ wxString inline GetSectorName(_Sector sect)
 	default: return "";
 	}
 }
+*/
 
 // ItemInfo functions...
 ItemInfo::ItemInfo(double& marketcap, double& daygain) : market_cap(marketcap), day_return(daygain)
@@ -479,16 +481,16 @@ void SectorClass::ActivateData()
 {
 	this->sec.push_back(BOND);
 	this->_sec.push_back(_BONDS);
-	this->sec.push_back(REIT);
-	this->_sec.push_back(_REIT);
+//	this->sec.push_back(REIT);
+//	this->_sec.push_back(_REIT);
 	this->sec.push_back(SMALLCAP);
 	this->_sec.push_back(_SMALLCAP);
 	this->sec.push_back(MIDCAP);
 	this->_sec.push_back(_MIDCAP);
 	this->sec.push_back(LARGECAP);
 	this->_sec.push_back(_LARGECAP);
-	this->sec.push_back(TECH);
-	this->_sec.push_back(_TECH);
+//	this->sec.push_back(TECH);
+//	this->_sec.push_back(_TECH);
 	this->sec.push_back(CRYPTO);
 	this->_sec.push_back(_CRYPTO);
 	this->sec.push_back(FOREIGN);
@@ -518,6 +520,10 @@ void SectorClass::ActivateData()
 	this->sec.push_back(SECTOR_INVALID);
 	this->_sec.push_back(_SECTOR_INVALID);
 
+	//NEW
+	this->communication_services.push_back(ETF);
+	this->_communication_services.push_back(_ETF);
+
 	this->communication_services.push_back(ADVERTISING_AGENCIES);
 	this->_communication_services.push_back(_ADVERTISING_AGENCIES);
 	this->communication_services.push_back(BRODCASTING);
@@ -532,6 +538,10 @@ void SectorClass::ActivateData()
 	this->_communication_services.push_back(_PUBLISHING);
 	this->communication_services.push_back(TELECOM_SERVICES);
 	this->_communication_services.push_back(_TELECOM_SERVICES);
+
+	//NEW
+	this->consumer_discretionary.push_back(ETF);
+	this->_consumer_discretionary.push_back(_ETF);
 
 	this->consumer_discretionary.push_back(APPAREL_MANUFACTURING);
 	this->_consumer_discretionary.push_back(_APPAREL_MANUFACTURING);
@@ -580,6 +590,10 @@ void SectorClass::ActivateData()
 	this->consumer_discretionary.push_back(TRAVEL_SERVICES);
 	this->_consumer_discretionary.push_back(_TRAVEL_SERVICES);
 
+	//NEW
+	this->consumer_staples.push_back(ETF);
+	this->_consumer_staples.push_back(_ETF);
+
 	this->consumer_staples.push_back(BEVERAGES_BREWERS);
 	this->_consumer_staples.push_back(_BEVERAGES_BREWERS);
 	this->consumer_staples.push_back(BEVERAGES_NON_ALCOHOLIC);
@@ -605,6 +619,10 @@ void SectorClass::ActivateData()
 	this->consumer_staples.push_back(TOBACCO);
 	this->_consumer_staples.push_back(_TOBACCO);
 
+	//NEW
+	this->energy.push_back(ETF);
+	this->_energy.push_back(_ETF);
+
 	this->energy.push_back(OIL_AND_GAS_DRILLING);
 	this->_energy.push_back(_OIL_AND_GAS_DRILLING);
 	this->energy.push_back(OIL_AND_GAS_E_AND_P);
@@ -621,6 +639,10 @@ void SectorClass::ActivateData()
 	this->_energy.push_back(_THERMAL_COAL);
 	this->energy.push_back(URANIUM);
 	this->_energy.push_back(_URANIUM);
+
+	//NEW
+	this->financials.push_back(ETF);
+	this->_financials.push_back(_ETF);
 
 	this->financials.push_back(ASSET_MANAGEMENT);
 	this->_financials.push_back(_ASSET_MANAGEMENT);
@@ -653,6 +675,10 @@ void SectorClass::ActivateData()
 	this->financials.push_back(SHELL_COMPANIES);
 	this->_financials.push_back(_SHELL_COMPANIES);
 
+	//NEW
+	this->health_care.push_back(ETF);
+	this->_health_care.push_back(_ETF);
+
 	this->health_care.push_back(BIOTECHNOLOGY);
 	this->_health_care.push_back(_BIOTECHNOLOGY);
 	this->health_care.push_back(DIAGNOSTICS_AND_RESEARCH);
@@ -675,6 +701,10 @@ void SectorClass::ActivateData()
 	this->_health_care.push_back(_MEDICAL_INSTRUMENTS_AND_SUPPLIES);
 	this->health_care.push_back(PHARMECUTICALS_RETAILERS);
 	this->_health_care.push_back(_PHARMECUTICALS_RETAILERS);
+
+	//NEW
+	this->industrials.push_back(ETF);
+	this->_industrials.push_back(_ETF);
 
 	this->industrials.push_back(AEROSPACE_AND_DEFENSE);
 	this->_industrials.push_back(_AEROSPACE_AND_DEFENSE);
@@ -725,6 +755,10 @@ void SectorClass::ActivateData()
 	this->industrials.push_back(WASTE_MANAGEMENT);
 	this->_industrials.push_back(_WASTE_MANAGEMENT);
 
+	//NEW
+	this->information_technology.push_back(ETF);
+	this->_information_technology.push_back(_ETF);
+
 	this->information_technology.push_back(COMMUNICATIONS_EQUIPMENT);
 	this->_information_technology.push_back(_COMMUNICATIONS_EQUIPMENT);
 	this->information_technology.push_back(COMPUTER_HARDWARE);
@@ -737,7 +771,6 @@ void SectorClass::ActivateData()
 	this->_information_technology.push_back(_ELECTRONICS_AND_COMPUTER_DISTRIBUTION);
 	this->information_technology.push_back(INFORMATION_TECHNOLOGY_SERVICES);
 	this->_information_technology.push_back(_INFORMATION_TECHNOLOGY_SERVICES);
-
 	this->information_technology.push_back(SCIENTIFIC_AND_TECHNICAL_INSTRUMENTS);
 	this->_information_technology.push_back(_SCIENTIFIC_AND_TECHNICAL_INSTRUMENTS);
 	this->information_technology.push_back(SEMICONDUCTOR_EQUIPMENT_AND_MATERIALS);
@@ -750,6 +783,10 @@ void SectorClass::ActivateData()
 	this->_information_technology.push_back(_SOFTWARE_INFRASTRUCTURE);
 	this->information_technology.push_back(SOLAR);
 	this->_information_technology.push_back(_SOLAR);
+
+	//NEW
+	this->materials.push_back(ETF);
+	this->_materials.push_back(_ETF);
 
 	this->materials.push_back(AGRICULTURE_INPUTS);
 	this->_materials.push_back(_AGRICULTURE_INPUTS);
@@ -780,11 +817,14 @@ void SectorClass::ActivateData()
 	this->materials.push_back(STEEL);
 	this->_materials.push_back(_STEEL);
 
+	//NEW
+	this->real_estate.push_back(ETF);
+	this->_real_estate.push_back(_ETF);
+
 	this->real_estate.push_back(REAL_ESTATE_DEVELOPMENT);
 	this->_real_estate.push_back(_REAL_ESTATE_DEVELOPMENT);
 	this->real_estate.push_back(REAL_ESTATE_DIVERSIFIED);
 	this->_real_estate.push_back(_REAL_ESTATE_DIVERSIFIED);
-
 	this->real_estate.push_back(REAL_ESTATE_SERVICES);
 	this->_real_estate.push_back(_REAL_ESTATE_SERVICES);
 	this->real_estate.push_back(REIT_DIVERSIFIED);
@@ -805,6 +845,10 @@ void SectorClass::ActivateData()
 	this->_real_estate.push_back(_REIT_RETAIL);
 	this->real_estate.push_back(REAL_ESTATE_DIVERSIFIED);
 	this->_real_estate.push_back(_REIT_SPECIALTY);
+
+	//NEW
+	this->utilities.push_back(ETF);
+	this->_utilities.push_back(_ETF);
 
 	this->utilities.push_back(UTILITIES_DIVERSIFIED);
 	this->_utilities.push_back(_UTILITIES_DIVERSIFIED);
@@ -860,7 +904,7 @@ wxString SectorClass::GetSubSectorString(_Sector s, _Sub_Sector sub)
 	case _Sector::SMALLCAP: return _ETF;
 	case _Sector::MIDCAP: return _ETF;
 	case _Sector::LARGECAP: return _ETF;
-	case _Sector::TECH: return _ETF;
+//	case _Sector::TECH: return _ETF;
 	case _Sector::FOREIGN: return _ETF;
 	case _Sector::CRYPTO: return _ETF;
 	case _Sector::COMMUNICATION_SERVICES: return this->m_GetSubSector(this->communication_services, this->_communication_services, sub);
@@ -873,7 +917,7 @@ wxString SectorClass::GetSubSectorString(_Sector s, _Sub_Sector sub)
 	case _Sector::INFORMATION_TECHNOLOGY: return this->m_GetSubSector(this->information_technology, this->_information_technology, sub);
 	case _Sector::MATERIALS: return this->m_GetSubSector(this->materials, this->_materials, sub);
 	case _Sector::REAL_ESTATE: return this->m_GetSubSector(this->real_estate, this->_real_estate, sub);
-	case _Sector::REIT: return _ETF;
+//	case _Sector::REIT: return _ETF;
 	case _Sector::SECTOR_INVALID: return _SECTOR_INVALID;
 	case _Sector::UTILITIES: return this->m_GetSubSector(this->utilities, this->_utilities, sub);
 	}
@@ -902,7 +946,7 @@ _Sub_Sector SectorClass::GetSubSectorID(_Sector id, wxString sub)
 	case _Sector::SMALLCAP: return ETF;
 	case _Sector::MIDCAP: return ETF;
 	case _Sector::LARGECAP: return ETF;
-	case _Sector::TECH: return ETF;
+//	case _Sector::TECH: return ETF;
 	case _Sector::FOREIGN: return ETF;
 	case _Sector::CRYPTO: return ETF;
 	case _Sector::COMMUNICATION_SERVICES: return this->m_GetSubSectorID(this->_communication_services, this->communication_services, sub);
@@ -915,7 +959,7 @@ _Sub_Sector SectorClass::GetSubSectorID(_Sector id, wxString sub)
 	case _Sector::INFORMATION_TECHNOLOGY: return this->m_GetSubSectorID(this->_information_technology, this->information_technology, sub);
 	case _Sector::MATERIALS: return this->m_GetSubSectorID(this->_materials, this->materials, sub);
 	case _Sector::REAL_ESTATE: return this->m_GetSubSectorID(this->_real_estate, this->real_estate, sub);
-	case _Sector::REIT: return ETF;
+//	case _Sector::REIT: return ETF;
 	case _Sector::SECTOR_INVALID: return SUB_SECTOR_INVALID;
 	case _Sector::UTILITIES: return this->m_GetSubSectorID(this->_utilities, this->utilities, sub);
 	}
@@ -1395,7 +1439,7 @@ void stock_node::Save(DataStream& ds)
 	else
 		ds.WriteData(invalid);
 
-	ds.Write(this->m_ticker);
+//	ds.Write(this->m_ticker);
 	ds.WriteLong(this->m_id);
 	ds.WriteData(this->m_price_per_share);
 	ds.WriteData(this->m_shares);
@@ -1420,7 +1464,7 @@ void stock_node::Retrieve(DataStream& ds)
 	if (temp == valid)
 		ds.ReadwxDateTime(this->m_reinvest_start);
 
-	ds.Read(this->m_ticker);
+//	ds.Read(this->m_ticker);
 	ds.ReadLong(this->m_id);
 	ds.ReadData(this->m_price_per_share);
 	ds.ReadData(this->m_shares);
@@ -1539,6 +1583,7 @@ bool StockThread::GetResult()
 StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S, bool reinvest, wxString T) 
 	: Return_node(&P->market_value, &S->market_value, nullptr), m_ticker(t), m_parentclock(p), m_grand_parent(P), m_parent(S), DivReinvest(reinvest)
 {
+	this->sectorID = S->GetID();
 	this->Bind(ThreadComplete, &StockNode::OnThreadComplete, this);
 	if (this->DivReinvest)
 	{
@@ -1550,6 +1595,7 @@ StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S, bool re
 StockNode::StockNode(wxString t, wxDateTime* p, Portfolio* P, Sector* S)
 	: Return_node(&P->market_value, &S->market_value, nullptr), m_ticker(t), m_parentclock(p), m_grand_parent(P), m_parent(S)
 {
+	this->sectorID = S->GetID();
 	this->Bind(ThreadComplete, &StockNode::OnThreadComplete, this);
 }
 
@@ -1564,7 +1610,8 @@ StockNode::StockNode(const StockNode& sn) : Return_node(sn.PortfolioMarketValue,
 	this->SetSummaryData(sn.current_Data);
 	this->DivReinvest = sn.DivReinvest;
 	this->div_reinvest_start_date = sn.div_reinvest_start_date;
-//	this->Calibrate();
+	this->sectorID = sn.sectorID;
+
 }
 
 StockNode::~StockNode()
@@ -1703,10 +1750,10 @@ void StockNode::Calibrate(bool force)
 
 	// We put an astrisk next to the name if the stock is enrolled in dividend re investment
 	// and there is a pending re investment that needs to be entered by the user...
-	wxString t = !this->PendingReInvestment() ? this->m_ticker + " *" : this->m_ticker;
+	wxString t = this->PendingReInvestment() ? this->m_ticker + " *" : this->m_ticker;
 
 	this->svd = StockViewerData(this, t, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
-		_shares, originalcostbasis / _shares, _marketprice, _previous_close,
+		this->sectorID, _shares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
 		marketvalue, this->GetDividends());
 
@@ -1792,27 +1839,32 @@ bool StockNode::Historical_prices_UpToDate()
 
 double StockNode::GetDeviation(int days)
 {
-	Day_Prices* it = this->historical_prices.begin();
-	int size = 0;
-	if (*this->m_parentclock != wxDateTime::Today())
-		it = this->GetHistoricalIndexIter();
-
-	if (it == this->historical_prices.end())
+	int size = days;
+	auto it = this->historical_prices.rbegin();
+	if (it == this->historical_prices.rend())
 		return 0.0;
 
 	double total = 0.0, standardDiv = 0.0;
-	Day_Prices* index = it;
-	while (index != this->historical_prices.end() && size <= days)
+	while (it != this->historical_prices.rend() && days)
 	{
-		++size;
-		total += index->close;
-		++index;
+		--days;
+		total += it->close;
+		++it;
 	}
 
+	if (days != 0)
+		size -= days;
+
 	double mean = total / size;
-	index = it;
-	for (int i = 0; i < size; ++i)
-		standardDiv += std::pow((index->close - mean), 2);
+
+	days = size;
+	it = this->historical_prices.rbegin();
+	while (it != this->historical_prices.rend() && days)
+	{
+		--days;
+		standardDiv += std::pow((it->close - mean), 2);
+		++it;
+	}
 
 	return std::sqrt(standardDiv / (size - 1));
 }
@@ -2291,6 +2343,14 @@ void StockNode::OnThreadComplete(wxCommandEvent&)
 	this->m_parent->ThreadComplete(this);
 }
 
+Day_Prices* StockNode::GetDayPricesOfLastMarketOpen()
+{
+	if (this->historical_prices.rbegin() != this->historical_prices.rend())
+		return &*this->historical_prices.rbegin();
+
+	return NULL;
+}
+
 double StockNode::GetDividends()
 {
 	wxDateTime T = *this->m_parentclock;
@@ -2419,7 +2479,9 @@ void StockNode::SetHistoricalData(Day_Prices day)
 Sector::Sector(_Sector s, wxDateTime* date, Portfolio* P) 
 	: Return_node(&P->market_value, nullptr, nullptr), id(s), m_parentclock(date), m_parent(P)
 {
-	this->Sector_Name = GetSectorName(s);
+	SectorClass& sc = GetSectorClass();
+	this->Sector_Name = sc.GetSectorString(s);
+//	this->Sector_Name = GetSectorName(s);
 }
 
 Sector::~Sector()
@@ -2535,7 +2597,7 @@ void Sector::Calibrate(bool datechange)
 
 	this->ReturnCalibarate();
 	this->svd = StockViewerData(this, this->Sector_Name, "", "",
-		this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		this->GetID(), this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
 		this->market_value, this->dividends);
 }
@@ -2660,8 +2722,8 @@ int Sector::GetStockSize()
 // Portfolio Functions...
 
 Portfolio::Portfolio(wxFrame* f, double money, wxDateTime* m) 
-	: Return_node(nullptr, nullptr, nullptr), m_parent(f), m_parentclock(m), dow_jones("DJI", m_parentclock, this, nullptr, false, ""),
-	nasdaq("Nasdaq", m_parentclock, this, nullptr, false, "")
+	: Return_node(nullptr, nullptr, nullptr), m_parent(f), m_parentclock(m)//, dow_jones("DJI", m_parentclock, this, nullptr, false, ""),
+	//nasdaq("Nasdaq", m_parentclock, this, nullptr, false, "")
 {
 	Holidays& h = GetHolidays();
 	h.Retrieve();
@@ -2804,7 +2866,7 @@ void Portfolio::Calibrate(bool datechange)
 		this->PortfolioPerc = this->market_value / this->GetFreeCash();
 
 	this->svd = StockViewerData(this, "Total", "", "",
-		this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		_Sector::SECTOR_INVALID, this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
 		this->market_value, this->dividends, this->cash.GetFreeCash());
 }
