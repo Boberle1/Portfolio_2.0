@@ -362,10 +362,10 @@ public:
 	void ReadDayPricesVector(wxVector<Day_Prices>&);
 	void WriteDepositVector(wxVector<deposit_pair>&);
 	void WriteWithdrawlVector(wxVector<withdrawl_pair>&);
-	void WritePurchaseVector(wxVector<pair>&);
+	void Write_pairVector(wxVector<pair>&);
 	void ReadDepositVector(wxVector<deposit_pair>&);
 	void ReadWithdrawlVector(wxVector<withdrawl_pair>&);
-	void ReadPurchaseVector(wxVector<pair>&);
+	void Read_pairVector(wxVector<pair>&);
 	void WriteCashDivVector(wxVector<Pair>&);
 	void ReadCashDivVector(wxVector<Pair>&);
 	void ReadStringwxVector(wxVector<wxString>&);

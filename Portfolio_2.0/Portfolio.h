@@ -412,9 +412,9 @@ struct StockViewerData
 {
 	StockViewerData(){}
 	StockViewerData(Return_node* r, wxString t, wxString e, wxString pd, _Sector S, double s, double pp, double p, double pc, double dg, double wg,
-		double qg, double yg, double tg, double cb, double mv, double td, double cash = 0.0)
+		double qg, double yg, double tg, double cb, double mv, double td, double cash = 0.0, wxString ex_div = "NA")
 		: m_parent(r), ticker(t), earnings(e), purchase_date(pd), sec(S), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
-		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash) 
+		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash), ex_div_date(ex_div)
 	{
 		if (S != _Sector::SECTOR_INVALID)
 		{
@@ -425,6 +425,7 @@ struct StockViewerData
 	wxString GetTicker() { return this->ticker; }
 	wxString GetEarningsDate() { return this->earnings; }
 	wxString GetPurchaseDate() { return this->purchase_date; }
+	wxString GetExDivDate() { return this->ex_div_date; }
 	wxString GetSectorName() { return this->SectorName; }
 	wxString GetShares() { return wxNumberFormatter::ToString(this->shares, 2); }
 	wxString GetPurchasePrice() { return wxNumberFormatter::ToString(this->purchase_price, 2); }
@@ -454,6 +455,7 @@ struct StockViewerData
 	wxString ticker = "";
 	wxString earnings = "";
 	wxString purchase_date = "";
+	wxString ex_div_date = "NA";
 	wxString SectorName = "";
 	_Sector sec = _Sector::SECTOR_INVALID;
 	double shares = 0.0;
@@ -479,6 +481,7 @@ class stock_node
 public:
 	stock_node(long id, wxString ticker, wxDateTime date, double price_per_share, double shares, Action a, wxDateTime);
 	void SetSibling(stock_node sn);
+	bool IsActive() { return this->active; }
 	void ShareDivsWithSibling(stock_node*);
 	double GetCostBasis(wxDateTime*);
 	double GetShares(wxDateTime*);
@@ -520,6 +523,7 @@ private:
 	double m_shares = 0.0;
 	double m_average_sold_price = 0.0;
 	Action action = UNDEFINED;
+	int active = 0;
 
 	// Purchased stock_nodes can have multiple siblings because you can sell partial lots. Example, you sell two shares of 
 	// a four share lot and later on sell the other two shares. That would create two siblings of the same lot number....
@@ -567,11 +571,11 @@ public:
 	bool Sell(long& id, wxDateTime&, double& price_per_share, double& shares);
 	bool IdMatch(long);
 	bool TickerMatch(wxString);
-	wxString GetTicker();
+	wxString GetTicker() const;
 	double GetShares();
 	SummaryData GetSummaryData() { return this->current_Data; }
 	wxString GetNextEarningsDate();
-	bool IsActive();
+	bool IsActive() const;
 	void Calibrate(bool force = false);
 	void ClockChange();
 	void SetHistoricalData(Day_Prices);
@@ -592,6 +596,7 @@ public:
 	wxVector<stock_node*> GetChildren();
 
 private:
+	wxString GetLatestEx_Div_Date();
 	bool DistributeReInvestmentShares(double&);
 	bool UpDate(bool force_update = false);
 	bool Historical_prices_UpToDate();
@@ -611,6 +616,7 @@ private:
 	double GetYearCostBasis(wxDateTime*);
 	double GetTotalCostBasis(wxDateTime*);
 	double GetMarketValue(wxDateTime*);
+	void m_CheckActive();
 	bool m_Purchase(long&, wxDateTime&, double&, double&);
 	bool m_Sell(long&, wxDateTime&, double&, double&, stock_node*);
 	stock_node* FindLot(long&);
@@ -664,11 +670,14 @@ public:
 	Pair GetPair();
 	void Calibrate(bool datechange = false);
 	void CalcRatiosOfChildren();
-	StockViewerData* GetStockViewerData();
+	const StockViewerData* GetStockViewerData() const;
 	void Save();
 	void Retrieve();
 	void Update();
+	bool IsStockActive(wxString&) const;
+	bool IsActive() const;
 	_Sector GetID() { return this->id; }
+	wxString GetSectorName() const;
 	
 	//call back from for StockNode after thread completion...
 	void ThreadComplete(StockNode*);
@@ -713,6 +722,9 @@ public:
 	bool AddWithdrawl(wxDateTime&, double&);
 	void DateChange();
 	void Update();
+	bool IsStockActive(wxString&);
+	wxString GetSectorName(wxString&);
+	const Sector* GetConstSector(wxString&);
 
 	// call back for sector after one of its stocks completes a thread...
 	void ThreadComplete(StockNode*);

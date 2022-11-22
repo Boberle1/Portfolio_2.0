@@ -12,7 +12,7 @@ void SetStaticTextColor(wxStaticText& T, wxColour green, wxColour red)
 bool IsStringPositive(wxString& s)
 {
 	int index = s.find('-');
-	return index;
+	return index == -1 ? true : false;
 }
 
 bool IswxDateEqual(wxDateTime& d1, wxDateTime& d2)
@@ -357,7 +357,7 @@ void DataStream::WriteWithdrawlVector(wxVector<withdrawl_pair>& v)
 	}
 }
 
-void DataStream::WritePurchaseVector(wxVector<pair>& v)
+void DataStream::Write_pairVector(wxVector<pair>& v)
 {
 	size_t size = v.size();
 	this->WriteData(size);
@@ -395,7 +395,7 @@ void DataStream::ReadWithdrawlVector(wxVector<withdrawl_pair>& v)
 	}
 }
 
-void DataStream::ReadPurchaseVector(wxVector<pair>& v)
+void DataStream::Read_pairVector(wxVector<pair>& v)
 {
 	size_t size;
 	this->ReadData(size);

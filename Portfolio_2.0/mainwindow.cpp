@@ -13,6 +13,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
 	EVT_MENU(_MenuItemIDs::_SELL_STOCK, OnSellMenu)
 	EVT_MENU(_MenuItemIDs::P_SELL_STOCK, OnSellPopupClick)
+	EVT_MENU(_MenuItemIDs::P_STOCK_PURCHASE, OnPurchasePopupClick)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(GridNode, wxStaticText)
@@ -53,6 +54,7 @@ auto constexpr DIVIDEND = "Dividend";
 auto constexpr TOTAL_DIVIDENDS = "Total Dividends";
 auto constexpr DIV_RE_INVEST = "Dividend Re-Investment";
 auto constexpr _SECTOR = "Sector";
+auto constexpr _EX_DIV = "Ex-Div Date";
 auto constexpr PORTFOLIO_PERC = "Portfolio Percent";
 auto constexpr _52WEEK_DEVIATION = "52Week Deviation";
 auto constexpr _90DAY_DEVIATION = "90Day Deviation";
@@ -249,8 +251,11 @@ void VirtualListView::UpdateItemsCount()
 // GridView functions...
 
 GridNode::GridNode(GridView* gv, wxWindow* w, size_t row, size_t col, GridNode* up, GridNode* right, GridNode* down, GridNode* left, wxString tval, int gridtype)
-	: wxStaticText(w, wxID_ANY, tval), m_grid_view(gv), m_parent(w), m_row(row), m_col(col), m_up(up), m_right(right), m_down(down), m_left(left), t_val(tval)
+	: wxStaticText(w, wxID_ANY, tval), m_grid_view(gv), m_parent(w), m_row(row), m_col(col), m_up(up), m_right(right), m_down(down), m_left(left), t_val(tval), Gridtype(gridtype)
 {
+	this->InitializeGridNode();
+
+	/*
 	this->SetBackgroundColour(this->normal);
 	this->Bind(wxEVT_LEFT_DOWN, &GridNode::OnClickEvent, this);
 	this->onclick = wxColour(39, 38, 51);
@@ -260,21 +265,58 @@ GridNode::GridNode(GridView* gv, wxWindow* w, size_t row, size_t col, GridNode* 
 		this->is_empty = false;
 	}
 
-	if (GRIDROW == gridtype)
+	if (GRIDROW == this->Gridtype)
 	{
 		this->Bind(wxEVT_RIGHT_DOWN, &GridNode::OnRightClick, this);
 		this->textcolor = wxColour(182, 203, 242);
 		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
 		this->SetForegroundColour(this->textcolor);
 	}
-	if (GRIDCOL == gridtype)
+	if (GRIDCOL == this->Gridtype)
 	{
 		this->textcolor = wxColour(213, 220, 227);
 		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
 		this->SetForegroundColour(this->textcolor);
 	}
-	if (gridtype == -1)
+	if (this->Gridtype == -1)
 		this->SetFont(wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM));
+	*/
+}
+
+GridNode::GridNode(const GridNode& gn) 
+	: wxStaticText(gn.m_parent, wxID_ANY, gn.t_val), m_grid_view(gn.m_grid_view), 
+	m_parent(gn.m_parent), m_row(gn.m_row), m_col(gn.m_col), m_up(gn.m_up), m_right(gn.m_right), m_down(gn.m_down), m_left(gn.m_left), 
+	t_val(gn.t_val), Gridtype(gn.Gridtype)
+{
+	this->SetLabel(gn.GetLabel());
+	this->SetFont(gn.GetFont());
+	if (gn.SummaryItem)
+		this->SummaryItem = true;
+
+	this->SetBackgroundColour(gn.GetBackgroundColour());
+	this->SetForegroundColour(gn.GetForegroundColour());
+}
+
+void GridNode::operator=(const GridNode& gn)
+{
+	this->m_grid_view = gn.m_grid_view;
+	this->m_parent = gn.m_parent;
+	this->m_row = gn.m_row;
+	this->m_col = gn.m_col;
+	this->m_up = gn.m_up;
+	this->m_right = gn.m_right;
+	this->m_down = gn.m_down;
+	this->m_left = gn.m_left;
+	this->t_val = gn.t_val;
+	this->Gridtype = gn.Gridtype;
+
+	this->SetLabel(gn.GetLabel());
+	this->SetFont(gn.GetFont());
+	if (gn.SummaryItem)
+		this->SummaryItem = true;
+
+	this->SetBackgroundColour(gn.GetBackgroundColour());
+	this->SetForegroundColour(gn.GetForegroundColour());
 }
 
 GridNode::~GridNode()
@@ -285,6 +327,7 @@ GridNode::~GridNode()
 bool GridNode::CopyText(const GridNode& gn)
 {
 	this->t_val = gn.t_val;
+	this->Gridtype = gn.Gridtype;
 	this->SetLabel(gn.GetLabel());
 	this->SetFont(gn.GetFont());
 	if (gn.SummaryItem)
@@ -516,6 +559,34 @@ void GridNode::ChangeColorToClicked(int direction)
 void GridNode::UnClick()
 {
 	this->SetBackgroundColour(this->SummaryItem ? this->summaryitem : this->normal);
+}
+
+void GridNode::InitializeGridNode()
+{
+	this->SetBackgroundColour(this->normal);
+	this->Bind(wxEVT_LEFT_DOWN, &GridNode::OnClickEvent, this);
+	this->onclick = wxColour(39, 38, 51);
+
+	if (this->t_val.size())
+	{
+		this->is_empty = false;
+	}
+
+	if (GRIDROW == this->Gridtype)
+	{
+		this->Bind(wxEVT_RIGHT_DOWN, &GridNode::OnRightClick, this);
+		this->textcolor = wxColour(182, 203, 242);
+		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
+		this->SetForegroundColour(this->textcolor);
+	}
+	if (GRIDCOL == this->Gridtype)
+	{
+		this->textcolor = wxColour(213, 220, 227);
+		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
+		this->SetForegroundColour(this->textcolor);
+	}
+	if (this->Gridtype == -1)
+		this->SetFont(wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM));
 }
 
 // Private VirtualListView functions....
@@ -802,6 +873,8 @@ gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
 		return gridpair(svd->GetEarningsDate(), false);
 	if (collabel == PURCHASE_DATE)
 		return gridpair(svd->GetPurchaseDate(), false);
+	if (collabel == _EX_DIV)
+		return gridpair(svd->GetExDivDate(), false);
 	if (collabel == _SECTOR)
 		return gridpair(svd->GetSectorName(), false);
 	if (collabel == PORTFOLIO_PERC)
@@ -839,12 +912,13 @@ wxString GridView::GetColTitle(size_t col)
 	case 17: return TOTAL_DIVIDENDS;
 	case 18: return EARNINGS_DATE;
 	case 19: return PURCHASE_DATE;
-	case 20: return _SECTOR;
-	case 21: return PORTFOLIO_PERC;
-	case 22: return _52WEEK_DEVIATION;
-	case 23: return _90DAY_DEVIATION;
-	case 24: return _30DAY_DEVIATION;
-	case 25: return "";
+	case 20: return _EX_DIV;
+	case 21: return _SECTOR;
+	case 22: return PORTFOLIO_PERC;
+	case 23: return _52WEEK_DEVIATION;
+	case 24: return _90DAY_DEVIATION;
+	case 25: return _30DAY_DEVIATION;
+	case 26: return "";
 	}
 
 	return "";
@@ -1390,14 +1464,26 @@ void PortfolioWin::OnUpdateButtonPress(wxCommandEvent& evt)
 
 
 template <typename T>
-Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, wxSize s, wxString msg, T* t) : wxDialog(parent, id, msg, p, s), m_parent(parent), m_type(type)
+Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, wxSize s, wxString msg, T* t) : wxDialog(parent, id, msg, p, s), 
+	m_parent(parent), m_type(type)
 {
 	this->Bind(wxEVT_CLOSE_WINDOW, &Dialog::OnCloseDialog, this);
 	this->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
 
 	switch (type)
 	{
-	case STOCK_PURCHASE_DIALOG: this->CreateStockEntry(); break;
+	case STOCK_PURCHASE_DIALOG: 
+	{
+		if (sizeof(wxString) == sizeof(*t))
+			this->_ticker_ptr = reinterpret_cast<wxString*>(t);
+		else
+		{
+			this->string_t = *reinterpret_cast<string_three*>(t);
+			this->_ticker_ptr = &this->string_t.longname;
+		}
+		this->CreateStockEntry(); 
+		break;
+	}
 	case _EnterDialog::SELL_STOCK: this->sellkit = reinterpret_cast<GenericKit*>(t); this->CreateSellStockWin(); break;
 	case _EnterDialog::QUOTE_WIN: sumptr = reinterpret_cast<SummaryData*>(t); this->CreateQuoteWin(); break;
 	case _EnterDialog::ENTER_DEPOSIT: this->CreateDepositWin(); break;
@@ -1448,11 +1534,17 @@ void Dialog::CreateStockEntry()
 	SetColor(*this, wxColour(157, 157, 163));
 //	this->SetBackgroundColour(wxColour(157, 157, 163));
 	// init controls...
-	this->s_ticker = new wxStaticText(this, wxID_ANY, "Enter Ticker");
-	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
-	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &this->_ticker));
-	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
-	SetColor(*this->m_ticker, c);
+//	this->s_ticker = new wxStaticText(this, wxID_ANY, "Enter Ticker");
+//	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
+//	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &this->_ticker));
+//	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
+//	SetColor(*this->m_ticker, c);
+
+	if (this->_ticker_ptr)
+	{
+		this->s_ticker = new wxStaticText(this, wxID_ANY, *this->_ticker_ptr);
+		this->s_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	}
 
 	this->CreateChoiceControls();
 
@@ -1491,15 +1583,15 @@ void Dialog::CreateStockEntry()
 	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* bottomH = new wxBoxSizer(wxHORIZONTAL);
-	wxBoxSizer* tick = new wxBoxSizer(wxVERTICAL);
+//	wxBoxSizer* tick = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* sect = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* subsect = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* price = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* share = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* date = new wxBoxSizer(wxVERTICAL);
 
-	tick->Add(this->s_ticker, 0, wxALIGN_LEFT);
-	tick->Add(this->m_ticker, 0, wxALIGN_LEFT);
+//	tick->Add(this->s_ticker, 0, wxALIGN_LEFT);
+//	tick->Add(this->m_ticker, 0, wxALIGN_LEFT);
 
 	sect->Add(this->sector_choice, 0, wxALIGN_LEFT);
 	sect->Add(this->choice, 0, wxALIGN_LEFT);
@@ -1516,7 +1608,7 @@ void Dialog::CreateStockEntry()
 	date->Add(this->s_date, 0, wxALIGN_LEFT);
 	date->Add(this->m_date, 0, wxALIGN_LEFT);
 
-	topH->Add(tick, 1, wxALIGN_CENTER_VERTICAL);
+//	topH->Add(tick, 1, wxALIGN_CENTER_VERTICAL);
 	topH->Add(sect, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, 10);
 	topH->Add(subsect, 0, wxALIGN_CENTER_VERTICAL);
 	topH->Add(price, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, 10);
@@ -1535,6 +1627,7 @@ void Dialog::CreateStockEntry()
 	bottomH->Add(ok, 0, wxRIGHT, 10);
 	bottomH->Add(cancel, 0);
 
+	mainV->Add(this->s_ticker, 0, wxALIGN_CENTER_HORIZONTAL);
 	mainV->Add(topH, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
 	mainV->Add(_static, 1, wxALIGN_CENTER_HORIZONTAL);
 	mainV->Add(bottomH, 0, wxALIGN_RIGHT | wxALL, 10);
@@ -1553,6 +1646,8 @@ void Dialog::CreateQuoteWin()
 	SetColor(*this, wxColour(207, 208, 212));
 
 	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* topHlongname = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* topVbutton = new wxBoxSizer(wxVERTICAL);
 	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* staticH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* staticH2 = new wxBoxSizer(wxHORIZONTAL);
@@ -1597,12 +1692,18 @@ void Dialog::CreateQuoteWin()
 
 //	wxStaticLine* stat1 = new wxStaticLine(this, wxID_ANY);
 //	wxStaticLine* stat2 = new wxStaticLine(this, wxID_ANY);
+// 
 //	stat1->SetForegroundColour("Black");
 //	stat2->SetForegroundColour("Black");
 	
 
 	staticH->Add(new wxStaticLine(this, wxID_ANY), 1, wxEXPAND);
 	staticH2->Add(new wxStaticLine(this, wxID_ANY), 1, wxEXPAND);
+
+	wxButton* B = new wxButton(this, wxID_OK, "Purchase");
+	topVbutton->Add(B, 1, wxBOTTOM | wxRIGHT | wxTOP | wxALIGN_RIGHT, 5);
+	topHlongname->Add(longname, 1, wxBOTTOM | wxLEFT | wxTOP | wxALIGN_LEFT, 5);
+	topHlongname->Add(topVbutton, 1);
 
 	topH->Add(curr_price, 0, wxALIGN_BOTTOM);
 	topH->Add(_dayreturn, 0, wxLEFT | wxALIGN_BOTTOM, 5);
@@ -1613,13 +1714,14 @@ void Dialog::CreateQuoteWin()
 	bottomH->Add(open, 1, wxALIGN_LEFT | wxLEFT, 10);
 	bottomH->Add(previousclose, 1, wxALIGN_LEFT | wxLEFT, 15);
 
-	mainV->Add(longname, 0, wxBOTTOM | wxLEFT |wxTOP | wxALIGN_LEFT, 5);
+	mainV->Add(topHlongname, 0, wxBOTTOM);
+//	mainV->Add(longname, 0, wxBOTTOM | wxLEFT |wxTOP | wxALIGN_LEFT, 5);
 	mainV->Add(staticH, 0, wxEXPAND | wxALL, 5);
 	mainV->Add(topH, 1, wxALIGN_LEFT | wxLEFT, 5);
 	mainV->Add(staticH2, 0, wxEXPAND | wxALL, 5);
 	mainV->Add(bottomH, 0, wxBOTTOM, 10);
 	mainV->Add(beta, 0, wxBOTTOM | wxLEFT | wxALIGN_LEFT, 10);
-	mainV->Add(this->CreateSeparatedSizer(this->CreateTextSizer(Decipherhtmlcodes(sumptr->description), 800)), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
+	mainV->Add(this->CreateSeparatedSizer(this->CreateTextSizer(Decipherhtmlcodes(sumptr->description), 850)), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
 
 	this->SetSizer(mainV);
 	mainV->Fit(this);
@@ -1659,6 +1761,8 @@ void Dialog::CreateDayGainers_LosersWin(bool gainers)
 	{
 		wxStaticText* ticker = new wxStaticText(this, wxID_ANY, it->ticker);
 		ticker->Bind(wxEVT_LEFT_DOWN, &Dialog::OnMouseDown, this);
+		ticker->Bind(wxEVT_ENTER_WINDOW, &Dialog::OnMouseEnter, this);
+		ticker->Bind(wxEVT_LEAVE_WINDOW, &Dialog::OnMouseLeave, this);
 		ticker->SetForegroundColour(wxColour(17, 121, 212));
 	
 		wxStaticText* marketprice = new wxStaticText(this, wxID_ANY, wxNumberFormatter::ToString(it->_marketprice, 2));
@@ -2041,6 +2145,20 @@ void Dialog::CreateChoiceControls()
 	this->choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
 	this->subSector = new wxChoice(this, wxID_ANY);
 
+	// If Dialog was called with string_three struct then we can skip all this because the user is buying a stock they
+	// Already purchased before. Which means the sector does not have to be selected. We already know it.
+	// There for we will fill in the choice control with the sector sent int the string_three struct and disable it...
+	if (&this->string_t.longname == this->_ticker_ptr)
+	{
+		this->choice->Append(this->string_t.sector);
+		this->choice->SetSelection(0);
+		this->subSector->Append("Exchange Traded Fund");
+		this->subSector->SetSelection(0);
+		this->choice->Disable();
+		this->subSector->Disable();
+		return;
+	}
+
 	// Bind choice to event OnSectorChoice...
 	this->choice->Bind(wxEVT_CHOICE, &Dialog::OnSectorChoice, this);
 
@@ -2172,6 +2290,32 @@ void Dialog::OnMouseDown(wxMouseEvent& evt)
 	this->Enable();
 }
 
+void Dialog::OnMouseEnter(wxMouseEvent& evt)
+{
+	wxStaticText* T = (wxStaticText*)this->FindItem(evt.GetId());
+	if (!T)
+	{
+		wxFAIL_MSG("Could not find item in Dialog::OnMouseEnter!");
+		return;
+	}
+
+	T->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_EXTRABOLD));
+	this->Layout();
+}
+
+void Dialog::OnMouseLeave(wxMouseEvent& evt)
+{
+	wxStaticText* T = (wxStaticText*)this->FindItem(evt.GetId());
+	if (!T)
+	{
+		wxFAIL_MSG("Could not find item in Dialog::OnMouseLeave!");
+		return;
+	}
+
+	T->SetFont(wxFont(12, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	this->Layout();
+}
+
 bool Dialog::HandlePurchaseOkClick()
 {
 	wxDateTime purch;
@@ -2209,11 +2353,7 @@ bool Dialog::HandlePurchaseOkClick()
 
 	return true;
 	this->Destroy();
-//	wxString selection = this->choice->GetStringSelection();
-//	PurchaseKit kit(this->_ticker, GetStringToSector(this->choice->GetStringSelection()), 
-//		this->_price, this->_shares, this->_date, this->_reinvest_date, this->check->IsChecked());
 
-//	this->m_parent->PurchaseDataTransfer(kit);
 }
 
 bool Dialog::HandleDepositOkClick()
@@ -2522,9 +2662,20 @@ mainwindow::~mainwindow()
 	this->DeletePopupMenu();
 }
 
-wxFrame* mainwindow::PurchaseWin()
+void mainwindow::PurchaseWin(wxString& ticker, wxString& longname)
 {
-	return NULL;
+	const Sector* s = this->port.GetConstSector(ticker); 
+	wxString sector_name = s->GetSectorName();
+
+	string_three st(ticker, longname, sector_name);
+	this->dialog = new Dialog(STOCK_PURCHASE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Stock Data", &st);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		PurchaseKit kit = this->dialog->GetPurchaseKit();
+		this->port.Purchase(kit.m_sect, ticker, kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
+		dialog = nullptr;
+		this->UpdateGridView();
+	}
 }
 
 void mainwindow::DialogCancel()
@@ -2558,6 +2709,7 @@ void mainwindow::SectorClick(wxVector<SubSector>* v, wxString& name)
 
 void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
 {
+	this->rightclick_ticker = ticker;
 	this->p_sell->SetItemLabel("Sell " + ticker);
 	this->p_buy->SetItemLabel("Purchase " + ticker);
 	bool result = PopupMenu(this->popup, p);
@@ -2578,6 +2730,7 @@ void mainwindow::OnThreadCompletion(wxThreadEvent& evt)
 //	this->Refresh();
 }
 
+/*
 void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 {
 	this->dialog = new Dialog(STOCK_PURCHASE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Stock Data", (int*)nullptr);
@@ -2588,6 +2741,48 @@ void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 		dialog = nullptr;
 		this->UpdateGridView();
 	}
+}
+*/
+
+void mainwindow::PurchaseWin(wxString& ticker)
+{
+	this->dialog = new Dialog(STOCK_PURCHASE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Stock Data", &ticker);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		PurchaseKit kit = this->dialog->GetPurchaseKit();
+		this->port.Purchase(kit.m_sect, ticker, kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
+		dialog = nullptr;
+		this->UpdateGridView();
+	}
+}
+
+void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
+{
+	this->buy = new wxTextEntryDialog(this, "Enter Ticker Symbol");
+	wxString ticker = "";
+	this->buy->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &ticker));
+	this->buy->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->buy->CenterOnParent();
+	
+	if (this->buy->ShowModal() == wxID_OK)
+	{
+		SummaryData sd = port.QuoteLookup(ticker);
+		if (sd.Longname == "NotFound" || sd.marketprice == 0.00)
+		{
+			wxMessageDialog* d = new wxMessageDialog(this, "Ticker: " + ticker + " does not exist!");
+			if (d->ShowModal())
+				d->Destroy();
+
+			this->buy = NULL;
+			return;
+		}
+
+		this->buy = NULL;
+		sd.Longname = Decipherhtmlcodes(sd.Longname);
+		this->PurchaseWin(sd.Longname);
+	}
+
+	this->buy = NULL;
 }
 
 stock_node* mainwindow::LotSelectionWindow(wxString& ticker)
@@ -2642,7 +2837,14 @@ void mainwindow::UserEnterSellDataWin(stock_node* stock_n)
 	{
 		SellKit kit = this->dialog->GetSellKit();
 		kit.id = lot;
-		this->port.Sell(lot, kit.date, kit.m_shares, kit.m_price);
+		if (this->port.Sell(lot, kit.date, kit.m_shares, kit.m_price))
+		{
+			if (!this->port.IsStockActive(ticker))
+				this->grid_view->RemoveRow(ticker);
+			
+			this->UpdateGridView();
+			this->portwin->Update();
+		}
 	}
 }
 
@@ -2664,55 +2866,6 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 		return;
 
 	this->UserEnterSellDataWin(stock_n);
-
-	/*
-	wxVector<stock_node*> sn = this->port.GetLotData();
-	if (!sn.size())
-	{
-		if (this->sell->ShowModal())
-		{
-			this->sell->Destroy();
-			this->sell = NULL;
-		}
-		return;
-	}
-	wxArrayString string;
-	wxDateTime T = wxDateTime::Today();
-	for (auto& v : sn)
-	{
-		wxString s = " Lot: " + wxNumberFormatter::ToString(v->GetLotNumber()) + "  Purchase Date: " + v->GetPurchaseDate().Format(STANDARD_DATE) + "  Purchase Price: " + 
-			wxNumberFormatter::ToString(v->GetPurchasePrice(), 5) + "  Shares: " + wxNumberFormatter::ToString(v->GetShares(NULL), 5) + "  Costbasis: " + 
-			wxNumberFormatter::ToString(v->GetCostBasis(&T), 2);
-		string.push_back(s);
-	}
-
-	this->sellstock = new SellStockWin(this, wxID_ANY, "Pick lot to sell", user, string);
-	stock_node* stock_n = NULL;
-	if (this->sellstock->ShowModal() == wxID_OK)
-	{
-		int selection = this->sellstock->GetSelection();
-		stock_n = sn[selection];
-		this->sellstock->Destroy();
-	}
-	else
-	{
-		this->sellstock->Destroy();
-		return;
-	}
-
-	long lot = stock_n->GetLotNumber();
-	wxDateTime date = stock_n->GetPurchaseDate();
-	double shares = stock_n->GetShares(NULL);
-	GenericKit kit(date, shares);
-	this->dialog = new Dialog(_EnterDialog::SELL_STOCK, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, user, &kit);
-
-	if (this->dialog->ShowModal() == wxID_OK)
-	{
-		SellKit kit = this->dialog->GetSellKit();
-		kit.id = lot;
-		this->port.Sell(lot, kit.date, kit.m_shares, kit.m_price);
-	}
-	*/
 }
 
 void mainwindow::OnSellPopupClick(wxCommandEvent&)
@@ -2729,6 +2882,15 @@ void mainwindow::OnSellPopupClick(wxCommandEvent&)
 		return;
 
 	this->UserEnterSellDataWin(sn);
+}
+
+void mainwindow::OnPurchasePopupClick(wxCommandEvent& evt)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+	SummaryData sd = this->port.QuoteLookup(ticker);
+
+	sd.Longname = Decipherhtmlcodes(sd.Longname);
+	this->PurchaseWin(ticker, sd.Longname);
 }
 
 void mainwindow::OnReInvestSharesMenu(wxCommandEvent& evt)
@@ -2754,7 +2916,7 @@ void mainwindow::OnQuoteLookup(wxCommandEvent& evt)
 	SummaryData sd;
 	this->quote = new wxTextEntryDialog(this, "Enter Ticker Symbol");
 	wxString user = "";
-	this->quote->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &user));
+	this->quote->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &user));
 	this->quote->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
 	this->quote->CenterOnParent();
 	if (this->quote->ShowModal() == wxID_OK)
@@ -2780,6 +2942,8 @@ void mainwindow::OnKeyDown(wxKeyEvent& evt)
 		t = this->quote->GetTextValidator()->GetTextEntry();
 	else if (this->sell)
 		t = this->sell->GetTextValidator()->GetTextEntry();
+	else if (this->buy)
+		t = this->buy->GetTextValidator()->GetTextEntry();
 	if (t)
 		t->ForceUpper();
 	evt.Skip();
@@ -2881,7 +3045,7 @@ wxScrolled<wxPanel>* mainwindow::GetRightWin()
 	P->EnableScrolling(true, true);
 
 	P->SetBackgroundColour(wxColour(0, 0, 0));
-	this->grid_view = new GridView(P, 25);
+	this->grid_view = new GridView(P, 26);
 	this->UpdateGridView();
 	
 	P->SetSizer(grid_view);

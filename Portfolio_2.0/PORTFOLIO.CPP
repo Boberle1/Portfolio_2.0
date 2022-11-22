@@ -1183,9 +1183,9 @@ SectorClass& GetSectorClass()
 
 // stock_node functions...
 stock_node::stock_node(long id, wxString ticker, wxDateTime date, double price_per_share, double shares, Action a, wxDateTime reinvest)
-	: m_id(id), m_ticker(ticker), m_date(date), m_price_per_share(price_per_share), m_shares(shares), action(a), m_reinvest_start(reinvest)
+	: m_id(id), m_ticker(ticker), m_date(date), m_price_per_share(price_per_share), m_shares(shares), action(a), m_reinvest_start(reinvest), active(1)
 {
-
+	
 }
 
 void stock_node::SetSibling(stock_node sn)
@@ -1197,16 +1197,18 @@ void stock_node::SetSibling(stock_node sn)
 		this->sold.push_back(sn);
 	else
 		this->sold.insert(&this->sold[i], sn);
+
+	this->active = this->GetShares(NULL) ? true : false;
 }
 
 void stock_node::ShareDivsWithSibling(stock_node* sn)
 {
 	if (this == sn)
 		return;
-	for (size_t i = 0; i < this->divs.size(); ++i)
+	for (auto& v : this->divs)
 	{
-		if (this->divs[i].ex_Div > sn->GetPurchaseDate())
-			sn->HandleDivReInvest(&this->divs[i]);
+		if (v.ex_Div > sn->GetPurchaseDate())
+			sn->HandleDivReInvest(&v);
 	}
 }
 
@@ -1496,8 +1498,6 @@ void stock_node::InsertDiv(Dividend& d)
 		// check for duplicate
 		if (this->divs[i].ex_Div != d.ex_Div)
 			this->divs.insert(&this->divs[i], d)->id = this->m_id;
-//		else
-//			wxMessageBox("stock_node::InsertDiv tried to insert a duplicate dividend!");
 	}
 }
 
@@ -1689,7 +1689,7 @@ bool StockNode::IdMatch(long l)
 	return false;
 }
 
-wxString StockNode::GetTicker()
+wxString StockNode::GetTicker() const
 {
 	return this->m_ticker;
 }
@@ -1714,7 +1714,7 @@ wxString StockNode::GetNextEarningsDate()
 	return this->current_Data.earningsdate;
 }
 
-bool StockNode::IsActive()
+bool StockNode::IsActive() const
 {
 	return this->m_active;
 }
@@ -1743,6 +1743,8 @@ void StockNode::Calibrate(bool force)
 	double divshares = this->GetDividendShares();
 	double _dividends = this->GetDividends();
 
+	wxString ex_div = this->GetLatestEx_Div_Date();
+
 	this->SetNewValues(originalcostbasis, daycostbasis, weekcostbasis, quartercostbasis, yearcostbasis, marketvalue, _shares, divshares, _dividends);
 	this->UpToDate = 1;
 	double _marketprice = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.marketprice : marketvalue / this->GetShares();
@@ -1755,7 +1757,7 @@ void StockNode::Calibrate(bool force)
 	this->svd = StockViewerData(this, t, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
 		this->sectorID, _shares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
-		marketvalue, this->GetDividends());
+		marketvalue, this->GetDividends(), 0.0, ex_div);
 
 	this->UpToDate = 1;
 }
@@ -1767,6 +1769,22 @@ void StockNode::ClockChange()
 }
 
 // StockNode private functions...
+
+wxString StockNode::GetLatestEx_Div_Date()
+{
+	for (auto& v : this->bought)
+	{
+		wxDateTime* T = NULL;
+		if (v.IsActive())
+		{
+			T = v.GetLatestDivDate();
+			if (T && T->IsValid())
+				return T->Format(STANDARD_DATE);
+		}
+	}
+
+	return "NA";
+}
 
 bool StockNode::DistributeReInvestmentShares(double& s)
 {
@@ -2148,6 +2166,20 @@ double StockNode::GetMarketValue(wxDateTime* T)
 	return this->GetClosePrice(&copy) * this->m_GetShares(T) + this->GetDividendShares();
 }
 
+void StockNode::m_CheckActive()
+{
+	for (auto& v : this->bought)
+	{
+		if (v.IsActive())
+		{
+			this->m_active = true;
+			return;
+		}
+	}
+
+	this->m_active = false;
+}
+
 bool StockNode::m_Purchase(long& id, wxDateTime& date, double& price_per_share, double& shares)
 {
 	wxDateTime r_date(wxInvalidDateTime);
@@ -2176,6 +2208,12 @@ bool StockNode::m_Sell(long& id, wxDateTime& date, double& price_per_share, doub
 	if (this->DivReinvest)
 		r_date = this->div_reinvest_start_date;
 	sn->SetSibling(stock_node(id, this->m_ticker, date, price_per_share, shares, SELL, r_date));
+
+	// Signal that the StockNode now is not up to date and needs to be calibrated...
+	this->UpToDate = 0;
+
+	// We need to see if all shares were sold for all lots, and if so, we need to make this StockNode inactive so it doesn't get included in the portfolio's calibration...
+	this->m_CheckActive();
 	return true;
 }
 
@@ -2212,10 +2250,10 @@ void StockNode::DeleteParser()
 
 void StockNode::ShareDivstoLastPurchase()
 {
-	if(this->lastPurchase)
-	for (size_t i = 0; i < this->bought.size(); ++i)
+	if (this->lastPurchase)
 	{
-		this->bought[i].ShareDivsWithSibling(this->lastPurchase);
+		for (auto& v : this->bought)
+			v.ShareDivsWithSibling(this->lastPurchase);
 	}
 
 	this->purchaseDateSwitch = false;
@@ -2481,7 +2519,6 @@ Sector::Sector(_Sector s, wxDateTime* date, Portfolio* P)
 {
 	SectorClass& sc = GetSectorClass();
 	this->Sector_Name = sc.GetSectorString(s);
-//	this->Sector_Name = GetSectorName(s);
 }
 
 Sector::~Sector()
@@ -2547,7 +2584,10 @@ wxVector<StockNode*> Sector::GetStockVector()
 {
 	wxVector<StockNode*> sn;
 	for (size_t i = 0; i < this->stocks.size(); ++i)
-		sn.push_back(&this->stocks[i]);
+	{
+		if (this->stocks[i].IsActive())
+			sn.push_back(&this->stocks[i]);
+	}
 
 	return sn;
 }
@@ -2592,7 +2632,8 @@ void Sector::Calibrate(bool datechange)
 			this->stocks[i].ClockChange();
 		else
 			this->stocks[i].Calibrate();
-		this->AddNewValues(stocks[i].GetReturnNode());
+		if (this->stocks[i].IsActive())
+			this->AddNewValues(stocks[i].GetReturnNode());
 	}
 
 	this->ReturnCalibarate();
@@ -2602,7 +2643,7 @@ void Sector::Calibrate(bool datechange)
 		this->market_value, this->dividends);
 }
 
-StockViewerData* Sector::GetStockViewerData()
+const StockViewerData* Sector::GetStockViewerData() const
 {
 	return &this->svd;
 }
@@ -2650,6 +2691,40 @@ void Sector::Update()
 {
 	for (size_t i = 0; i < this->stocks.size(); ++i)
 		this->stocks[i].Calibrate(true);
+}
+
+bool Sector::IsStockActive(wxString& ticker) const
+{
+	if (this->sn)
+	{
+		if (this->sn->GetTicker() == ticker)
+			return this->sn->IsActive();
+	}
+
+	for (auto& v : this->stocks)
+	{
+		if (v.GetTicker() == ticker)
+			return v.IsActive();
+	}
+
+	wxFAIL_MSG("this->sn was nullptr or ticker is not equal to this->sn->GetTicker() in Sector::IsStockActive!");
+	return true;
+}
+
+bool Sector::IsActive() const
+{
+	for (auto& v : this->stocks)
+	{
+		if (v.IsActive())
+			return true;
+	}
+
+	return false;
+}
+
+wxString Sector::GetSectorName() const
+{
+	return this->Sector_Name;
 }
 
 void Sector::ThreadComplete(StockNode* sn)
@@ -2796,8 +2871,10 @@ bool Portfolio::Sell(long& lot, wxDateTime& d, double& shares, double& price)
 	bool result = this->sec->Sell(lot, d, shares, price);
 	if (result)
 	{
-		this->cash.ReplaceDividends(this->sec->GetPair());
-		return true;
+		Pair p = this->sec->GetPair();
+		bool result = cash.CompleteSale(p, d, price * shares, lot);
+		this->Calibrate();
+		return result;
 	}
 
 	return false;
@@ -2963,6 +3040,35 @@ void Portfolio::ThreadComplete(StockNode* sn)
 	if (!this->threads_running)
 		wxPostEvent(this->m_parent, wxThreadEvent());
 	
+}
+
+bool Portfolio::IsStockActive(wxString& ticker)
+{
+	if (this->sec)
+	{
+		return this->sec->IsStockActive(ticker);
+	}
+
+	wxFAIL_MSG("this->sec is nullptr in Portfolio::IsStockActive!");
+	return true;
+}
+
+wxString Portfolio::GetSectorName(wxString& ticker)
+{
+	Sector* S = this->GetSector(ticker);
+	if (!S)
+	{
+		wxMessageBox("Cannot find Sector in Portfolio::GetSectorName!");
+		return _SECTOR_INVALID;
+	}
+	
+	return S->GetSectorName();
+}
+
+const Sector* Portfolio::GetConstSector(wxString& ticker) 
+{
+	const Sector* s = this->GetSector(ticker);
+	return s;
 }
 
 // Portfolio private functions...

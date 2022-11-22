@@ -55,8 +55,11 @@ class GridNode : public wxStaticText
 {
 public:
 	GridNode(GridView*, wxWindow*, size_t, size_t, GridNode*, GridNode*, GridNode*, GridNode*, wxString, int);
+	GridNode(const GridNode&);
+	void operator=(const GridNode&);
 	~GridNode();
 	bool CopyText(const GridNode&);
+
 	bool SetNewVal(gridpair, bool total_row = false);
 	void SetUP(GridNode*);
 	void SetRight(GridNode*);
@@ -81,6 +84,8 @@ public:
 	void UnClick();
 	wxDECLARE_EVENT_TABLE();
 private:
+	void InitializeGridNode();
+private:
 	GridNode* m_up = nullptr;
 	GridNode* m_right = nullptr;
 	GridNode* m_down = nullptr;
@@ -103,6 +108,7 @@ private:
 	wxWindow* m_parent = nullptr;
 	GridView* m_grid_view = nullptr;
 	bool SummaryItem = false;
+	int Gridtype = GRIDCOL;
 };
 
 class mainwindow;
@@ -254,6 +260,16 @@ struct SellKit
 	long id = -1;
 };
 
+// Simple struct for storing the ticker name, longname and the sector name that its in...
+struct string_three
+{
+	string_three(wxString& t, wxString& l, wxString& s) : ticker(t), longname(l), sector(s) {}
+	string_three() {}
+	wxString ticker = "";
+	wxString longname = "";
+	wxString sector = "";
+};
+
 class Dialog : public wxDialog
 {
 public:
@@ -288,6 +304,9 @@ private:
 
 	// event functio for DayGainers_LosersWin...
 	void OnMouseDown(wxMouseEvent&);
+	void OnMouseEnter(wxMouseEvent&);
+	void OnMouseLeave(wxMouseEvent&);
+
 private:
 	bool HandlePurchaseOkClick();
 	bool HandleDepositOkClick();
@@ -321,6 +340,7 @@ private:
 	wxTextCtrl* m_reinvest_date = nullptr;
 
 	wxString _ticker = "";
+	wxString* _ticker_ptr = NULL;
 	double _price = 0.0;
 	double _shares = 0.0;
 	wxString _date = "";
@@ -333,6 +353,7 @@ private:
 	GenericKit* sellkit = NULL;
 	wxVector<DayGainersandLosers>* gainers = nullptr;
     wxVector<SubSector>* sub = NULL;
+	string_three string_t;
 };
 
 class SellStockWin : public wxSingleChoiceDialog
@@ -375,18 +396,23 @@ class mainwindow : public wxFrame
 public:
 	mainwindow();
 	~mainwindow();
-	wxFrame* PurchaseWin();
+	void PurchaseWin(wxString&, wxString&);
 	void DialogCancel();
 	void PurchaseDataTransfer(PurchaseKit&);
 	void ReInvestShares(double&, wxString&);
 	bool ValidateExistingTicker(wxString&);
 	void SectorClick(wxVector<SubSector>*, wxString&);
 	void RightClickGrid(wxString&, wxPoint&);
+
 	// Event functions...
 	void CloseEvent(wxCloseEvent&);
 	void ClosePanelEvent(wxCloseEvent&);
 	void OnThreadCompletion(wxThreadEvent&);
+
+	// Helper functions for OnPurchaseMenu...
+	void PurchaseWin(wxString&);
 	void OnPurchaseMenu(wxCommandEvent&);
+	// End of helper functions for OnPurchaseMenu and OnPurchaseMenu itself...
 
 	//Helper functions for OnSellMenu...
 	stock_node* LotSelectionWindow(wxString&);
@@ -395,6 +421,7 @@ public:
 	// End of helper functions for OnSellMenu..
 
 	void OnSellPopupClick(wxCommandEvent&);
+	void OnPurchasePopupClick(wxCommandEvent&);
 
 	void OnReInvestSharesMenu(wxCommandEvent&);
 	void OnSave(wxCommandEvent&);
@@ -433,11 +460,15 @@ private:
 	SellStockWin* sellstock = NULL;
 	wxTextEntryDialog* quote = nullptr;
 	wxTextEntryDialog* sell = NULL;
+	wxTextEntryDialog* buy = NULL;
 	wxWindow* right_win = nullptr;
 //	wxWindow* bottom_frame = NULL;
 	Portfolio port;
 	webdata data;
 	wxDateTime main_clock;
+
+	// For storing the ticker that was clicked on for convenience...
+	wxString rightclick_ticker = "";
 
 	//Popup Menu Items...
 	wxMenuItem* p_sell = NULL;

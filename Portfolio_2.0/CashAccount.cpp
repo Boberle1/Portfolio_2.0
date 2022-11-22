@@ -157,6 +157,18 @@ bool CashAccount::RequestPurchase(long l, double d)
 	return true;
 }
 
+bool CashAccount::CompleteSale(Pair p, wxDateTime date, double proceeds, long lot)
+{
+	pair* P = this->m_FindPurchase(lot);
+	if (!P)
+	{
+		wxFAIL_MSG("Could not find lot in CashAccount::AddSellInfo!");
+		return false;
+	}
+
+	return this->m_CompleteSale(p, date, proceeds, lot);
+}
+
 bool CashAccount::Deposit(wxDateTime t, double d)
 {
 	// check that date is valid and not in the future....
@@ -276,7 +288,8 @@ void CashAccount::Save()
 
 	ds.WriteDepositVector(this->deposit);
 	ds.WriteWithdrawlVector(this->withdrawl);
-	ds.WritePurchaseVector(this->purchase);
+	ds.Write_pairVector(this->purchase);
+	ds.Write_pairVector(this->sell);
 	ds.WriteCashDivVector(this->divs);
 
 	size_t size = this->schedule.size();
@@ -293,10 +306,10 @@ void CashAccount::Retrieve()
 
 	ds.ReadDepositVector(this->deposit);
 	ds.ReadWithdrawlVector(this->withdrawl);
-	ds.ReadPurchaseVector(this->purchase);
+	ds.Read_pairVector(this->purchase);
+	ds.Read_pairVector(this->sell);
 	ds.ReadCashDivVector(this->divs);
-//	size_t waste;
-//	ds.ReadData(waste);
+
 	size_t size;
 	ds.ReadData(size);
 	for (size_t i = 0; i < size; ++i)
@@ -309,6 +322,26 @@ void CashAccount::Retrieve()
 }
 
 // private CashAccount Methods...
+pair* CashAccount::m_FindPurchase(long& lot)
+{
+	for (auto& v : this->purchase)
+	{
+		if (v.id == lot)
+			return &v;
+	}
+
+	return NULL;
+}
+
+bool CashAccount::m_CompleteSale(Pair& p, wxDateTime& date, double& proceeds, long& lot)
+{
+	this->sell.push_back(pair(lot, proceeds, date));
+	if (p.amount)
+		this->m_ReplaceDividends(p);
+	this->UpdateCash();
+	return true;
+}
+
 bool CashAccount::m_CheckDate(wxDateTime& T, wxString s)
 {
 	if (T.IsValid())
@@ -377,6 +410,7 @@ double CashAccount::m_UpdateCash()
 	temp += this->m_AddDeposits();
 	temp += this->m_AddWithdrawls();
 	temp += this->m_AddPurchases();
+	temp += this->m_AddSales();
 	temp += this->m_AddDividends();
 
 	return temp;
@@ -410,7 +444,7 @@ double CashAccount::m_AddWithdrawls()
 {
 	double temp = 0.0;
 	for (size_t i = 0; i < this->withdrawl.size(); ++i)
-		temp += this->withdrawl[i].value;
+		temp += -(this->withdrawl[i].value);
 
 	return temp;
 }
@@ -420,6 +454,15 @@ double CashAccount::m_AddPurchases()
 	double temp = 0.0;
 	for (size_t i = 0; i < this->purchase.size(); ++i)
 		temp += -(purchase[i].value);
+
+	return temp;
+}
+
+double CashAccount::m_AddSales()
+{
+	double temp = 0.0;
+	for (auto& v : this->sell)
+		temp += v.value;
 
 	return temp;
 }

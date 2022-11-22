@@ -30,13 +30,14 @@ public:
 	CashAccount();
 	bool Purchase(long, double, wxDateTime);
 	bool RequestPurchase(long, double);
+	bool CompleteSale(Pair, wxDateTime, double, long);
 	bool Deposit(wxDateTime, double);
 	bool Withdrawl(wxDateTime, double);
 	bool NewDepositSchedule(double, int, wxDateTime);
 	bool NewDepositSchedule(double, int, wxDateTime, wxDateTime);
 
 	// One thing to note is if the Pair::amount is zero then the divs index will be erased with that ticker
-	// because is assumes it is not needed being that the dividend amount is zero..
+	// because it assumes it is not needed being that the dividend amount is zero..
 	// So do not send a pair with amount zero if you dont want that index erased from the sector...
 	bool ReplaceDividends(Pair);
 
@@ -47,6 +48,8 @@ public:
 	void Save();
 	void Retrieve();
 private:
+	pair* m_FindPurchase(long&);
+	bool m_CompleteSale(Pair&, wxDateTime&, double&, long&);
 	bool m_CheckDate(wxDateTime&, wxString);
 	bool m_ValidDate(wxDateTime&, wxString);
 	bool m_CheckCashAmount(double&, wxString);
@@ -58,6 +61,7 @@ private:
 	double m_AddDeposits();
 	double m_AddWithdrawls();
 	double m_AddPurchases();
+	double m_AddSales();
 	void m_Purchase(wxDateTime&, double&, long&);
 	void m_Withdrawl(wxDateTime&, double&);
 	void m_Deposit(wxDateTime&, double&);
@@ -72,6 +76,7 @@ private:
 	
 	double m_cash = 0.0;
 	wxVector<pair> purchase;
+	wxVector<pair> sell;
 	wxVector<deposit_pair> deposit;
 	wxVector<withdrawl_pair> withdrawl;
 	wxVector<DepositSchedule> schedule;
