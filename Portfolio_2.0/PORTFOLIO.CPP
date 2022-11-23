@@ -1390,7 +1390,7 @@ double stock_node::GetDividendShares(wxDateTime* date)
 	double d = 0.0;
 	for (size_t i = 0; i < this->divs.size(); ++i)
 	{
-		if (divs[i].DivReinvest && *date <= this->divs[i].ex_Div)
+		if (divs[i].DivReinvest && *date >= this->divs[i].ex_Div)
 			d += this->divs[i].re_invest_shares;
 	}
 
@@ -1504,6 +1504,24 @@ void stock_node::InsertDiv(Dividend& d)
 double stock_node::GetPurchasePrice()
 {
 	return this->m_price_per_share;
+}
+
+void stock_node::_FillClientDividendVec(wxVector<Dividend>& vec)
+{
+	for (auto& v : this->divs)
+	{
+		bool duplicate = false;
+		for (auto& vv : vec)
+		{
+			if (vv.ex_Div == v.ex_Div)
+			{
+				duplicate = true;
+				break;
+			}
+		}
+		if (!duplicate)
+			vec.push_back(v);
+	}
 }
 
 void stock_node::FillClientDividendVec(wxVector<Dividend>& v)
@@ -1694,6 +1712,11 @@ wxString StockNode::GetTicker() const
 	return this->m_ticker;
 }
 
+wxString StockNode::GetLongName()
+{
+	return this->current_Data.Longname;
+}
+
 double StockNode::GetShares()
 {
 	wxDateTime T = *this->m_parentclock;
@@ -1755,7 +1778,7 @@ void StockNode::Calibrate(bool force)
 	wxString t = this->PendingReInvestment() ? this->m_ticker + " *" : this->m_ticker;
 
 	this->svd = StockViewerData(this, t, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
-		this->sectorID, _shares, originalcostbasis / _shares, _marketprice, _previous_close,
+		this->sectorID, _shares + divshares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
 		marketvalue, this->GetDividends(), 0.0, ex_div);
 
@@ -1818,6 +1841,7 @@ bool StockNode::DistributeReInvestmentShares(double& s)
 		}
 	}
 
+	this->UpToDate = false;
 	return endresult;
 }
 
@@ -2373,7 +2397,7 @@ bool StockNode::SetReInvestShares(double& s)
 	else
 		shares = s;
 
-	return this->DistributeReInvestmentShares(s);
+	return this->DistributeReInvestmentShares(shares);
 }
 
 void StockNode::OnThreadComplete(wxCommandEvent&)
@@ -2407,6 +2431,15 @@ wxVector<Dividend> StockNode::GetDividendVec()
 	for (size_t i = 0; i < this->bought.size(); ++i)
 		this->bought[i].GetDividendVec(vec);
 	
+	return vec;
+}
+
+wxVector<Dividend> StockNode::GetAllDividends()
+{
+	wxVector<Dividend> vec;
+	for (auto& v : this->bought)
+		v._FillClientDividendVec(vec);
+
 	return vec;
 }
 
@@ -2545,6 +2578,27 @@ bool Sector::Purchase(long lot, wxString ticker, wxString date, double price, do
 	return true;
 }
 
+bool Sector::AddToPosition(long& lot, wxString& date, double& price, double& shares, bool& div_re, wxString& T)
+{
+	if (!this->sn)
+	{
+		wxFAIL_MSG("this->sn in Sector::AddToPosition is nullptr!");
+		return false;
+	}
+
+	if (!this->sn->Purchase(lot, date, price, shares))
+	{
+		if (this->sn->IsActive())
+		{
+			this->sn = NULL;
+			this->stocks.erase(this->sn);
+		}
+		return false;
+	}
+
+	return true;
+}
+
 bool Sector::Sell(long& lot, wxDateTime& d, double& shares, double& price)
 {
 	if (!this->sn)
@@ -2570,6 +2624,29 @@ bool Sector::AddReInvestShares(double& shares)
 	}
 
 	return this->sn->SetReInvestShares(shares);
+}
+
+bool Sector::AddDividend(Dividend& div)
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::AddDividend!");
+		return false;
+	}
+
+	this->sn->SetDividends(div);
+	return true;
+}
+
+wxVector<Dividend> Sector::GetDividendsFromStagedStock()
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::GetAllDividends!");
+		return wxVector<Dividend>();
+	}
+
+	return this->sn->GetAllDividends();
 }
 
 bool Sector::IsId(_Sector s)
@@ -2741,6 +2818,25 @@ bool Sector::IsChild(wxString& ticker)
 	return sn ? true : false;
 }
 
+wxString Sector::GetLongNameOfStock(wxString& t)
+{
+	if (IsChild(t))
+		this->sn->GetLongName();
+
+	return "";
+}
+
+wxString Sector::GetLongNameOfStock()
+{
+	if (!this->sn)
+	{
+		wxFAIL_MSG("this->sn in Sector::GetLongNameOfStock is nullptr!");
+		return "";
+	}
+
+	return this->sn->GetLongName();
+}
+
 bool Sector::IsChild(long& id)
 {
 	this->sn = NULL;
@@ -2832,6 +2928,27 @@ bool Portfolio::Purchase(_Sector s, wxString ticker, wxString purchasedate, doub
 	return true;
 }
 
+bool Portfolio::AddToPosition(wxString purchasedate, double price, double shares, bool div_re, wxString T)
+{
+	long lotnumber = this->GetLot();
+	wxDateTime date;
+	date.ParseDate(purchasedate);
+	if (!this->cash.RequestPurchase(lotnumber, price * shares))
+	{
+		this->DeleteLot(lotnumber);
+		return false;
+	}
+
+	if (!this->m_AddToPosition(lotnumber, purchasedate, price, shares, div_re, T))
+	{
+		this->DeleteLot(lotnumber);
+		return false;
+	}
+
+	this->Calibrate();
+	return true;
+}
+
 bool Portfolio::NewDepositSchedule(double d, int i, wxDateTime date)
 {
 	bool result = this->cash.NewDepositSchedule(d, i, date);
@@ -2844,6 +2961,22 @@ bool Portfolio::NewDepositSchedule(double d, int i, wxDateTime date)
 bool Portfolio::DoesTickerExist(wxString& t)
 {
 	return this->RequestSell(t);
+}
+
+bool Portfolio::StageStock(wxString& t)
+{
+	this->sec = NULL;
+	sec = this->GetSector(t);
+
+	return sec ? true : false;
+}
+
+wxString Portfolio::StageStockandGetLongName(wxString& t)
+{
+	if (this->StageStock(t))
+		return this->sec->GetLongNameOfStock();
+
+	return "";
 }
 
 bool Portfolio::RequestSell(wxString& ticker)
@@ -2888,7 +3021,46 @@ bool Portfolio::AddReInvestShares(double& shares)
 		return false;
 	}
 
-	return this->sec->AddReInvestShares(shares);
+	if (this->sec->AddReInvestShares(shares))
+	{
+		this->Calibrate();
+		return true;
+	}
+
+	return false;
+}
+
+bool Portfolio::AddDividend(Dividend& div)
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::AddDividend!");
+		return false;
+	}
+
+	if (this->sec->AddDividend(div))
+	{
+		this->Calibrate();
+		return true;
+	}
+
+	return false;
+}
+
+wxVector<Dividend> Portfolio::GetDividendsFromStagedStock()
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::GetDividendsFromStagedStock!");
+		return wxVector<Dividend>();
+	}
+
+	return this->sec->GetDividendsFromStagedStock();
+}
+
+wxVector<deposit_pair> Portfolio::GetDepositVector()
+{
+	return this->cash.GetDepositVector();
 }
 
 wxVector<stock_node*> Portfolio::GetLotData()
@@ -2935,17 +3107,22 @@ void Portfolio::Calibrate(bool datechange)
 		this->AddNewValues(this->sectors[i].GetReturnNode());
 	}
 
-	for (size_t i = 0; i < this->sectors.size(); ++i)
-		this->sectors[i].CalcRatiosOfChildren();
-	
 	this->ReturnCalibarate();
-	if (this->GetFreeCash())
-		this->PortfolioPerc = this->market_value / this->GetFreeCash();
+	this->CalcRatiosOfAllChildren();
 
 	this->svd = StockViewerData(this, "Total", "", "",
 		_Sector::SECTOR_INVALID, this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
 		this->market_value, this->dividends, this->cash.GetFreeCash());
+}
+
+void Portfolio::CalcRatiosOfAllChildren()
+{
+	for (auto& v : this->sectors)
+		v.CalcRatiosOfChildren();
+
+	if (this->GetFreeCash())
+		this->PortfolioPerc = this->market_value / this->GetFreeCash();
 }
 
 StockViewerData* Portfolio::GetStockViewerData()
@@ -3072,6 +3249,29 @@ const Sector* Portfolio::GetConstSector(wxString& ticker)
 }
 
 // Portfolio private functions...
+
+bool Portfolio::m_AddToPosition(long& lot, wxString& purchasedate, double& price, double& shares, bool& div_re, wxString& T)
+{
+	if (!this->sec)
+	{
+		wxFAIL_MSG("this->sec in Portfolio::m_AddToPosition is nullptr!");
+		return false;
+	}
+
+	if (!this->sec->AddToPosition(lot, purchasedate, price, shares, div_re, T))
+		return false;
+
+	wxDateTime date;
+	date.ParseDate(purchasedate);
+	bool result = this->cash.Purchase(lot, price * shares, date);
+	if (result)
+	{
+		this->cash.AddDividends(this->sec->GetPair());
+		return true;
+	}
+
+	return result;
+}
 
 long Portfolio::GetLot()
 {

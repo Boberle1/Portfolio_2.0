@@ -108,7 +108,7 @@ private:
 	wxWindow* m_parent = nullptr;
 	GridView* m_grid_view = nullptr;
 	bool SummaryItem = false;
-	int Gridtype = GRIDCOL;
+	int Gridtype = -1;
 };
 
 class mainwindow;
@@ -348,7 +348,6 @@ private:
 	wxDateTime datetime;
 	wxDateTime redatetime;
 	_EnterDialog m_type = STOCK_PURCHASE_DIALOG;
-//	SummaryData sd;
 	SummaryData* sumptr = nullptr;
 	GenericKit* sellkit = NULL;
 	wxVector<DayGainersandLosers>* gainers = nullptr;
@@ -356,10 +355,10 @@ private:
 	string_three string_t;
 };
 
-class SellStockWin : public wxSingleChoiceDialog
+class GenericListWin : public wxSingleChoiceDialog
 {
 public:
-	SellStockWin(mainwindow*, wxWindowID, wxString, wxString, wxArrayString);
+	GenericListWin(mainwindow*, wxWindowID, wxString, wxString, wxArrayString);
 private:
 	mainwindow* m_parent = NULL;
 };
@@ -397,9 +396,11 @@ public:
 	mainwindow();
 	~mainwindow();
 	void PurchaseWin(wxString&, wxString&);
+	void AddDividendWin(wxString&, wxString&);
+	void RemoveDividend(wxString&);
 	void DialogCancel();
 	void PurchaseDataTransfer(PurchaseKit&);
-	void ReInvestShares(double&, wxString&);
+	void ReInvestSharesWin(wxString&, wxString&);
 	bool ValidateExistingTicker(wxString&);
 	void SectorClick(wxVector<SubSector>*, wxString&);
 	void RightClickGrid(wxString&, wxPoint&);
@@ -422,18 +423,24 @@ public:
 
 	void OnSellPopupClick(wxCommandEvent&);
 	void OnPurchasePopupClick(wxCommandEvent&);
+	void OnAddReInvestSharesPopup(wxCommandEvent&);
+	void OnQuoteLookupPopup(wxCommandEvent&);
+	void OnAddDividendPopup(wxCommandEvent&);
+	void OnRemoveDividendPopup(wxCommandEvent&);
 
+	void OnRemoveDividend(wxCommandEvent&);
 	void OnReInvestSharesMenu(wxCommandEvent&);
 	void OnSave(wxCommandEvent&);
 	void OnQuoteLookup(wxCommandEvent&);
 	void OnKeyDown(wxKeyEvent&);
 	void OnAddDeposit(wxCommandEvent&);
 	void OnWithdrawl(wxCommandEvent&);
-	void OnAddDividend(wxCommandEvent&);	
 	void OnMarketGainers(wxCommandEvent&);
 	void OnMarketLosers(wxCommandEvent&);
 	void OnAddDepositSchdule(wxCommandEvent&);
 	void OnRightClick(wxMouseEvent& evt);
+	void OnAddDividend(wxCommandEvent&);
+	void OnViewDeposits(wxCommandEvent&);
 
 	//function called by PortfolioWin when user pressed enter after typing in a date...
 	void OnDateChange();
@@ -452,19 +459,18 @@ private:
 	void CreatePopupMenu();
 private:
 	wxScrolled<wxPanel>* grid_panel = NULL;
-	wxScrolledWindow* scrolled = nullptr;
 	GridView* grid_view = NULL;
 	PortfolioWin* portwin = nullptr;
 	BottomFrame* bottom_frame = nullptr;
 	Dialog* dialog = nullptr;
-	SellStockWin* sellstock = NULL;
-	wxTextEntryDialog* quote = nullptr;
-	wxTextEntryDialog* sell = NULL;
-	wxTextEntryDialog* buy = NULL;
+	GenericListWin* generic_list = NULL;
+
+	// For entering ticker to perform an action on it example: sell, buy add dividend ect...
+	wxTextEntryDialog* generic_entry = NULL;
+
 	wxWindow* right_win = nullptr;
-//	wxWindow* bottom_frame = NULL;
+
 	Portfolio port;
-	webdata data;
 	wxDateTime main_clock;
 
 	// For storing the ticker that was clicked on for convenience...
@@ -474,6 +480,7 @@ private:
 	wxMenuItem* p_sell = NULL;
 	wxMenuItem* p_buy = NULL;
 	wxMenuItem* p_quote = NULL;
+	wxMenuItem* p_add_div_reinvest = NULL;
 	wxMenuItem* p_add_div = NULL;
 	wxMenuItem* p_remove_div = NULL;
 	wxMenuItem* p_ohlc = NULL;

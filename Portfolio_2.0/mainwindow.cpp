@@ -8,12 +8,18 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::_WITHDRAWL, OnWithdrawl)
 	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT_SCHEDULE, OnAddDepositSchdule)
 	EVT_MENU(_MenuItemIDs::ADD_DIV, OnAddDividend)
+	EVT_MENU(_MenuItemIDs::REMOVE_DIV, OnRemoveDividend)
 	EVT_MENU(_MenuItemIDs::ADD_DIV_SHARES, OnReInvestSharesMenu)
 	EVT_MENU(_MenuItemIDs::DAY_GAINERS_MENU, OnMarketGainers)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
 	EVT_MENU(_MenuItemIDs::_SELL_STOCK, OnSellMenu)
+	EVT_MENU(_MenuItemIDs::P_QUOTE, OnQuoteLookupPopup)
 	EVT_MENU(_MenuItemIDs::P_SELL_STOCK, OnSellPopupClick)
 	EVT_MENU(_MenuItemIDs::P_STOCK_PURCHASE, OnPurchasePopupClick)
+	EVT_MENU(_MenuItemIDs::P_ADD_DIV_REINVEST, OnAddReInvestSharesPopup)
+	EVT_MENU(_MenuItemIDs::P_ADD_DIV, OnAddDividendPopup)
+	EVT_MENU(_MenuItemIDs::P_REMOVE_DIV, OnRemoveDividendPopup)
+	EVT_MENU(_MenuItemIDs::VIEW_DEPOSITS, OnViewDeposits)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(GridNode, wxStaticText)
@@ -439,6 +445,9 @@ bool GridNode::IsID(int id)
 
 bool GridNode::IsMatch(wxString s)
 {
+	// If t_val has the * in the ticker because there is an upcoming dividend reinvestment date than the tickerw wont match so we need to add one to it...
+	if (this->t_val.find("*") != -1)
+		s += " *";
 	if (s == t_val)
 		return true;
 
@@ -489,6 +498,8 @@ void GridNode::OnClickEvent(wxMouseEvent& evt)
 
 void GridNode::OnRightClick(wxMouseEvent& evt)
 {
+	if (this->SummaryItem)
+		return;
 	evt.SetEventObject(this);
 	wxCoord x, y;
 	evt.GetPosition(&x, &y);
@@ -1489,8 +1500,8 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::ENTER_DEPOSIT: this->CreateDepositWin(); break;
 	case _EnterDialog::ENTER_DEPOSIT_SCHEDULE: this->CreateDepositScheduleWin(); break;
 	case _EnterDialog::WITHDRAWL: this->CreateWithdrawlWin(); break;
-	case _EnterDialog::ENTER_DIVIDEND: this->CreateAddDividendWin(); break;
-	case _EnterDialog::DIVIDEND_SHARE_DIALOG: this->CreateAddReInvestShares(); break;
+	case _EnterDialog::ENTER_DIVIDEND: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddDividendWin(); break;
+	case _EnterDialog::DIVIDEND_SHARE_DIALOG: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddReInvestShares(); break;
 	case _EnterDialog::DAY_GAINERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(true); break;
 	case _EnterDialog::DAY_LOSERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(false); break;
 	case _EnterDialog::SUBSECTORWIN: this->sub = reinterpret_cast<wxVector<SubSector>*>(t); this->CreateSubSectorWin(); break;
@@ -1721,9 +1732,13 @@ void Dialog::CreateQuoteWin()
 	mainV->Add(staticH2, 0, wxEXPAND | wxALL, 5);
 	mainV->Add(bottomH, 0, wxBOTTOM, 10);
 	mainV->Add(beta, 0, wxBOTTOM | wxLEFT | wxALIGN_LEFT, 10);
-	mainV->Add(this->CreateSeparatedSizer(this->CreateTextSizer(Decipherhtmlcodes(sumptr->description), 850)), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
+//	mainV->Add(this->CreateSeparatedSizer(this->CreateTextSizer(Decipherhtmlcodes(sumptr->description))), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
 
 	this->SetSizer(mainV);
+	mainV->Fit(this);
+	mainV->SetSizeHints(this);
+	this->Layout();
+	mainV->Add(this->CreateSeparatedSizer(this->CreateTextSizer(Decipherhtmlcodes(sumptr->description), B->GetPosition().x - longname->GetPosition().x)), 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
 	mainV->Fit(this);
 	mainV->SetSizeHints(this);
 	this->Layout();
@@ -2057,6 +2072,9 @@ void Dialog::CreateAddDividendWin()
 	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* bottomH = new wxBoxSizer(wxHORIZONTAL);
 
+	this->s_ticker = new wxStaticText(this, wxID_ANY, *this->_ticker_ptr);
+	this->s_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+
 	this->s_price = new wxStaticText(this, wxID_ANY, "Dividend Amount:");
 	this->m_price = new wxTextCtrl(this, wxID_ANY);
 	this->m_price->SetValidator(wxFloatingPointValidator<double>(&this->_price, wxNumValidatorStyle::wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY));
@@ -2073,18 +2091,22 @@ void Dialog::CreateAddDividendWin()
 	ok->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
 	cancel->Bind(wxEVT_BUTTON, &Dialog::OnCancelDialog, this);
 
-	topH->Add(s_date, wxALIGN_CENTER_VERTICAL);
-	topH->Add(m_date, wxALIGN_CENTER_VERTICAL);
+	topH->Add(s_date, 0, wxALIGN_CENTER_VERTICAL);
+	topH->AddSpacer(5);
+	topH->Add(m_date, 0, wxALIGN_CENTER_VERTICAL);
 	topH->AddSpacer(20);
-	topH->Add(s_price, wxALIGN_CENTER_VERTICAL);
-	topH->Add(m_price, wxALIGN_CENTER_VERTICAL);
+	topH->Add(s_price, 0, wxALIGN_CENTER_VERTICAL);
+	topH->AddSpacer(5);
+	topH->Add(m_price, 0, wxALIGN_CENTER_VERTICAL);
 
 	bottomH->Add(ok, 0, wxRIGHT, 10);
 	bottomH->Add(cancel, 0);
 
+	mainV->Add(this->s_ticker, 1, wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 10);
 	mainV->Add(topH, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
-	mainV->Add(bottomH, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
+	mainV->Add(bottomH, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
 
+	this->m_date->SetFocus();
 	this->SetSizer(mainV);
 	mainV->Fit(this);
 	mainV->SetSizeHints(this);
@@ -2103,11 +2125,12 @@ void Dialog::CreateAddReInvestShares()
 	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* bottomH = new wxBoxSizer(wxHORIZONTAL);
 
-	this->s_ticker = new wxStaticText(this, wxID_ANY, "Enter Ticker:");
-	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
-	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_EMPTY, &this->_ticker));
-	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
-	SetColor(*this->m_ticker, c);
+	this->s_ticker = new wxStaticText(this, wxID_ANY, *this->_ticker_ptr);
+	this->s_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	//	this->m_ticker = new wxTextCtrl(this, wxID_ANY);
+	//	this->m_ticker->SetValidator(wxTextValidator(wxFILTER_EMPTY, &this->_ticker));
+	//	this->m_ticker->GetValidator()->Bind(wxEVT_KEY_DOWN, &Dialog::OnKeyDown, this);
+	//	SetColor(*this->m_ticker, c);
 
 	this->s_shares = new wxStaticText(this, wxID_ANY, "Shares:");
 	this->m_shares = new wxTextCtrl(this, wxID_ANY);
@@ -2120,15 +2143,16 @@ void Dialog::CreateAddReInvestShares()
 	ok->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
 	cancel->Bind(wxEVT_BUTTON, &Dialog::OnCancelDialog, this);
 
-	topH->Add(s_ticker, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
-	topH->Add(m_ticker, 0, wxALIGN_CENTER_VERTICAL);
-	topH->AddSpacer(30);
+	///	topH->Add(s_ticker, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+	//	topH->Add(m_ticker, 0, wxALIGN_CENTER_VERTICAL);
+	//	topH->AddSpacer(30);
 	topH->Add(s_shares, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
 	topH->Add(m_shares, 0, wxALIGN_CENTER_VERTICAL);
 
 	bottomH->Add(ok, 0, wxRIGHT, 10);
 	bottomH->Add(cancel, 0);
 
+	mainV->Add(this->s_ticker, 1, wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 10);
 	mainV->Add(topH, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
 	mainV->Add(bottomH, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
 
@@ -2239,7 +2263,6 @@ void Dialog::OnOkClick(wxCommandEvent& evt)
 void Dialog::OnSectorChoice(wxCommandEvent& evt)
 {
 	wxString sector = this->choice->GetStringSelection();
-	int index = this->choice->GetSelection();
 	int type = GetSectorClass().GetSectorID(sector);
 	if (type <= FOREIGN)
 	{
@@ -2417,17 +2440,11 @@ bool Dialog::HandleReInvestSharesOkClick()
 		return false;
 	}
 
-	if (!this->m_parent->ValidateExistingTicker(this->_ticker))
-	{
-		wxMessageBox(this->_ticker + " does not exist!");
-		return false;
-	}
-
 	return true;
 }
 
 // SellStockWin functions...
-SellStockWin::SellStockWin(mainwindow* m, wxWindowID id, wxString msg, wxString caption, wxArrayString string) : 
+GenericListWin::GenericListWin(mainwindow* m, wxWindowID id, wxString msg, wxString caption, wxArrayString string) :
 	wxSingleChoiceDialog(m, msg, caption, string), m_parent(m)
 {
 
@@ -2619,9 +2636,10 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	stock->Append(new wxMenuItem(stock, _EnterDialog::STOCK_PURCHASE_DIALOG, "Purchase Stock"));
 	deposits->Append(new wxMenuItem(deposits, NEW_DEPOSIT, "Add Deposit"));
 	deposits->Append(new wxMenuItem(deposits, _WITHDRAWL, "Withdrawl"));
+	deposits->Append(new wxMenuItem(deposits, VIEW_DEPOSITS, "View Deposits"));
 	deposits->Append(new wxMenuItem(deposits, NEW_DEPOSIT_SCHEDULE, "Add Deposit Schedule"));
 	divs->Append(new wxMenuItem(divs, ENTER_DIVIDEND, "Add Dividend"));
-	divs->Append(new wxMenuItem(divs, REMOVE_DIVIDEND, "Remove Dividend"));
+	divs->Append(new wxMenuItem(divs, REMOVE_DIV, "Remove Dividend"));
 	divs->Append(new wxMenuItem(divs, ADD_DIV_SHARES, "Re-Investment Shares"));
 
 	m->Append(new wxMenuItem(m, wxID_SAVE, "Save"));
@@ -2672,10 +2690,55 @@ void mainwindow::PurchaseWin(wxString& ticker, wxString& longname)
 	if (this->dialog->ShowModal() == wxID_OK)
 	{
 		PurchaseKit kit = this->dialog->GetPurchaseKit();
-		this->port.Purchase(kit.m_sect, ticker, kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
+
+		// Here we call port.AddToPosition instead of port.Purchase because we already own some of this stock or previously owned it in which it is already in the system...
+		this->port.AddToPosition(kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
 		dialog = nullptr;
 		this->UpdateGridView();
 	}
+}
+
+void mainwindow::AddDividendWin(wxString& ticker, wxString& longname)
+{
+	this->dialog = new Dialog(ENTER_DIVIDEND, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Dividend Date & Amount", &longname);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		GenericKit gk = this->dialog->GetGenericKit();
+		Dividend div(0, gk.date, gk.amount);
+		if (!this->port.AddDividend(div))
+			wxMessageBox("Failed to add dividend to " + ticker);
+	}
+}
+
+void mainwindow::RemoveDividend(wxString& ticker)
+{
+	wxString longname = this->port.StageStockandGetLongName(ticker);
+	wxVector<Dividend> vec = this->port.GetDividendsFromStagedStock();
+	if (!vec.size())
+	{
+		wxMessageBox("No dividends to list for " + ticker);
+		return;
+	}
+
+	wxArrayString string;
+	for (auto& v : vec)
+	{
+		wxString item = "";
+		wxString Bool = v.DivReinvest ? "True" : "False";
+		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "  Amount: " + wxNumberFormatter::ToString(v.div, 4) + "  Re-Invest Elligible: " + Bool +
+			"  Re-Invested amount: " + wxNumberFormatter::ToString(v.re_invest_shares, 4);
+		string.Add(item);
+	}
+
+	this->generic_list = new GenericListWin(this, wxID_ANY, "Click on Dividend to Remove", ticker, string);
+	if (this->generic_list->ShowModal() == wxID_OK)
+	{
+		int selection = this->generic_list->GetSelection();
+		Dividend& dev = vec[selection];
+		this->generic_list->Destroy();
+	}
+	else
+		this->generic_list->Destroy();
 }
 
 void mainwindow::DialogCancel()
@@ -2692,9 +2755,20 @@ void mainwindow::PurchaseDataTransfer(PurchaseKit& kit)
 	this->UpdateGridView();
 }
 
-void mainwindow::ReInvestShares(double& d, wxString& t)
+void mainwindow::ReInvestSharesWin(wxString& ticker, wxString& longname)
 {
+	this->dialog = new Dialog(_EnterDialog::DIVIDEND_SHARE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Dividend ReInvestment Shares", &longname);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		double shares = dialog->GetReInvestShares();
+		if (!this->port.AddReInvestShares(shares))
+		{
+			wxMessageBox("Unsuccessful in adding shares to " + ticker);
+			return;
+		}
+	}
 
+	this->UpdateGridView();
 }
 
 bool mainwindow::ValidateExistingTicker(wxString& t)
@@ -2758,31 +2832,44 @@ void mainwindow::PurchaseWin(wxString& ticker)
 
 void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 {
-	this->buy = new wxTextEntryDialog(this, "Enter Ticker Symbol");
+	this->generic_entry = new wxTextEntryDialog(this, "Enter Ticker Symbol");
 	wxString ticker = "";
-	this->buy->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &ticker));
-	this->buy->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
-	this->buy->CenterOnParent();
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &ticker));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
 	
-	if (this->buy->ShowModal() == wxID_OK)
+	if (this->generic_entry->ShowModal() == wxID_OK)
 	{
-		SummaryData sd = port.QuoteLookup(ticker);
-		if (sd.Longname == "NotFound" || sd.marketprice == 0.00)
-		{
-			wxMessageDialog* d = new wxMessageDialog(this, "Ticker: " + ticker + " does not exist!");
-			if (d->ShowModal())
-				d->Destroy();
+		// First see if this is a stock already owned, then we dont need to validate the ticker...
+		wxString longname = this->port.StageStockandGetLongName(ticker);
+		SummaryData sd;
 
-			this->buy = NULL;
-			return;
+		// If longname is empty than it was not found and needs to be verified by looking up a quote on yahoo finance for it...
+		if (longname.IsEmpty())
+		{
+			sd = port.QuoteLookup(ticker);
+			longname = sd.Longname;
+			if (sd.Longname == "NotFound" || sd.marketprice == 0.00)
+			{
+				// Not a valid ticker, notify the user and return...
+				wxMessageDialog* d = new wxMessageDialog(this, "Ticker: " + ticker + " does not exist!");
+				if (d->ShowModal())
+					d->Destroy();
+
+				this->generic_entry = NULL;
+				return;
+			}
 		}
 
-		this->buy = NULL;
-		sd.Longname = Decipherhtmlcodes(sd.Longname);
-		this->PurchaseWin(sd.Longname);
+		this->generic_entry = NULL;
+		longname = Decipherhtmlcodes(longname);
+		if (sd.Longname != "NotFound")
+			this->PurchaseWin(longname);
+		else
+			this->PurchaseWin(ticker, longname);
 	}
 
-	this->buy = NULL;
+	this->generic_entry = NULL;
 }
 
 stock_node* mainwindow::LotSelectionWindow(wxString& ticker)
@@ -2790,10 +2877,10 @@ stock_node* mainwindow::LotSelectionWindow(wxString& ticker)
 	wxVector<stock_node*> sn = this->port.GetLotData();
 	if (!sn.size())
 	{
-		if (this->sell->ShowModal())
+		if (this->generic_entry->ShowModal())
 		{
-			this->sell->Destroy();
-			this->sell = NULL;
+			this->generic_entry->Destroy();
+			this->generic_entry = NULL;
 		}
 		return NULL;
 	}
@@ -2807,17 +2894,17 @@ stock_node* mainwindow::LotSelectionWindow(wxString& ticker)
 		string.push_back(s);
 	}
 
-	this->sellstock = new SellStockWin(this, wxID_ANY, "Pick lot to sell", ticker, string);
+	this->generic_list = new GenericListWin(this, wxID_ANY, "Pick lot to sell", ticker, string);
 	stock_node* stock_n = NULL;
-	if (this->sellstock->ShowModal() == wxID_OK)
+	if (this->generic_list->ShowModal() == wxID_OK)
 	{
-		int selection = this->sellstock->GetSelection();
+		int selection = this->generic_list->GetSelection();
 		stock_n = sn[selection];
-		this->sellstock->Destroy();
+		this->generic_list->Destroy();
 	}
 	else
 	{
-		this->sellstock->Destroy();
+		this->generic_list->Destroy();
 		return NULL;
 	}
 
@@ -2850,14 +2937,14 @@ void mainwindow::UserEnterSellDataWin(stock_node* stock_n)
 
 void mainwindow::OnSellMenu(wxCommandEvent& evt)
 {
-	this->sell = new wxTextEntryDialog(this, "Enter Ticker Symbol");
+	this->generic_entry = new wxTextEntryDialog(this, "Enter Ticker Symbol");
 	wxString user = "";
-	this->sell->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &user));
-	this->sell->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
-	this->sell->CenterOnParent();
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &user));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
 	do
 	{
-		if (this->sell->ShowModal() == wxID_CANCEL)
+		if (this->generic_entry->ShowModal() == wxID_CANCEL)
 			return;
 	} while (!this->port.RequestSell(user));
 	
@@ -2887,23 +2974,95 @@ void mainwindow::OnSellPopupClick(wxCommandEvent&)
 void mainwindow::OnPurchasePopupClick(wxCommandEvent& evt)
 {
 	wxString ticker = this->grid_view->GetRightClickTicker();
-	SummaryData sd = this->port.QuoteLookup(ticker);
+	wxString longname = this->port.StageStockandGetLongName(ticker);
+	longname = Decipherhtmlcodes(longname);
 
-	sd.Longname = Decipherhtmlcodes(sd.Longname);
-	this->PurchaseWin(ticker, sd.Longname);
+	this->PurchaseWin(ticker, longname);
+}
+
+void mainwindow::OnAddReInvestSharesPopup(wxCommandEvent& evt)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+	wxString longname = this->port.StageStockandGetLongName(ticker);
+	longname = Decipherhtmlcodes(longname);
+
+	this->ReInvestSharesWin(ticker, longname);
+}
+
+void mainwindow::OnQuoteLookupPopup(wxCommandEvent& evt)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+
+	SummaryData sd = port.QuoteLookup(ticker);
+	if (sd.Longname == "NotFound")
+	{
+		wxMessageDialog* d = new wxMessageDialog(this, "Data for " + ticker + " could not be found!");
+		if (d->ShowModal())
+			d->Destroy();
+		return;
+	}
+
+	this->dialog = new Dialog(_EnterDialog::QUOTE_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, ticker, &sd);
+}
+
+void mainwindow::OnAddDividendPopup(wxCommandEvent& evt)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+	wxString longname = this->port.StageStockandGetLongName(ticker);
+
+	this->AddDividendWin(ticker, longname);
+}
+
+void mainwindow::OnRemoveDividendPopup(wxCommandEvent& evt)
+{
+	wxString ticker = this->grid_view->GetRightClickTicker();
+	this->RemoveDividend(ticker);
+}
+
+void mainwindow::OnRemoveDividend(wxCommandEvent& evt)
+{
+	wxString ticker = "";
+	this->generic_entry = new wxTextEntryDialog(this, "Enter ticker");
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &ticker));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
+	wxString longname = "";
+	do {
+		if (this->generic_entry->ShowModal() == wxID_OK)
+			this->generic_entry->TransferDataFromWindow();
+		else
+		{
+			this->generic_entry = NULL;
+			return;
+		}
+		longname = this->port.StageStockandGetLongName(ticker);
+
+	} while (longname.IsEmpty());
+
+	this->RemoveDividend(ticker);
 }
 
 void mainwindow::OnReInvestSharesMenu(wxCommandEvent& evt)
 {
-	wxString filler = "";
-	this->dialog = new Dialog(_EnterDialog::DIVIDEND_SHARE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Dividend ReInvestment Shares", &filler);
-	if (this->dialog->ShowModal() == wxID_OK)
-	{
-		double shares = dialog->GetReInvestShares();
-		wxString ticker = dialog->GetTicker();
-		if (!this->port.AddReInvestShares(shares))
-			wxMessageBox("Unsuccessful in adding shares to " + ticker);
-	}
+	wxString ticker = "";
+	this->generic_entry = new wxTextEntryDialog(this, "Enter ticker");
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &ticker));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
+	wxString longname = "";
+	do {
+		if (this->generic_entry->ShowModal() == wxID_OK)
+			this->generic_entry->TransferDataFromWindow();
+		else
+		{
+			this->generic_entry = NULL;
+			return;
+		}
+		longname = this->port.StageStockandGetLongName(ticker);
+
+	} while (longname.IsEmpty());
+
+	this->ReInvestSharesWin(ticker, longname);
 }
 
 void mainwindow::OnSave(wxCommandEvent& evt)
@@ -2914,23 +3073,23 @@ void mainwindow::OnSave(wxCommandEvent& evt)
 void mainwindow::OnQuoteLookup(wxCommandEvent& evt)
 {
 	SummaryData sd;
-	this->quote = new wxTextEntryDialog(this, "Enter Ticker Symbol");
+	this->generic_entry = new wxTextEntryDialog(this, "Enter Ticker Symbol");
 	wxString user = "";
-	this->quote->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &user));
-	this->quote->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
-	this->quote->CenterOnParent();
-	if (this->quote->ShowModal() == wxID_OK)
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &user));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
+	if (this->generic_entry->ShowModal() == wxID_OK)
 	{
-		bool validate = this->quote->Validate();
-		sd = port.QuoteLookup(this->quote->GetValue());
+		bool validate = this->generic_entry->Validate();
+		sd = port.QuoteLookup(this->generic_entry->GetValue());
 		if (sd.Longname == "NotFound")
 		{
-			wxMessageDialog* d = new wxMessageDialog(this, "Data for " + this->quote->GetValue() + " could not be found!");
+			wxMessageDialog* d = new wxMessageDialog(this, "Data for " + user + " could not be found!");
 			if (d->ShowModal())
 				d->Destroy();
 			return;
 		}
-		this->dialog = new Dialog(_EnterDialog::QUOTE_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, this->quote->GetValue(), &sd);
+		this->dialog = new Dialog(_EnterDialog::QUOTE_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, user, &sd);
 	}
 }
 
@@ -2938,12 +3097,13 @@ void mainwindow::OnKeyDown(wxKeyEvent& evt)
 {
 	int n = evt.GetKeyCode();
 	wxTextEntry* t = NULL;
-	if (quote)
-		t = this->quote->GetTextValidator()->GetTextEntry();
-	else if (this->sell)
-		t = this->sell->GetTextValidator()->GetTextEntry();
-	else if (this->buy)
-		t = this->buy->GetTextValidator()->GetTextEntry();
+	if (generic_entry)
+		t = this->generic_entry->GetTextValidator()->GetTextEntry();
+	else
+	{
+		wxFAIL_MSG("this->generic_entry is nullptr in mainwindow::OnKeyDown!");
+		return;
+	}
 	if (t)
 		t->ForceUpper();
 	evt.Skip();
@@ -2985,7 +3145,53 @@ void mainwindow::OnWithdrawl(wxCommandEvent& evt)
 
 void mainwindow::OnAddDividend(wxCommandEvent& evt)
 {
+	this->generic_entry = new wxTextEntryDialog(this, "Enter Ticker Symbol");
+	wxString ticker = "";
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &ticker));
+	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
+	this->generic_entry->CenterOnParent();
+	wxString longname = "";
+	do {
+		if (this->generic_entry->ShowModal() == wxID_OK)
+		{
+			this->generic_entry->TransferDataFromWindow();
+			longname = this->port.StageStockandGetLongName(ticker);
+		}
+		else
+			return;
+	} while (longname.IsEmpty());
 
+	this->AddDividendWin(ticker, longname);
+}
+
+void mainwindow::OnViewDeposits(wxCommandEvent& evt)
+{
+	wxVector<deposit_pair> vec = this->port.GetDepositVector();
+
+	wxArrayString string;
+	if (!vec.size())
+	{
+		wxMessageBox("There are no deposits to view.");
+		return;
+	}
+
+	double total = 0.0;
+	for (auto& v : vec)
+	{
+		total += v.value;
+		wxString item = "";
+		item = "Deposit Date: " + v.T.Format(STANDARD_DATE) + "  Deposit: $" + wxNumberFormatter::ToString(v.value, 2);
+		string.Add(item);
+	}
+
+	this->generic_list = new GenericListWin(this, wxID_ANY, "Total Deposits: $" + wxNumberFormatter::ToString(total, 2), "Past Deposits", string);
+	this->generic_list->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_MODERN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
+	if (this->generic_list->ShowModal() == wxID_OK)
+	{
+		this->generic_list->Destroy();
+	}
+	else
+		this->generic_list->Destroy();
 }
 
 void mainwindow::OnMarketGainers(wxCommandEvent&)
@@ -3116,6 +3322,7 @@ void mainwindow::CreatePopupMenu()
 	this->p_sell = new wxMenuItem(popup, _MenuItemIDs::P_SELL_STOCK, "Sell");
 	this->p_buy = new wxMenuItem(popup, _MenuItemIDs::P_STOCK_PURCHASE, "Purchase");
 	this->p_quote = new wxMenuItem(popup, _MenuItemIDs::P_QUOTE, "Quote Lookup");
+	this->p_add_div_reinvest = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV_REINVEST, "Add Div Re-invest shares");
 	this->p_add_div = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV, "Add Dividend");
 	this->p_remove_div = new wxMenuItem(popup, _MenuItemIDs::P_REMOVE_DIV, "Remove Dividend");
 	this->p_ohlc = new wxMenuItem(popup, _MenuItemIDs::P_GET_OHLC, "Open High Low Close");
@@ -3123,6 +3330,7 @@ void mainwindow::CreatePopupMenu()
 	this->popup->Append(this->p_buy);
 	this->popup->Append(this->p_sell);
 	this->popup->Append(this->p_quote);
+	this->popup->Append(this->p_add_div_reinvest);
 	this->popup->Append(this->p_add_div);
 	this->popup->Append(this->p_remove_div);
 	this->popup->Append(this->p_ohlc);

@@ -9,6 +9,7 @@ public:
 	DepositSchedule(double d, int schedule, wxDateTime start);
 	DepositSchedule(double d, int schedule, wxDateTime start, wxDateTime end);
 	double RunDepositSchedule();
+	void FillClientVector(wxVector<deposit_pair>&);
 	bool IsOK();
 	void Save(DataStream&);
 	void Retrieve(DataStream&);
@@ -45,6 +46,7 @@ public:
 	void UpdateCash();
 	const double GetFreeCash() const;
 	const double* GetFreeCashPtr() const;
+	wxVector<deposit_pair> GetDepositVector();
 	void Save();
 	void Retrieve();
 private:

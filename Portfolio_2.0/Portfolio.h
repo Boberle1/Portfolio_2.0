@@ -286,11 +286,6 @@ public:
 		this->quarter_return$ = market_value - quarter_cost_basis;
 		this->year_return$ = market_value - year_cost_basis;
 		this->total_return$ = market_value - original_cost_basis;
-
-		// Percent Relative To Parents...
-		this->PortfolioPerc = this->PortfolioMarketValue && *this->PortfolioMarketValue ? this->market_value / *this->PortfolioMarketValue : 0.0;
-		this->SectorPerc = this->SectorMarketValue && *this->SectorMarketValue ? this->market_value / *this->SectorMarketValue : 0.0;
-		this->AssetPerc = this->StockMarketValue && *this->StockMarketValue ? this->market_value / *this->StockMarketValue : 0.0;
 	}
 
 	void Reset()
@@ -511,6 +506,10 @@ public:
 	bool SetReInvestShares(double&);
 	void Save(DataStream&);
 	void Retrieve(DataStream&);
+
+	// This function differs from the private one such that it will give you everydividend including ones that are not a dividend reinvestment
+	// It will also make sure that it will not insert duplicates...
+	void _FillClientDividendVec(wxVector<Dividend>&);
 private:
 	void FillClientDividendVec(wxVector<Dividend>&);
 	double m_GetShares(wxDateTime*);
@@ -572,6 +571,7 @@ public:
 	bool IdMatch(long);
 	bool TickerMatch(wxString);
 	wxString GetTicker() const;
+	wxString GetLongName();
 	double GetShares();
 	SummaryData GetSummaryData() { return this->current_Data; }
 	wxString GetNextEarningsDate();
@@ -586,6 +586,9 @@ public:
 	Day_Prices* GetDayPricesOfLastMarketOpen();
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
+
+	// This function differs from get dividends in that it returns all the dividends including the ones that are elligible for dividend re-investment..
+	wxVector<Dividend> GetAllDividends();
 	StockViewerData* GetStockViewerData();
 	bool PendingReInvestment();
 	void Save();
@@ -658,10 +661,15 @@ public:
 	Sector(_Sector, wxDateTime*, Portfolio*);
 	~Sector();
 	bool Purchase(long, wxString, wxString, double, double, bool, wxString);
+	bool AddToPosition(long&, wxString&, double&, double&, bool&, wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
+	bool AddDividend(Dividend&);
+	wxVector<Dividend> GetDividendsFromStagedStock();
 	bool IsId(_Sector);
 	bool IsChild(wxString&);
+	wxString GetLongNameOfStock(wxString&);
+	wxString GetLongNameOfStock();
 	bool IsChild(long&);
 	int GetNumItems(_PortfolioType);
 	wxVector<StockNode*> GetStockVector();
@@ -702,15 +710,25 @@ class Portfolio : public Return_node
 public:
 	Portfolio(wxFrame*, double, wxDateTime*);
 	bool Purchase(_Sector, wxString, wxString, double, double, bool, wxString);
+	bool AddToPosition(wxString, double, double, bool, wxString);
 	bool DoesTickerExist(wxString&);
+
+	// This function finds a stock with the matching ticker amongst the sectors and stages it in the queue for easy lookup later
+	// to make a modification to it such as: selling, buying, adding div shares ect...
+	bool StageStock(wxString&);
+	wxString StageStockandGetLongName(wxString&);
 	bool RequestSell(wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
+	bool AddDividend(Dividend&);
+	wxVector<Dividend> GetDividendsFromStagedStock();
+	wxVector<deposit_pair> GetDepositVector();
 	wxVector<stock_node*> GetLotData();
 	bool NewDepositSchedule(double, int, wxDateTime);
 	int GetNumItems(_PortfolioType);
 	const wxVector<StockNode*> GetStockNodeItems();
 	void Calibrate(bool datechange = false);
+	void CalcRatiosOfAllChildren();
 	StockViewerData* GetStockViewerData();
 	void Save();
 	void Retrieve();
@@ -730,6 +748,7 @@ public:
 	void ThreadComplete(StockNode*);
 private:
 	bool m_Purchase(long, _Sector, wxString, wxString, double, double, bool, wxString);
+	bool m_AddToPosition(long&, wxString&, double&, double&, bool&, wxString&);
 	long GetLot();
 	void DeleteLot(long&);
 	Sector* GetSector(_Sector);

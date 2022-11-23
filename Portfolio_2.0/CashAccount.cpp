@@ -58,6 +58,24 @@ double DepositSchedule::RunDepositSchedule()
 	return deposit;
 }
 
+void DepositSchedule::FillClientVector(wxVector<deposit_pair>& vec)
+{
+	wxDateTime current(wxDateTime::Today());
+	wxDateTime temp = this->m_startDate;
+
+	for (temp; temp <= current; temp = temp + this->m_days)
+	{
+		size_t i = 0;
+		while (vec.size() > i && temp <= vec[i].T)
+			++i;
+
+		if (!i)
+			vec.push_back(deposit_pair(temp, this->m_deposit));
+		else
+			vec.insert(&vec[i], deposit_pair(temp, this->m_deposit));
+	}
+}
+
 bool DepositSchedule::IsOK()
 {
 	return this->OK;
@@ -278,6 +296,18 @@ const double CashAccount::GetFreeCash() const
 const double* CashAccount::GetFreeCashPtr() const
 {
 	return &this->m_cash;
+}
+
+wxVector<deposit_pair> CashAccount::GetDepositVector()
+{
+	wxVector<deposit_pair> vec;
+	for (auto& v : this->deposit)
+		vec.push_back(v);
+
+	for (auto& v : this->schedule)
+		v.FillClientVector(vec);
+
+	return vec;
 }
 
 void CashAccount::Save()
@@ -516,13 +546,11 @@ bool CashAccount::m_ReplaceDividends(Pair& p)
 
 bool CashAccount::m_AddDividends(Pair& p)
 {
-	if (this->m_FindDiv(p.ticker))
-	{
-		wxFAIL_MSG("Ticker: " + p.ticker + " is already in the dividend vector in CashAccount::m_AddDividends!");
-		return false;
-	}
+	auto index = this->m_FindDiv(p.ticker);
+	if(!index)
+		this->divs.push_back(p);
 
-	this->divs.push_back(p);
+	index->amount = p.amount;
 	this->UpdateCash();
 	return true;
 }
