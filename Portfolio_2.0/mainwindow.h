@@ -173,7 +173,6 @@ private:
 	wxString rightclick_ticker = "";
 };
 
-
 class PortfolioWin : public wxWindow
 {
 public:
@@ -224,8 +223,8 @@ private:
 	wxColour Green = wxColour(16, 82, 31);
 	wxColour Blue = wxColour(36, 11, 191);
 	wxColour DarkGrey = wxColour(43, 43, 43);
-	wxColour parenths = wxColour(40, 40, 84);
-	wxColour percents = wxColour(73, 73, 74);
+	wxColour parenths = wxColour(0, 0, 0);
+	wxColour percents = wxColour(41, 47, 227);
 };
 
 struct PurchaseKit
@@ -240,6 +239,14 @@ struct PurchaseKit
 	wxString m_date = "";
 	wxString m_reinvest_date = "";
 	bool m_reinvest = false;
+};
+
+template <typename A, typename B>
+struct GenericKitTemplate
+{
+	GenericKitTemplate(A a, B b) : thing1(a), thing2(b) {}
+	A thing1;
+	B thing2;
 };
 
 struct GenericKit
@@ -280,6 +287,7 @@ public:
 	SellKit GetSellKit();
 	double GetReInvestShares();
 	wxString GetTicker();
+	int GetDivChoice();
 	wxDECLARE_EVENT_TABLE();
 private:
 	void CreateStockEntry();
@@ -290,6 +298,7 @@ private:
 	void CreateSellStockWin();
 	void CreateAddDividendWin();
 	void CreateAddReInvestShares();
+	void CreateDividendActionWin();
 
 	// helper func for CreateStockEntry, it creates the wxChoice controls for selecting sector and industry(subsector)...
 	void CreateChoiceControls();
@@ -300,6 +309,7 @@ private:
 	void OnCloseDialog(wxCloseEvent&);
 	void OnOkClick(wxCommandEvent&);
 	void OnSectorChoice(wxCommandEvent&);
+	void OnDividendChoice(wxCommandEvent&);
 	void OnKeyDown(wxKeyEvent&);
 
 	// event functio for DayGainers_LosersWin...
@@ -353,6 +363,10 @@ private:
 	wxVector<DayGainersandLosers>* gainers = nullptr;
     wxVector<SubSector>* sub = NULL;
 	string_three string_t;
+	GenericKitTemplate<Dividend, wxString>* generic_kit_template = NULL;
+
+	// This holds the button id pressed that is an indicater of what the user wants to do to an existing dividend...
+	int dividend_action = 0;
 };
 
 class GenericListWin : public wxSingleChoiceDialog
@@ -397,7 +411,9 @@ public:
 	~mainwindow();
 	void PurchaseWin(wxString&, wxString&);
 	void AddDividendWin(wxString&, wxString&);
-	void RemoveDividend(wxString&);
+	void OnViewDividendWin(wxString&);
+	void OnModifyDividendWin(Dividend&, wxString&, wxString&);
+	void OnAddDivPayoutDate(Dividend&, wxString&);
 	void DialogCancel();
 	void PurchaseDataTransfer(PurchaseKit&);
 	void ReInvestSharesWin(wxString&, wxString&);
@@ -426,9 +442,9 @@ public:
 	void OnAddReInvestSharesPopup(wxCommandEvent&);
 	void OnQuoteLookupPopup(wxCommandEvent&);
 	void OnAddDividendPopup(wxCommandEvent&);
-	void OnRemoveDividendPopup(wxCommandEvent&);
+	void OnViewDividendPopup(wxCommandEvent&);
 
-	void OnRemoveDividend(wxCommandEvent&);
+	void OnViewDividend(wxCommandEvent&);
 	void OnReInvestSharesMenu(wxCommandEvent&);
 	void OnSave(wxCommandEvent&);
 	void OnQuoteLookup(wxCommandEvent&);

@@ -1342,6 +1342,21 @@ void stock_node::HandleDivReInvest(Dividend* d)
 	}
 }
 
+void stock_node::HandlePaymentDate(Dividend& dividend, wxDateTime& date)
+{
+	if (this->GetPurchaseDate() < dividend.ex_Div && this->GetShares(&dividend.ex_Div))
+	{
+		for (auto& v : this->divs)
+		{
+			if (v.ex_Div == dividend.ex_Div)
+			{
+				v.payment_date = date;
+				return;
+			}
+		}
+	}
+}
+
 wxDateTime* stock_node::GetLatestDivDate()
 {
 	wxDateTime* latest = nullptr;
@@ -2387,6 +2402,14 @@ void StockNode::SetDividends(Dividend d)
 	}
 }
 
+void StockNode::SetPaymentDate(Dividend& dividend, wxDateTime& date)
+{
+	for (auto& v : this->bought)
+		v.HandlePaymentDate(dividend, date);
+
+	this->UpToDate = 0;
+}
+
 bool StockNode::SetReInvestShares(double& s)
 {
 	wxDateTime date(wxDateTime::Today());
@@ -2636,6 +2659,17 @@ bool Sector::AddDividend(Dividend& div)
 
 	this->sn->SetDividends(div);
 	return true;
+}
+
+void Sector::AddDividendPaymentDate(Dividend& dividend, wxDateTime& date)
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::AddDividendPaymentDate!");
+		return;
+	}
+
+	this->sn->SetPaymentDate(dividend, date);
 }
 
 wxVector<Dividend> Sector::GetDividendsFromStagedStock()
@@ -3045,6 +3079,18 @@ bool Portfolio::AddDividend(Dividend& div)
 	}
 
 	return false;
+}
+
+void Portfolio::SetDividendPaymentDate(Dividend& dividend, wxDateTime& date)
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::AddDividendPaymentDate!");
+		return;
+	}
+
+	this->sec->AddDividendPaymentDate(dividend, date);
+	this->Calibrate();
 }
 
 wxVector<Dividend> Portfolio::GetDividendsFromStagedStock()

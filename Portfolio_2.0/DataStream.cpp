@@ -231,9 +231,14 @@ void DataStream::WriteDividendVector(wxVector<Dividend>& v)
 {
 	size_t size = v.size();
 	this->WriteData(size);
+	size_t valid = 0;
 	for (size_t i = 0; i < v.size(); ++i)
 	{
 		this->WritewxDateTime(v[i].ex_Div);
+		valid = v[i].payment_date.IsValid() ? 1 : 0;
+		this->WriteData(valid);
+		if (valid)
+			this->WritewxDateTime(v[i].payment_date);
 		this->WriteLong(v[i].id);
 		this->WriteData(v[i].div);
 		this->WriteBool(v[i].DivReinvest);
@@ -246,10 +251,14 @@ void DataStream::ReadDividendVector(wxVector<Dividend>& v)
 {
 	size_t size;
 	this->ReadData(size);
+	size_t valid = 0;
 	for (size_t i = 0; i < size; ++i)
 	{
 		Dividend d(0, wxDateTime(), 0.0);
 		this->ReadwxDateTime(d.ex_Div);
+		this->ReadData(valid);
+		if (valid)
+			this->ReadwxDateTime(d.payment_date);
 		this->ReadLong(d.id);
 		this->ReadData(d.div);
 		this->ReadBool(d.DivReinvest);

@@ -8,7 +8,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::_WITHDRAWL, OnWithdrawl)
 	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT_SCHEDULE, OnAddDepositSchdule)
 	EVT_MENU(_MenuItemIDs::ADD_DIV, OnAddDividend)
-	EVT_MENU(_MenuItemIDs::REMOVE_DIV, OnRemoveDividend)
+	EVT_MENU(_MenuItemIDs::REMOVE_DIV, OnViewDividend)
 	EVT_MENU(_MenuItemIDs::ADD_DIV_SHARES, OnReInvestSharesMenu)
 	EVT_MENU(_MenuItemIDs::DAY_GAINERS_MENU, OnMarketGainers)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
@@ -18,7 +18,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::P_STOCK_PURCHASE, OnPurchasePopupClick)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV_REINVEST, OnAddReInvestSharesPopup)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV, OnAddDividendPopup)
-	EVT_MENU(_MenuItemIDs::P_REMOVE_DIV, OnRemoveDividendPopup)
+	EVT_MENU(_MenuItemIDs::P_REMOVE_DIV, OnViewDividendPopup)
 	EVT_MENU(_MenuItemIDs::VIEW_DEPOSITS, OnViewDeposits)
 wxEND_EVENT_TABLE()
 
@@ -447,7 +447,10 @@ bool GridNode::IsMatch(wxString s)
 {
 	// If t_val has the * in the ticker because there is an upcoming dividend reinvestment date than the tickerw wont match so we need to add one to it...
 	if (this->t_val.find("*") != -1)
-		s += " *";
+	{
+		if (s.find("*") == -1)
+			s += " *";
+	}
 	if (s == t_val)
 		return true;
 
@@ -1263,11 +1266,12 @@ void PortfolioWin::Update()
 	this->DayReturnDisplay->SetLabel(svd->GetDayGain());
 	this->DayReturnDollar->SetLabel(svd->GetDayReturn$());
 	this->AccountValueDisplay->SetLabel("$" + wxNumberFormatter::ToString(svd->market_value + port->GetFreeCash(), 2));
-//	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain() + " " + "($" + svd->GetTotalReturn$() + ")");
+	this->MarketValueDisplay->SetLabel("$" + svd->GetMarketValue());
 	this->TotalReturnDisplay->SetLabel(svd->GetTotalGain());
 	this->TotalReturnDollar->SetLabel(svd->GetTotalReturn$());
 
 	SetStaticTextColor(*this->DayReturnDisplay, this->Green, this->Red);
+	SetStaticTextColor(*this->DayReturnDollar, this->Green, this->Red);
 	SetStaticTextColor(*this->TotalReturnDisplay, this->Green, this->Red);
 	SetStaticTextColor(*this->TotalReturnDollar, this->Green, this->Red);
 
@@ -1292,6 +1296,8 @@ void PortfolioWin::Create()
 	this->DayReturnDollar = new wxStaticText(panel, wxID_ANY, svd->GetDayReturn$());
 	this->AccountValue = new wxStaticText(panel, wxID_ANY, "Account Value");
 	this->AccountValueDisplay = new wxStaticText(panel, wxID_ANY, "$" + svd->GetTotalValue());
+	this->MarketValue = new wxStaticText(panel, wxID_ANY, "Market Value");
+	this->MarketValueDisplay = new wxStaticText(panel, wxID_ANY, "$" + svd->GetMarketValue());
 	this->TotalReturn = new wxStaticText(panel, wxID_ANY, "Total Return");
 	this->TotalReturnDisplay = new wxStaticText(panel, wxID_ANY, svd->GetTotalGain());
 	this->TotalReturnDollar = new wxStaticText(panel, wxID_ANY, svd->GetTotalReturn$());
@@ -1368,6 +1374,10 @@ void PortfolioWin::Create()
 	main->Add(this->AccountValue, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
 	main->Add(this->AccountValueDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
+	main->AddSpacer(5);
+	main->Add(this->MarketValue, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
+	main->AddSpacer(5);
+	main->Add(this->MarketValueDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
 	main->Add(line3H, 0, wxEXPAND | wxALL, 5);
 	main->Add(this->TotalReturn, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
 	main->AddSpacer(5);
@@ -1396,6 +1406,8 @@ void PortfolioWin::SetControlFonts()
 	this->DayReturnDollar->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->AccountValue->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->AccountValueDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	this->MarketValue->SetFont(this->AccountValue->GetFont());
+	this->MarketValueDisplay->SetFont(this->AccountValueDisplay->GetFont());
 	this->TotalReturn->SetFont(wxFont(17, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->TotalReturnDisplay->SetFont(wxFont(19, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
 	this->TotalReturnDollar->SetFont(this->TotalReturnDisplay->GetFont());
@@ -1424,9 +1436,11 @@ void PortfolioWin::SetControlFonts()
 	this->Cash->SetForegroundColour(this->DarkGrey);
 	this->DayReturn->SetForegroundColour(this->DarkGrey);
 	this->AccountValue->SetForegroundColour(this->DarkGrey);
+	this->MarketValue->SetForegroundColour(this->DarkGrey);
 	this->TotalReturn->SetForegroundColour(this->DarkGrey);
 
 	this->CashDisplay->SetForegroundColour(this->Green);
+	this->MarketValueDisplay->SetForegroundColour(this->Green);
 	this->AccountValueDisplay->SetForegroundColour(this->Green);
 
 	SetStaticTextColor(*this->DayReturnDisplay, this->Green, this->Red);
@@ -1500,6 +1514,7 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::ENTER_DEPOSIT: this->CreateDepositWin(); break;
 	case _EnterDialog::ENTER_DEPOSIT_SCHEDULE: this->CreateDepositScheduleWin(); break;
 	case _EnterDialog::WITHDRAWL: this->CreateWithdrawlWin(); break;
+	case _EnterDialog::DIVIDEND_ACTION_WIN: this->generic_kit_template = reinterpret_cast<GenericKitTemplate<Dividend, wxString>*>(t); this->CreateDividendActionWin(); break;
 	case _EnterDialog::ENTER_DIVIDEND: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddDividendWin(); break;
 	case _EnterDialog::DIVIDEND_SHARE_DIALOG: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddReInvestShares(); break;
 	case _EnterDialog::DAY_GAINERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(true); break;
@@ -1537,6 +1552,11 @@ double Dialog::GetReInvestShares()
 wxString Dialog::GetTicker()
 {
 	return this->_ticker;
+}
+
+int Dialog::GetDivChoice()
+{
+	return this->dividend_action;
 }
 
 void Dialog::CreateStockEntry()
@@ -1712,6 +1732,8 @@ void Dialog::CreateQuoteWin()
 	staticH2->Add(new wxStaticLine(this, wxID_ANY), 1, wxEXPAND);
 
 	wxButton* B = new wxButton(this, wxID_OK, "Purchase");
+	B->SetBackgroundColour(wxColour(2, 99, 23));
+
 	topVbutton->Add(B, 1, wxBOTTOM | wxRIGHT | wxTOP | wxALIGN_RIGHT, 5);
 	topHlongname->Add(longname, 1, wxBOTTOM | wxLEFT | wxTOP | wxALIGN_LEFT, 5);
 	topHlongname->Add(topVbutton, 1);
@@ -2163,6 +2185,65 @@ void Dialog::CreateAddReInvestShares()
 	this->CenterOnParent();
 }
 
+void Dialog::CreateDividendActionWin()
+{
+	wxColour c(205, 209, 206);
+	SetColor(*this, wxColour(157, 157, 163));
+
+	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* topH = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* bottomH = new wxBoxSizer(wxHORIZONTAL);
+
+	Dividend& div = this->generic_kit_template->thing1;
+	this->s_ticker = new wxStaticText(this, wxID_ANY, this->generic_kit_template->thing2);
+	this->s_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+
+	wxStaticText* ex_div_desc = new wxStaticText(this, wxID_ANY, "Ex-Div-Date:");
+	wxStaticText* ex_div = new wxStaticText(this, wxID_ANY, div.ex_Div.Format(STANDARD_DATE));
+	wxStaticText* amount_desc = new wxStaticText(this, wxID_ANY, "Dividend Amount:");
+	wxStaticText* amount = new wxStaticText(this, wxID_ANY, wxNumberFormatter::ToString(div.div, 3));
+
+	ex_div_desc->SetFont(ex_div_desc->GetFont().MakeBold());
+	ex_div->SetFont(ex_div->GetFont().MakeBold());
+	amount_desc->SetFont(amount_desc->GetFont().MakeBold());
+	amount->SetFont(amount->GetFont().MakeBold());
+
+	wxArrayString string;
+	string.Add("Remove Dividend");
+	string.Add("Add Payment Date");
+	string.Add("Change Dividend Amount");
+	this->choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, string);
+	this->choice->SetStringSelection("Remove Dividend");
+	this->choice->Bind(wxEVT_CHOICE, &Dialog::OnDividendChoice, this);
+	this->dividend_action = REMOVE_DIVIDEND;
+
+	wxButton* ok = new wxButton(this, wxID_OK, "OK");
+	wxButton* cancel = new wxButton(this, wxID_CANCEL, "CANCEL");
+
+	ok->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
+	cancel->Bind(wxEVT_BUTTON, &Dialog::OnCancelDialog, this);
+
+	bottomH->Add(ok, 0, wxRIGHT, 10);
+	bottomH->Add(cancel, 0);
+
+	topH->Add(ex_div_desc, 0, wxRIGHT, 5);
+	topH->Add(ex_div, 0, wxRIGHT, 20);
+	topH->Add(amount_desc, 0, wxRIGHT, 5);
+	topH->Add(amount, 0, wxRIGHT, 5);
+
+	mainV->Add(this->s_ticker, 1, wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 10);
+	mainV->Add(topH, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
+	mainV->Add(choice, 0, wxALIGN_CENTER_HORIZONTAL);
+	mainV->AddSpacer(10);
+	mainV->Add(bottomH, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10);
+
+	this->SetSizer(mainV);
+	mainV->Fit(this);
+	mainV->SetSizeHints(this);
+	this->Layout();
+	this->CenterOnParent();
+}
+
 void Dialog::CreateChoiceControls()
 {
 	// Create choice controls...
@@ -2243,6 +2324,7 @@ void Dialog::OnOkClick(wxCommandEvent& evt)
 		evt.Skip();
 		break;
 	}
+	case _EnterDialog::DIVIDEND_ACTION_WIN: evt.Skip(); return;
 	case _EnterDialog::ENTER_DIVIDEND: this->HandleAddDividendOkClick(); break;
 	case _EnterDialog::DIVIDEND_SHARE_DIALOG: 
 	{
@@ -2283,6 +2365,17 @@ void Dialog::OnSectorChoice(wxCommandEvent& evt)
 		this->subSector->Append(sub->at(i));
 
 	this->subSector->SetStringSelection(*sub->begin());
+}
+
+void Dialog::OnDividendChoice(wxCommandEvent& evt)
+{
+	wxString selection = this->choice->GetStringSelection();
+	if (selection == "Remove Dividend")
+		this->dividend_action = REMOVE_DIVIDEND;
+	if (selection == "Add Payment Date")
+		this->dividend_action = ADD_DIV_PAYMENT_DATE;
+	if (selection == "Change Dividend Amount")
+		this->dividend_action = ADJUST_DIV_AMOUNT;
 }
 
 void Dialog::OnKeyDown(wxKeyEvent& evt)
@@ -2710,7 +2803,7 @@ void mainwindow::AddDividendWin(wxString& ticker, wxString& longname)
 	}
 }
 
-void mainwindow::RemoveDividend(wxString& ticker)
+void mainwindow::OnViewDividendWin(wxString& ticker)
 {
 	wxString longname = this->port.StageStockandGetLongName(ticker);
 	wxVector<Dividend> vec = this->port.GetDividendsFromStagedStock();
@@ -2724,8 +2817,9 @@ void mainwindow::RemoveDividend(wxString& ticker)
 	for (auto& v : vec)
 	{
 		wxString item = "";
-		wxString Bool = v.DivReinvest ? "True" : "False";
-		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "  Amount: " + wxNumberFormatter::ToString(v.div, 4) + "  Re-Invest Elligible: " + Bool +
+		wxString Bool = v.DivReinvest ? "Yes" : "No";
+		wxString payable_date = v.payment_date.IsValid() ? v.payment_date.Format(STANDARD_DATE) : "NA";
+		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "  Payment Date: " + payable_date + "  Amount: " + wxNumberFormatter::ToString(v.div, 4) + "  Re-Invest Elligible: " + Bool +
 			"  Re-Invested amount: " + wxNumberFormatter::ToString(v.re_invest_shares, 4);
 		string.Add(item);
 	}
@@ -2736,9 +2830,73 @@ void mainwindow::RemoveDividend(wxString& ticker)
 		int selection = this->generic_list->GetSelection();
 		Dividend& dev = vec[selection];
 		this->generic_list->Destroy();
+		this->OnModifyDividendWin(dev, ticker, longname);
 	}
 	else
 		this->generic_list->Destroy();
+}
+
+void mainwindow::OnModifyDividendWin(Dividend& d, wxString& ticker, wxString& longname)
+{
+	GenericKitTemplate<Dividend, wxString> kit(d, longname);
+	this->dialog = new Dialog(_EnterDialog::DIVIDEND_ACTION_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Dividend Modification Window", &kit);
+	if (this->dialog->ShowModal() == wxID_OK)
+	{
+		int selection = this->dialog->GetDivChoice();
+		switch (selection)
+		{
+		case REMOVE_DIVIDEND: break;
+		case ADD_DIV_PAYMENT_DATE: this->OnAddDivPayoutDate(d, ticker);  break;
+		case ADJUST_DIV_AMOUNT: break;
+		}
+		this->dialog->Destroy();
+	}
+
+}
+
+void mainwindow::OnAddDivPayoutDate(Dividend& div, wxString& t)
+{
+	wxString stringdate = "";
+	this->generic_entry = new wxTextEntryDialog(this, "Enter Payment Date For " + t);
+	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_EMPTY, &stringdate));
+	this->generic_entry->CenterOnParent();
+	wxDateTime date;
+	bool first = false;
+
+	do {
+		if (this->generic_entry->ShowModal() == wxID_OK)
+		{
+			if (first)
+				wxMessageBox("Invalid date entered for " + t);
+			first = true;
+			this->TransferDataFromWindow();
+		}
+		else
+		{
+			this->generic_entry->Destroy();
+			this->generic_entry = NULL;
+			return;
+		}
+	} while (!date.ParseDate(stringdate) && div.ex_Div > date);
+
+	if (div.payment_date.IsValid())
+	{
+		wxBell();
+		int answer = wxMessageBox("This dividend already has a payment date of " + div.payment_date.Format(STANDARD_DATE) + 
+			". \nAre you sure you want to replace it with " + stringdate + "?", t,  wxYES_NO);
+
+		if (answer != wxYES)
+		{
+			this->generic_entry->Destroy();
+			this->generic_entry = NULL;
+			return;
+		}
+	}
+	this->port.SetDividendPaymentDate(div, date);
+	this->UpdateGridView();
+
+	this->generic_entry->Destroy();
+	this->generic_entry = NULL;
 }
 
 void mainwindow::DialogCancel()
@@ -3013,13 +3171,13 @@ void mainwindow::OnAddDividendPopup(wxCommandEvent& evt)
 	this->AddDividendWin(ticker, longname);
 }
 
-void mainwindow::OnRemoveDividendPopup(wxCommandEvent& evt)
+void mainwindow::OnViewDividendPopup(wxCommandEvent& evt)
 {
 	wxString ticker = this->grid_view->GetRightClickTicker();
-	this->RemoveDividend(ticker);
+	this->OnViewDividendWin(ticker);
 }
 
-void mainwindow::OnRemoveDividend(wxCommandEvent& evt)
+void mainwindow::OnViewDividend(wxCommandEvent& evt)
 {
 	wxString ticker = "";
 	this->generic_entry = new wxTextEntryDialog(this, "Enter ticker");
@@ -3039,7 +3197,7 @@ void mainwindow::OnRemoveDividend(wxCommandEvent& evt)
 
 	} while (longname.IsEmpty());
 
-	this->RemoveDividend(ticker);
+	this->OnViewDividendWin(ticker);
 }
 
 void mainwindow::OnReInvestSharesMenu(wxCommandEvent& evt)

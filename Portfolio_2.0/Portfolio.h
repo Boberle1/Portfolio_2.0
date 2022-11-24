@@ -497,6 +497,7 @@ public:
 	double GetPurchasePrice();
 	void HandleDivReInvest(Dividend&);
 	void HandleDivReInvest(Dividend*);
+	void HandlePaymentDate(Dividend&, wxDateTime&);
 	wxDateTime* GetLatestDivDate();
 	wxDateTime* GetDividendDates(wxDateTime&);
 	double GetDividends(wxDateTime*);
@@ -581,6 +582,7 @@ public:
 	void SetHistoricalData(Day_Prices);
 	void SetSummaryData(SummaryData);
 	void SetDividends(Dividend);
+	void SetPaymentDate(Dividend&, wxDateTime&);
 	bool SetReInvestShares(double&);
 	void OnThreadComplete(wxCommandEvent&);
 	Day_Prices* GetDayPricesOfLastMarketOpen();
@@ -665,6 +667,7 @@ public:
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
 	bool AddDividend(Dividend&);
+	void AddDividendPaymentDate(Dividend&, wxDateTime&);
 	wxVector<Dividend> GetDividendsFromStagedStock();
 	bool IsId(_Sector);
 	bool IsChild(wxString&);
@@ -721,6 +724,7 @@ public:
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
 	bool AddDividend(Dividend&);
+	void SetDividendPaymentDate(Dividend&, wxDateTime&);
 	wxVector<Dividend> GetDividendsFromStagedStock();
 	wxVector<deposit_pair> GetDepositVector();
 	wxVector<stock_node*> GetLotData();

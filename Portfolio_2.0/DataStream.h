@@ -38,7 +38,14 @@ struct Dividend
 	bool IsPendingReInvestment()
 	{
 		if (DivReinvest && !re_invest_shares)
+		{
+			if (!this->payment_date.IsValid())
+				return true;
+			if (this->payment_date > wxDateTime::Today())
+				return false;
+			
 			return true;
+		}
 
 		return false;
 	}
@@ -54,10 +61,15 @@ struct Dividend
 	{
 		this->re_invest_shares = shares;
 	}
+	void AddPaymentDate(wxDateTime& date)
+	{
+		this->payment_date = date;
+	}
 
 	long id;
 	double div = 0.0;
 	wxDateTime ex_Div;
+	wxDateTime payment_date;
 	bool DivReinvest = false;
 	double re_invest_shares = 0.0;
 	bool linked = false;
