@@ -15,6 +15,33 @@ bool IsStringPositive(wxString& s)
 	return index == -1 ? true : false;
 }
 
+int IsStringPNZ(wxString& s)
+{
+	double d;
+	wxString temp = s;
+
+	int index = temp.find('$');
+	if (index != -1)
+		temp = temp.Mid(1);
+
+	index = temp.find('%');
+	if (index != -1)
+		temp = temp.Mid(0, index);
+
+	if (!temp.ToDouble(&d))
+	{
+		wxMessageBox("Todouble failed in IsStringPNZ! String is: " + temp);
+		return 0;
+	}
+
+	if (d > 0)
+		return 1;
+	if (d < 0)
+		return -1;
+
+	return 0;
+}
+
 bool IswxDateEqual(wxDateTime& d1, wxDateTime& d2)
 {
 	if (!d1.IsValid() || !d2.IsValid())

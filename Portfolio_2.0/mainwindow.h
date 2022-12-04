@@ -6,6 +6,15 @@
 #include "wx/dialog.h"
 #include "wx/validate.h"
 #include "wx/statline.h"
+#include "wx/graphics.h"
+#include "wx/dcbuffer.h"
+
+struct TextExtent
+{
+	TextExtent(double w1, double h1) : w(w1), h(h1) {}
+	double w = 0;
+	double h = 0;
+};
 
 // helper for Decipherhtmlcodes
 char DecipherHelper(char& a, char& b);
@@ -49,6 +58,107 @@ struct gridpair
 	gridpair(wxString v, bool b) : val(v), valcolor(b) {}
 	wxString val;
 	bool valcolor;
+	
+};
+
+class GridCanvas : public wxWindow
+{
+public:
+	GridCanvas(wxWindow*, wxSize, wxString&, int);
+	void OnPaint(wxPaintEvent&);
+	TextExtent* GetTextExtent();
+	bool IsMatch(wxString&);
+	bool IsEmpty();
+	void OnMouseEnter(wxMouseEvent&);
+	void OnMouseLeave(wxMouseEvent&);
+	wxDECLARE_EVENT_TABLE();
+protected:
+	void m_SetValue(wxString&);
+	void m_SetValue(wxString&, bool color);
+	wxString m_GetValue();
+	void SetToTotalCanvas();
+	void SetTotTotalStartRowCanvas();
+	void SetToHeader();
+	void SetToRowStartCanvas();
+	void SetToDataCellColor();
+	void SetToNormalBackground();
+	void SetToMediumFont();
+	void SetToLargeFont();
+	void LeftClick();
+	void RightClick();
+private:
+	void Initialize();
+	void SetTextColor(int);
+	void SetBackgroundColor();
+private:
+	wxString value = "";
+
+	// this flag value is used to determine how to display the data...
+	int flag = 0;
+
+	// Possible fonts..
+	wxFont rowStartFont = wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+	wxFont normalFont = wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM);
+
+	// textfont used in the paint method
+	// Its just a place holder for any of the fonts above...
+	wxFont textfont;
+
+	// Possible text colours...
+	wxColour green = wxColour(13, 158, 20);
+	wxColour red = wxColour(217, 7, 28);
+	wxColour yellow = wxColour(176, 194, 16);
+	wxColour colHeaderColour = wxColour(213, 220, 227);
+	wxColour rowHeaderColour = wxColour(182, 203, 242);
+	wxColour white = wxColour(255, 255, 255);
+
+	// textcolour used in the paint method
+	// Its just a place holder for any of the text colours above...
+	wxColour textcolor;
+	
+	// Possible background colours...
+	wxColour normal = wxColour(13, 10, 36);
+	wxColour totalRowColor = wxColour(21, 41, 46);
+	wxColour onClick;
+	wxColour hover = wxColour(11, 117, 143);
+
+	// backgroud color is used in the paint method...
+	// It is just a place holder for any of the background colors above...
+	wxColour background;
+
+	TextExtent textextent;
+};
+
+class GridNode;
+
+class Gnode : public GridCanvas
+{
+public:
+	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, wxString&, int);
+	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, int);
+
+	void SetValue(wxString&);
+	void SetValue(wxString&, bool color);
+
+	void SetUP(Gnode*);
+	void SetRight(Gnode*);
+	void SetDown(Gnode*);
+	void SetLeft(Gnode*);
+	Gnode* GetUP();
+	Gnode* GetRight();
+	Gnode* GetDown();
+	Gnode* GetLeft();
+
+	void OnRightClick(wxMouseEvent&);
+	wxDECLARE_EVENT_TABLE();
+private:
+	wxString emptystring = "";
+	Gnode* m_up = nullptr;
+	Gnode* m_right = nullptr;
+	Gnode* m_down = nullptr;
+	Gnode* m_left = nullptr;
+
+	GridView* m_parent = NULL;
 };
 
 class GridNode : public wxStaticText
@@ -59,6 +169,8 @@ public:
 	void operator=(const GridNode&);
 	~GridNode();
 	bool CopyText(const GridNode&);
+	void SetMySizer(wxSizer* sizer) { this->mySizer = sizer; }
+	void LayoutMySizer() { this->mySizer->Layout(); }
 
 	bool SetNewVal(gridpair, bool total_row = false);
 	void SetUP(GridNode*);
@@ -71,7 +183,7 @@ public:
 	GridNode* GetLeft();
 	bool IsEmpty();
 	bool Clear();
-	bool IsID(int);
+//	bool IsID(int);
 	bool IsMatch(wxString);
 	void OnClickEvent(wxMouseEvent&);
 	void OnRightClick(wxMouseEvent&);
@@ -85,6 +197,7 @@ public:
 	wxDECLARE_EVENT_TABLE();
 private:
 	void InitializeGridNode();
+	void SetBackGroundColor();
 private:
 	GridNode* m_up = nullptr;
 	GridNode* m_right = nullptr;
@@ -109,6 +222,7 @@ private:
 	GridView* m_grid_view = nullptr;
 	bool SummaryItem = false;
 	int Gridtype = -1;
+	wxSizer* mySizer = NULL;
 };
 
 class mainwindow;
@@ -116,11 +230,14 @@ class mainwindow;
 class GridView : public wxGridSizer
 {
 public:
-	GridView(wxWindow*, int);
+	GridView(wxWindow*, int, int);
 	~GridView();
-	void SetNewRow(StockViewerData*, bool total_row = false);
-	void UpdateRow(StockViewerData*, bool total_row = false);
+	void SetNewRow(StockViewerData*);
+	void UpdateRow(StockViewerData*);
+//	void SetNewRow(StockViewerData*, bool total_row = false);
+//	void UpdateRow(StockViewerData*, bool total_row = false);
 	bool DoesItemExist(wxString);
+	bool ItemExist(wxString&);
 	void Cleanup();
 	void OnClickColItem(GridNode*);
 	void OnClickRowItem(GridNode*);
@@ -136,7 +253,11 @@ private:
 	void ClickRowOff();
 	void ClickColOff();
 	gridpair GetLabelText(size_t&, StockViewerData*);
+	wxString GetStringLabel(size_t&, StockViewerData*);
 	wxString GetColTitle(size_t);
+	int GetGridNodeFlags(size_t&, size_t&);
+	Gnode* GetEmptyRow();
+	Gnode* GetMatch(wxString&);
 	GridNode* GetFirstEmptyRow();
 	GridNode* GetFirstMatch(wxString);
 	GridNode* GetFarthestRight(GridNode*);
@@ -148,29 +269,40 @@ private:
 	GridNode* GetUp(GridNode*, size_t, size_t start = 0);
 	GridNode* GetDown(GridNode*, size_t, size_t start = 0);
 
+	Gnode* GetFarthestRight(Gnode*);
+	Gnode* GetRight(Gnode*, size_t, size_t start = 0);
+	Gnode* GetLeft(Gnode*, size_t, size_t start = 0);
+	Gnode* GetUp(Gnode*, size_t, size_t start = 0);
+	Gnode* GetDown(Gnode*, size_t, size_t start = 0);
+
 private:
 	void RemoveRow(GridNode*);
 	void MoveRowUp(GridNode*);
 	void ClearRow(GridNode*);
 	void DeleteRow(GridNode*);
-	GridNode* FindItem(GridNode*, int);
+//	GridNode* FindItem(GridNode*, int);
 	void HighlightRow(GridNode*);
 	void HighlightCol(GridNode*);
-	GridNode* FindGridNode(int);
+//	GridNode* FindGridNode(int);
 	GridNode* GetSummaryRow();
 	void SwapSummaryRow(GridNode*&);
 private:
 	GridNode* head = nullptr;
+	Gnode* Head = NULL;
 	const Portfolio* port = NULL;
 	wxWindow* m_parent;
 	int gridnode_Size = 0;
 	size_t filledrows = 0;
+	size_t filledNodes = 0;
 	GridNode* grid_col = nullptr;
 	GridNode* grid_row = nullptr;
 	GridNode* clicked_node = nullptr;
 	GridNode* summaryrow = nullptr;
 	bool SummaryRowSet = false;
 	wxString rightclick_ticker = "";
+	wxVector<GridNode*> gridnode;
+	wxVector<wxString> headers;
+	int itemsize = 0;
 };
 
 class PortfolioWin : public wxWindow
@@ -178,6 +310,7 @@ class PortfolioWin : public wxWindow
 public:
 	PortfolioWin(mainwindow*, wxWindowID, wxDateTime*, StockViewerData*, Portfolio*);
 	void Update();
+	void OnClick(wxString&);
 private:
 	void Create();
 	void SetControlFonts();
@@ -225,6 +358,8 @@ private:
 	wxColour DarkGrey = wxColour(43, 43, 43);
 	wxColour parenths = wxColour(0, 0, 0);
 	wxColour percents = wxColour(41, 47, 227);
+
+	Gnode* canvas = NULL;
 };
 
 struct PurchaseKit
@@ -277,17 +412,57 @@ struct string_three
 	wxString sector = "";
 };
 
+// Simple struct that creates the ctrls for entering dividend data...
+struct DivCtrls
+{
+	DivCtrls(wxDialog*, Dividend&);
+	wxBoxSizer*& GetTopSizer();
+	wxBoxSizer*& GetBottomSizer();
+	void OnEdit();
+	
+	wxTextCtrl* payment_date = NULL;
+	wxTextCtrl* ex_div_date = NULL;
+	wxTextCtrl* amount = NULL;
+	wxTextCtrl* reInvestmentShares = NULL;
+	wxDialog* m_parent = NULL;
+
+	wxStaticText* s_payment_date = NULL;
+	wxStaticText* s_ex_div_date = NULL;
+	wxStaticText* s_amount = NULL;
+	wxStaticText* s_reInvestmentShares = NULL;
+
+	wxString _payment_date = "";
+	wxString _ex_div_date = "";
+	double d_amount = 0.0;
+	double d_reInvestmentShares = 0.0;
+
+	wxButton* edit = NULL;
+	wxButton* ok = NULL;
+	wxButton* cancel = NULL;
+
+	wxBoxSizer* payment_sizerV = NULL;
+	wxBoxSizer* ex_sizerV = NULL;
+	wxBoxSizer* reinvestment_sizerV = NULL;
+	wxBoxSizer* amount_sizerV = NULL;
+	wxBoxSizer* button_sizerH = NULL;
+	wxBoxSizer* sizerH = NULL;
+
+	Dividend div;
+};
+
 class Dialog : public wxDialog
 {
 public:
 	template <typename T>
 	Dialog(_EnterDialog, mainwindow*, wxWindowID, wxPoint, wxSize, wxString, T*);
+	~Dialog();
 	PurchaseKit GetPurchaseKit();
 	GenericKit GetGenericKit();
 	SellKit GetSellKit();
 	double GetReInvestShares();
 	wxString GetTicker();
 	int GetDivChoice();
+	Dividend GetDividend();
 	wxDECLARE_EVENT_TABLE();
 private:
 	void CreateStockEntry();
@@ -299,6 +474,7 @@ private:
 	void CreateAddDividendWin();
 	void CreateAddReInvestShares();
 	void CreateDividendActionWin();
+	void CreateEditDivWin();
 
 	// helper func for CreateStockEntry, it creates the wxChoice controls for selecting sector and industry(subsector)...
 	void CreateChoiceControls();
@@ -310,6 +486,7 @@ private:
 	void OnOkClick(wxCommandEvent&);
 	void OnSectorChoice(wxCommandEvent&);
 	void OnDividendChoice(wxCommandEvent&);
+	void OnEditClick(wxCommandEvent&);
 	void OnKeyDown(wxKeyEvent&);
 
 	// event functio for DayGainers_LosersWin...
@@ -325,6 +502,7 @@ private:
 	bool HandleSellStockOkClick();
 	void HandleAddDividendOkClick();
 	bool HandleReInvestSharesOkClick();
+	bool OnEditDivWinOK();
 private:
 	mainwindow* m_parent = nullptr;
 	wxStaticText* s_ticker = nullptr;
@@ -367,6 +545,7 @@ private:
 
 	// This holds the button id pressed that is an indicater of what the user wants to do to an existing dividend...
 	int dividend_action = 0;
+	DivCtrls* divctrl = NULL;
 };
 
 class GenericListWin : public wxSingleChoiceDialog
@@ -414,6 +593,7 @@ public:
 	void OnViewDividendWin(wxString&);
 	void OnModifyDividendWin(Dividend&, wxString&, wxString&);
 	void OnAddDivPayoutDate(Dividend&, wxString&);
+	void OnAddDivReInvestmentShares(Dividend&, double&);
 	void DialogCancel();
 	void PurchaseDataTransfer(PurchaseKit&);
 	void ReInvestSharesWin(wxString&, wxString&);
@@ -498,8 +678,9 @@ private:
 	wxMenuItem* p_quote = NULL;
 	wxMenuItem* p_add_div_reinvest = NULL;
 	wxMenuItem* p_add_div = NULL;
-	wxMenuItem* p_remove_div = NULL;
+	wxMenuItem* p_view_dividends = NULL;
 	wxMenuItem* p_ohlc = NULL;
 	wxMenu* popup = NULL;
+	int counter = 0;
 };
 

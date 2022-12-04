@@ -8,7 +8,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::_WITHDRAWL, OnWithdrawl)
 	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT_SCHEDULE, OnAddDepositSchdule)
 	EVT_MENU(_MenuItemIDs::ADD_DIV, OnAddDividend)
-	EVT_MENU(_MenuItemIDs::REMOVE_DIV, OnViewDividend)
+	EVT_MENU(_MenuItemIDs::VIEW_DIVIDENDS, OnViewDividend)
 	EVT_MENU(_MenuItemIDs::ADD_DIV_SHARES, OnReInvestSharesMenu)
 	EVT_MENU(_MenuItemIDs::DAY_GAINERS_MENU, OnMarketGainers)
 	EVT_MENU(_MenuItemIDs::DAY_LOSERS_MENU, OnMarketLosers)
@@ -18,8 +18,14 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::P_STOCK_PURCHASE, OnPurchasePopupClick)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV_REINVEST, OnAddReInvestSharesPopup)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV, OnAddDividendPopup)
-	EVT_MENU(_MenuItemIDs::P_REMOVE_DIV, OnViewDividendPopup)
+	EVT_MENU(_MenuItemIDs::P_VIEW_DIVIDENDS, OnViewDividendPopup)
 	EVT_MENU(_MenuItemIDs::VIEW_DEPOSITS, OnViewDeposits)
+wxEND_EVENT_TABLE()
+
+wxBEGIN_EVENT_TABLE(GridCanvas, wxWindow)
+wxEND_EVENT_TABLE()
+
+wxBEGIN_EVENT_TABLE(Gnode, wxWindow)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(GridNode, wxStaticText)
@@ -254,6 +260,353 @@ void VirtualListView::UpdateItemsCount()
 	this->SetItemCount(this->items.size());
 }
 
+GridCanvas::GridCanvas(wxWindow* w, wxSize size, wxString& val, int flags) : wxWindow(w, wxID_ANY, wxDefaultPosition, size),
+	value(val), textcolor(white), flag(flags), textextent(0.0, 0.0)
+{
+	this->Bind(wxEVT_ENTER_WINDOW, &GridCanvas::OnMouseEnter, this);
+	this->Bind(wxEVT_LEAVE_WINDOW, &GridCanvas::OnMouseLeave, this);
+	this->SetMaxSize(size);
+	this->SetMinSize(size);
+	this->SetBackgroundColour(w->GetBackgroundColour());
+	this->SetBackgroundStyle(wxBackgroundStyle::wxBG_STYLE_PAINT);
+	this->Bind(wxEVT_PAINT, &GridCanvas::OnPaint, this);
+
+	this->Initialize();
+}
+
+void GridCanvas::OnPaint(wxPaintEvent& evt)
+{
+	wxAutoBufferedPaintDC dc(this);
+	dc.Clear();
+
+	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
+	if (!gc)
+		return;
+
+	wxPoint rectOrigin = this->FromDIP(wxPoint(0, 0));
+	wxSize rectSize = this->FromDIP(this->GetSize());
+	
+	gc->SetBrush(gc->CreateBrush(wxBrush(this->background, wxBrushStyle::wxBRUSHSTYLE_SOLID)));
+	gc->DrawRoundedRectangle(rectOrigin.x, rectOrigin.y, rectSize.GetWidth(), rectSize.GetHeight(), 5.0);
+
+	// If the value of text is empty, no need to draw text...
+	if (this->value.empty())
+	{
+		delete gc;
+		return;
+	}
+
+	gc->SetFont(gc->CreateFont(this->textfont, this->textcolor));
+
+	gc->GetTextExtent(this->value, &textextent.w, &textextent.h);
+
+	gc->DrawText(this->value, rectOrigin.x + 4, (rectOrigin.y + rectSize.GetHeight() / 2.0) - textextent.h / 2.0);
+
+	delete gc;
+
+	/*
+	int width = parent->GetSize().x / 12;
+	int height = 0;
+	wxSize proportionSize(width, width * (2.0 / 6.0));
+	wxPoint rectOrigin = this->FromDIP(wxPoint(0, 0));
+	wxSize rectSize = this->FromDIP(proportionSize);
+	wxColour font = wxColour(255, 255, 255);
+	//	gc->SetPen(wxPen(wxColour(255, 0, 0), 2));
+
+	if (mousedown)
+	{
+		gc->SetBrush(*wxGREEN_BRUSH);
+		font = wxColour(0, 0, 0);
+	}
+	else if (evt.GetId() == 2)
+	{
+		wxColour begin = wxColour(0, 0, 0);
+		wxColour end = wxColour(255, 255, 255);
+		wxGraphicsBrush gb = gc->CreateLinearGradientBrush(rectOrigin.x, rectOrigin.y, rectOrigin.x + rectSize.GetWidth(), rectOrigin.y + rectSize.GetHeight(), begin, end);
+		gc->SetBrush(gb);
+	}
+	else
+	{
+		gc->SetBrush(*wxBLUE_BRUSH);
+	}
+
+	gc->DrawRoundedRectangle(rectOrigin.x, rectOrigin.y, rectSize.GetWidth(), rectSize.GetHeight(), rectSize.GetHeight() / 5.0);
+
+	wxFont f = wxFont(*wxNORMAL_FONT);
+	int pointsize = 8;
+	f.SetPointSize(pointsize);
+	f.SetFamily(wxFontFamily::wxFONTFAMILY_MODERN);
+	f = f.MakeBold();
+	wxGraphicsFont gf = gc->CreateFont(f, font);
+	gc->SetFont(gf);
+	double w = 0.0;
+	double h = 0.0;
+	gc->GetTextExtent(text, &w, &h);
+	gc->DrawText(text, rectOrigin.x + (rectSize.GetWidth() / 2.0) - w / 2.0, (rectOrigin.y + rectSize.GetHeight() / 2.0) - h / 2.0);
+
+	delete gc;
+	*/
+}
+
+TextExtent* GridCanvas::GetTextExtent()
+{
+	return &this->textextent;
+}
+
+bool GridCanvas::IsMatch(wxString& s)
+{
+	return s == this->value;
+}
+
+bool GridCanvas::IsEmpty()
+{
+	return this->value.IsEmpty();
+}
+
+void GridCanvas::OnMouseEnter(wxMouseEvent& evt)
+{
+	this->background = this->hover;
+	this->Refresh();
+}
+
+void GridCanvas::OnMouseLeave(wxMouseEvent& evt)
+{
+	this->SetBackgroundColor();
+	this->Refresh();
+}
+
+void GridCanvas::m_SetValue(wxString& val)
+{
+	if (this->value == val)
+		return;
+
+	this->value = val;
+
+	if (flag & GridCanvasFlag::COLORDEPENDENT)
+		this->SetTextColor(IsStringPNZ(this->value));
+
+	this->Refresh();
+}
+
+void GridCanvas::m_SetValue(wxString& val, bool color)
+{
+	if (this->value == val)
+		return;
+
+	this->value = val;
+
+	if (flag & GridCanvasFlag::COLORDEPENDENT)
+		this->SetTextColor(IsStringPNZ(this->value));
+
+	this->Refresh();
+}
+
+wxString GridCanvas::m_GetValue()
+{
+	return this->value;
+}
+
+void GridCanvas::SetToTotalCanvas()
+{
+	this->background = this->totalRowColor;
+}
+
+void GridCanvas::SetTotTotalStartRowCanvas()
+{
+	this->textcolor = this->rowHeaderColour;
+	this->textfont = this->rowStartFont;
+	this->SetToTotalCanvas();
+}
+
+void GridCanvas::SetToHeader()
+{
+	this->textcolor = this->colHeaderColour;
+	this->textfont = this->rowStartFont;
+	this->background = this->normal;
+}
+
+void GridCanvas::SetToRowStartCanvas()
+{
+	this->textcolor = this->rowHeaderColour;
+	this->textfont = this->rowStartFont;
+	this->background = this->normal;
+}
+
+void GridCanvas::SetToDataCellColor()
+{
+	this->textcolor = this->white;
+}
+
+void GridCanvas::SetToNormalBackground()
+{
+	this->background = this->normal;
+}
+
+void GridCanvas::SetToMediumFont()
+{
+	this->textfont = this->normalFont;
+}
+
+void GridCanvas::SetToLargeFont()
+{
+	this->textfont = this->rowStartFont;
+}
+
+void GridCanvas::LeftClick()
+{
+	this->background = this->background == this->onClick ? this->normal : this->onClick;
+	this->Refresh();
+}
+
+void GridCanvas::RightClick()
+{
+
+}
+
+void GridCanvas::Initialize()
+{
+	if (flag & GridCanvasFlag::COLHEAD)
+		this->SetToHeader();
+	if (flag & GridCanvasFlag::ROWHEAD)
+		this->SetToRowStartCanvas();
+	if (flag & GridCanvasFlag::DATACELL)
+		this->SetToDataCellColor();
+	if (flag & GridCanvasFlag::MEDIUMFONT)
+		this->SetToMediumFont();
+	if (flag & GridCanvasFlag::LARGEFONT)
+		this->SetToLargeFont();
+	if (flag & GridCanvasFlag::TOTALROWHEAD)
+		this->SetTotTotalStartRowCanvas();
+	if (flag & GridCanvasFlag::TOTALROW)
+		this->SetToTotalCanvas();
+	if (flag & GridCanvasFlag::BACKGROUDNORMAL)
+		this->SetToNormalBackground();
+	if (flag & GridCanvasFlag::COLORDEPENDENT)
+	{
+		if (this->value.length())
+			this->SetTextColor(IsStringPNZ(this->value));
+	}
+
+	if (this->value.empty())
+		return;
+
+	wxClientDC dc(this);
+	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
+	if (!gc)
+		return;
+	
+	gc->SetFont(gc->CreateFont(this->textfont, this->textcolor));
+	gc->GetTextExtent(this->value, &textextent.w, &textextent.h);
+	delete gc;
+}
+
+void GridCanvas::SetTextColor(int i)
+{
+	switch (i)
+	{
+	case 1: this->textcolor = this->green; return;
+	case 0: this->textcolor = this->yellow; return;
+	case -1: this->textcolor = this->red; return;
+	}
+
+	wxFAIL_MSG("Switch in GridCanvas::SetTextColor failed!");
+}
+
+void GridCanvas::SetBackgroundColor()
+{
+	if (flag & GridCanvasFlag::BACKGROUDNORMAL)
+		this->background = this->normal;
+	if (flag & GridCanvasFlag::TOTALROWHEAD)
+		this->background = this->totalRowColor;
+	if (flag & GridCanvasFlag::TOTALROW)
+		this->background = this->totalRowColor;
+	if (flag & GridCanvasFlag::COLHEAD)
+		this->background = this->normal;
+	if (flag & GridCanvasFlag::ROWHEAD)
+		this->background = this->normal;
+}
+
+// Gnode functions...
+Gnode::Gnode(GridView* gv, wxWindow* w, wxSize size, size_t row, size_t col, Gnode* up, Gnode* right, Gnode* down, Gnode* left, wxString& val, int flags)
+	: GridCanvas(w, size, val, flags), m_parent(gv), m_up(up), m_right(right), m_down(down), m_left(left)
+{
+	if(flags & GridCanvasFlag::ROWHEAD)
+		this->Bind(wxEVT_RIGHT_DOWN, &Gnode::OnRightClick, this);
+}
+
+Gnode::Gnode(GridView* gv, wxWindow* w, wxSize size, size_t row, size_t col, Gnode* up, Gnode* right, Gnode* down, Gnode* left, int flags)
+	: GridCanvas(w, size, emptystring, flags), m_parent(gv), m_up(up), m_right(right), m_down(down), m_left(left)
+{
+	if (flags & GridCanvasFlag::ROWHEAD)
+		this->Bind(wxEVT_RIGHT_DOWN, &Gnode::OnRightClick, this);
+}
+
+void Gnode::SetValue(wxString& s)
+{
+	this->m_SetValue(s);
+}
+
+void Gnode::SetValue(wxString& s, bool color)
+{
+	this->m_SetValue(s, color);
+}
+
+void Gnode::SetUP(Gnode* gn)
+{
+	this->m_up = gn;
+}
+
+void Gnode::SetRight(Gnode* gn)
+{
+	this->m_right = gn;
+}
+
+void Gnode::SetDown(Gnode* gn)
+{
+	this->m_down = gn;
+}
+
+void Gnode::SetLeft(Gnode* gn)
+{
+	this->m_left = gn;
+}
+
+Gnode* Gnode::GetUP()
+{
+	return this->m_up;
+}
+
+Gnode* Gnode::GetRight()
+{
+	return this->m_right;
+}
+
+Gnode* Gnode::GetDown()
+{
+	return this->m_down;
+}
+
+Gnode* Gnode::GetLeft()
+{
+	return this->m_left;
+}
+
+void Gnode::OnRightClick(wxMouseEvent& evt)
+{
+	wxString ticker = this->m_GetValue();
+	if (ticker.IsEmpty())
+		return;
+	wxCoord x, y;
+	evt.GetPosition(&x, &y);
+	x += this->GetScreenPosition().x;
+	y = this->GetScreenPosition().y - (2 * y);
+	wxPoint p(x, y);
+	int index = ticker.find(" ");
+	if (index != -1)
+		ticker = ticker.Mid(0, index);
+	this->m_parent->RightClickAlert(ticker, p);
+}
+
 // GridView functions...
 
 GridNode::GridNode(GridView* gv, wxWindow* w, size_t row, size_t col, GridNode* up, GridNode* right, GridNode* down, GridNode* left, wxString tval, int gridtype)
@@ -348,6 +701,9 @@ bool GridNode::CopyText(const GridNode& gn)
 
 bool GridNode::SetNewVal(gridpair gp, bool total_row)
 {
+	// Check to see if its just adding the same text, if so we just return false...
+	if (this->t_val == gp.val)
+		return false;
 	if (total_row)
 	{
 		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
@@ -434,7 +790,7 @@ bool GridNode::Clear()
 	this->Refresh();
 	return true;
 }
-
+/*
 bool GridNode::IsID(int id)
 {
 	if (this->GetId() == id)
@@ -442,7 +798,7 @@ bool GridNode::IsID(int id)
 
 	return false;
 }
-
+*/
 bool GridNode::IsMatch(wxString s)
 {
 	// If t_val has the * in the ticker because there is an upcoming dividend reinvestment date than the tickerw wont match so we need to add one to it...
@@ -451,6 +807,16 @@ bool GridNode::IsMatch(wxString s)
 		if (s.find("*") == -1)
 			s += " *";
 	}
+	else if (s.find("*") != -1)
+	{
+		wxString temp = t_val;
+		temp += " *";
+		if (temp == s)
+			return true;
+		else
+			return false;
+	}
+
 	if (s == t_val)
 		return true;
 
@@ -611,8 +977,10 @@ void VirtualListView::m_SetItemCount()
 
 // GridView functions...
 
-GridView::GridView(wxWindow* w, int cols) : wxGridSizer(cols), m_parent(w)
+GridView::GridView(wxWindow* w, int cols, int _itemsize) : wxGridSizer(cols), m_parent(w), itemsize(_itemsize)
 {
+	for (size_t i = 0; i < cols; ++i)
+		this->headers.push_back(this->GetColTitle(i));
 	this->SetTitleRow();
 	this->FillGrid();
 }
@@ -622,6 +990,49 @@ GridView::~GridView()
 	
 }
 
+void GridView::SetNewRow(StockViewerData* svd)
+{
+	Gnode* first = this->GetEmptyRow();
+	if (!first)
+	{
+		wxFAIL_MSG("Gnode* first in GridView::SetNewRow is NULL!");
+		return;
+	}
+
+	size_t size = this->GetCols();
+	for (size_t i = 0; i < size; ++i)
+	{
+		this->filledNodes++;
+		wxString label = this->GetStringLabel(i, svd);
+		first->SetValue(label);
+
+		first = first->GetRight();
+		if (first)
+			continue;
+		else
+			break;
+	}
+}
+
+void GridView::UpdateRow(StockViewerData* svd)
+{
+	size_t size = this->GetCols();
+	Gnode* first = this->GetMatch(svd->ticker);
+	if (!first)
+		return;
+	for (size_t i = 0; i < size; ++i)
+	{
+		wxString label = this->GetStringLabel(i, svd);
+		first->SetValue(label);
+
+		first = first->GetRight();
+		if (first)
+			continue;
+		else
+			break;
+	}
+}
+/*
 void GridView::SetNewRow(StockViewerData* svd, bool total_row)
 {
 	GridNode* first = this->GetFirstEmptyRow();
@@ -634,14 +1045,15 @@ void GridView::SetNewRow(StockViewerData* svd, bool total_row)
 	else if (first->GetUP() == this->summaryrow)
 		this->SwapSummaryRow(first);
 
-	GridNode* test = first->GetUP();
-
 	this->filledrows++;
 
 	size_t size = this->GetCols();
 	for (size_t i = 0; i < size; ++i)
 	{
+		this->filledNodes++;
 		first->SetNewVal(this->GetLabelText(i, svd), total_row);
+		this->gridnode.push_back(first);
+
 		first = first->GetRight();
 		if (first)
 			continue;
@@ -658,7 +1070,10 @@ void GridView::UpdateRow(StockViewerData* svd, bool total_row)
 		return;
 	for (size_t i = 0; i < size; ++i)
 	{
-		first->SetNewVal(this->GetLabelText(i, svd), total_row);
+		wxSizerItem* grid = this->GetItem(first);
+		if (first->SetNewVal(this->GetLabelText(i, svd), total_row))
+			this->gridnode.push_back(first);
+
 		first = first->GetRight();
 		if (first)
 			continue;
@@ -666,10 +1081,19 @@ void GridView::UpdateRow(StockViewerData* svd, bool total_row)
 			break;
 	}
 }
-
+*/
 bool GridView::DoesItemExist(wxString s)
 {
 	GridNode* first = this->GetFirstMatch(s);
+	if (first)
+		return true;
+
+	return false;
+}
+
+bool GridView::ItemExist(wxString& s)
+{
+	Gnode* first = this->GetMatch(s);
 	if (first)
 		return true;
 
@@ -721,7 +1145,13 @@ void GridView::OnClickItem(GridNode* gn)
 
 void GridView::LayoutGrid()
 {
-	this->Layout();
+	if (this->filledNodes = this->gridnode.size())
+		this->Layout();
+	else
+	{
+		for (auto v : this->gridnode)
+			v->LayoutMySizer();
+	}
 }
 
 void GridView::RightClickAlert(wxString& ticker, wxPoint& point)
@@ -754,33 +1184,105 @@ void GridView::SetTitleRow()
 {
 	size_t cols = this->GetCols();
 	wxString val = "";
-	GridNode* last = nullptr;
+	Gnode* last = nullptr;
+
+	for (size_t i = 0; i < cols; ++i)
+	{
+		val = this->GetColTitle(i);
+		if (i == 0)
+		{
+			this->Head = new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, NULL, NULL, NULL, NULL, val, GridCanvasFlag::COLHEAD);
+			this->Add(this->Head, 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
+		}
+		else if (i == 1)
+		{
+			this->Head->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, nullptr, nullptr, nullptr, this->Head, val, GridCanvasFlag::COLHEAD));
+			wxSizerItem* sizer = this->Add(Head->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
+			last = this->Head->GetRight();
+		}
+		else
+		{
+			last->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, nullptr, nullptr, nullptr, last, val, GridCanvasFlag::COLHEAD));
+			wxSizerItem* sizer = this->Add(last->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
+			last = last->GetRight();
+		}
+		this->filledNodes++;
+		++this->gridnode_Size;
+	}
+
+	/*
 	for (size_t i = 0; i < cols; ++i)
 	{
 		val = this->GetColTitle(i);
 		if (i == 0)
 		{
 			this->head = new GridNode(this, this->m_parent, (size_t)0, i, NULL, NULL, NULL, NULL, val, GRIDCOL);
-			this->Add(this->head, 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+			wxSizerItem* sizer = this->Add(this->head, 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+			this->head->SetMySizer(sizer->GetSizer());
+			this->gridnode.push_back(head);
 		}
 		else if (i == 1)
 		{
 			this->head->SetRight(new GridNode(this, this->m_parent, (size_t)0, i, nullptr, nullptr, nullptr, this->head, val, GRIDCOL));
-			this->Add(head->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+			wxSizerItem* sizer = this->Add(head->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 			last = this->head->GetRight();
+			last->SetMySizer(sizer->GetSizer());
+			this->gridnode.push_back(last);
 		}
 		else
 		{
 			last->SetRight(new GridNode(this, this->m_parent, (size_t)0, i, nullptr, nullptr, nullptr, last , val, GRIDCOL));
-			this->Add(last->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+			wxSizerItem* sizer = this->Add(last->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 			last = last->GetRight();
+			last->SetMySizer(sizer->GetSizer());
+			this->gridnode.push_back(last);
 		}
+		this->filledNodes++;
 		++this->gridnode_Size;
 	}
+	*/
 }
 
 void GridView::FillGrid()
 {
+	Gnode* last = nullptr;
+	Gnode* last_row = this->Head;
+	Gnode* current_row = nullptr;
+	size_t rowsize = this->GetCols();
+	size_t size = rowsize * 2;
+	size_t colsize = this->GetCols();
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (i > 0)
+			last_row = current_row;
+		for (size_t j = 0; j < colsize; ++j)
+		{
+			int flags = GetGridNodeFlags(j, i);
+			if (j == 0)
+			{
+				last_row->SetDown(new Gnode(this, this->m_parent, wxSize(204, 30), i + 1, (size_t)j, last_row, nullptr, nullptr, nullptr, flags));
+				this->Add(last_row->GetDown(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+				last = current_row = last_row->GetDown();
+			}
+			else
+			{
+				Gnode* lastrowitem = this->GetRight(last_row, j);
+				Gnode* currentrowitem = this->GetFarthestRight(current_row);
+				if (currentrowitem)
+				{
+					currentrowitem->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), i + 1, j, lastrowitem, nullptr, nullptr, last, flags));
+					wxSizerItem* sizer2 = this->Add(currentrowitem->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+					if (lastrowitem)
+						lastrowitem->SetDown(currentrowitem->GetRight());
+
+					Gnode* lastitem = currentrowitem->GetRight();
+				}
+			}
+			++this->gridnode_Size;
+		}
+	}
+
+	/*
 	GridNode* last = nullptr;
 	GridNode* last_row = head;
 	GridNode* current_row = nullptr;
@@ -798,8 +1300,9 @@ void GridView::FillGrid()
 			if (j == 0)
 			{
 				last_row->SetDown(new GridNode(this, this->m_parent, i + 1, j, last_row, nullptr, nullptr, nullptr, "", GRIDROW));
-				this->Add(last_row->GetDown(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+				wxSizerItem* sizer = this->Add(last_row->GetDown(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 				last = current_row = last_row->GetDown();
+				last->SetMySizer(sizer->GetSizer());
 			}
 			else 
 			{
@@ -808,14 +1311,18 @@ void GridView::FillGrid()
 				if (currentrowitem)
 				{
 					currentrowitem->SetRight(new GridNode(this, this->m_parent, i + 1, j, lastrowitem, nullptr, nullptr, last, "", -1));
-					this->Add(currentrowitem->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
+					wxSizerItem* sizer2 = this->Add(currentrowitem->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 					if (lastrowitem)
 						lastrowitem->SetDown(currentrowitem->GetRight());
+
+					GridNode* lastitem = currentrowitem->GetRight();
+					lastitem->SetMySizer(sizer2->GetSizer());
 				}
 			}
 			++this->gridnode_Size;
 		}
 	}
+	*/
 }
 
 void GridView::ClickRowOff()
@@ -902,8 +1409,87 @@ gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
 	return gridpair("", false);
 }
 
+wxString GridView::GetStringLabel(size_t& col, StockViewerData* svd)
+{
+	if (!svd)
+	{
+		wxFAIL_MSG("StockViewerData* is nullptr in GridView::GetStringLabel!");
+		return "";
+	}
+
+	wxString collabel = this->GetColTitle(col);
+	if (collabel == TICKER)
+		return svd->GetTicker();
+	if (collabel == SHARES)
+		return svd->GetShares();
+	if (collabel == PRICE)
+		return svd->GetPrice();
+	if (collabel == PURCHASE_PRICE)
+		return svd->GetPurchasePrice();
+	if (collabel == _PREVIOUS_CLOSE)
+		return svd->GetPreviousClose();
+	if (collabel == DAY_GAIN)
+		return svd->GetDayGain() + "%";
+	if (collabel == WEEK_GAIN)
+		return svd->GetWeekGain();
+	if (collabel == QUARTER_GAIN)
+		return svd->GetQuarterGain();
+	if (collabel == YEAR_GAIN)
+		return svd->GetYearGain();
+	if (collabel == TOTAL_GAIN)
+		return svd->GetTotalGain() + "%";
+
+	if (collabel == DAY_GAIN$)
+		return "$" + svd->GetDayReturn$();
+	if (collabel == WEEK_GAIN$)
+		return "$" + svd->GetWeekReturn$();
+	if (collabel == QUARTER_GAIN$)
+		return "$" + svd->GetQuarterReturn$();
+	if (collabel == YEAR_GAIN$)
+		return "$" + svd->GetYearReturn$();
+	if (collabel == TOTAL_GAIN$)
+		return "$" + svd->GetTotalReturn$();
+
+	if (collabel == COST_BASIS)
+		return svd->GetCostBasis();
+	if (collabel == _MARKET_VALUE)
+		return svd->GetMarketValue();
+	if (collabel == PURCHASE_PRICE)
+		return svd->GetPurchasePrice();
+	if (collabel == TOTAL_DIVIDENDS)
+		return svd->GetDividends();
+	if (collabel == EARNINGS_DATE)
+		return svd->GetEarningsDate();
+	if (collabel == PURCHASE_DATE)
+		return svd->GetPurchaseDate();
+	if (collabel == _EX_DIV)
+		return svd->GetExDivDate();
+	if (collabel == _SECTOR)
+		return svd->GetSectorName();
+	if (collabel == PORTFOLIO_PERC)
+		return svd->GetPortfolioPerc();
+	if (collabel == _52WEEK_DEVIATION)
+		return svd->Get52Week_Deviation();
+	if (collabel == _90DAY_DEVIATION)
+		return svd->Get90Day_Deviation();
+	if (collabel == _30DAY_DEVIATION)
+		return svd->Get30Day_Deviation();
+	return "";
+}
+
 wxString GridView::GetColTitle(size_t col)
 {
+//	if (col >= this->headers.size())
+//	{
+//		wxMessageBox("colsize is greater than the headers size in GridView::GetcolTitle!");
+//		return "";
+//	}
+//
+//	return this->headers[col];
+
+	if (this->headers.size() && col < this->headers.size())
+		return this->headers[col];
+
 	switch (col)
 	{
 	case 0: return TICKER;
@@ -936,6 +1522,77 @@ wxString GridView::GetColTitle(size_t col)
 	}
 
 	return "";
+}
+
+int GridView::GetGridNodeFlags(size_t& col, size_t& row)
+{
+	if (this->headers.size() <= col)
+		return 0;
+
+	if (!col)
+	{
+		if (itemsize != row)
+			return GridCanvasFlag::ROWHEAD;
+		else
+			return GridCanvasFlag::DATACELL | GridCanvasFlag::LARGEFONT | GridCanvasFlag::TOTALROW;
+	}
+
+	// check to see if this would be the total row...
+	if (itemsize == row)
+	{
+		if (this->headers[col].find("Gain") != -1)
+			return GridCanvasFlag::COLORDEPENDENT | GridCanvasFlag::LARGEFONT | GridCanvasFlag::TOTALROW;
+		else
+			return GridCanvasFlag::DATACELL | GridCanvasFlag::LARGEFONT | GridCanvasFlag::TOTALROW;
+	}
+
+	if (this->headers[col].find("Gain") != -1)
+		return GridCanvasFlag::COLORDEPENDENT | GridCanvasFlag::MEDIUMFONT | GridCanvasFlag::BACKGROUDNORMAL;
+	else
+		return GridCanvasFlag::DATACELL | GridCanvasFlag::MEDIUMFONT | GridCanvasFlag::BACKGROUDNORMAL;
+}
+
+Gnode* GridView::GetEmptyRow()
+{
+	Gnode* next = this->Head->GetDown();
+	if (!next)
+		return next;
+
+	while (1)
+	{
+		if (next)
+		{
+			if (next->IsEmpty())
+				return next;
+
+			next = next->GetDown();
+		}
+		else
+			return NULL;
+	}
+
+	return NULL;
+}
+
+Gnode* GridView::GetMatch(wxString& s)
+{
+	Gnode* next = this->Head->GetDown();
+	if (!next)
+		return next;
+	while (1)
+	{
+		if (next)
+		{
+			if (next->IsMatch(s))
+				return next;
+
+			next = next->GetDown();
+		}
+		else
+			return NULL;
+	}
+
+	return NULL;
 }
 
 GridNode* GridView::GetFirstEmptyRow()
@@ -1133,6 +1790,101 @@ GridNode* GridView::GetDown(GridNode* g, size_t i, size_t start)
 	return g;
 }
 
+Gnode* GridView::GetFarthestRight(Gnode* g)
+{
+	if (!g)
+	{
+		wxFAIL_MSG("GridNode* passed to GridView::GetFarthestRight is nullptr!");
+		return nullptr;
+	}
+
+	while (1)
+	{
+		if (!g->GetRight())
+			return g;
+
+		g = g->GetRight();
+	}
+
+	return nullptr;
+}
+
+Gnode* GridView::GetRight(Gnode* g, size_t i, size_t start)
+{
+	if (!g)
+	{
+		wxFAIL_MSG("GridNode* passed to GridView::GetRight is nullptr!");
+		return nullptr;
+	}
+
+	while (start < i)
+	{
+		if (!g->GetRight())
+			return g;
+		g = g->GetRight();
+		++start;
+	}
+
+	return g;
+}
+
+Gnode* GridView::GetLeft(Gnode* g, size_t i, size_t start)
+{
+	if (!g)
+	{
+		wxFAIL_MSG("GridNode* passed to GridView::GetLeft is nullptr!");
+		return nullptr;
+	}
+
+	while (start < i)
+	{
+		if (!g->GetLeft())
+			return g;
+		g = g->GetLeft();
+		++start;
+	}
+
+	return g;
+}
+
+Gnode* GridView::GetUp(Gnode* g, size_t i, size_t start)
+{
+	if (!g)
+	{
+		wxFAIL_MSG("GridNode* passed to GridView::GetUP is nullptr!");
+		return nullptr;
+	}
+
+	while (start < i)
+	{
+		if (!g->GetUP())
+			return g;
+		g = g->GetUP();
+		++start;
+	}
+
+	return g;
+}
+
+Gnode* GridView::GetDown(Gnode* g, size_t i, size_t start)
+{
+	if (!g)
+	{
+		wxFAIL_MSG("GridNode* passed to GridView::GetDown is nullptr!");
+		return nullptr;
+	}
+
+	while (start < i)
+	{
+		if (!g->GetDown())
+			return g;
+		g = g->GetDown();
+		++start;
+	}
+
+	return g;
+}
+
 void GridView::RemoveRow(GridNode* g)
 {
 	GridNode* remove = g;
@@ -1194,7 +1946,7 @@ void GridView::DeleteRow(GridNode* g)
 	g = nullptr;
 	--this->gridnode_Size;
 }
-
+/*
 GridNode* GridView::FindItem(GridNode* gn, int id)
 {
 	if (!gn)
@@ -1204,7 +1956,7 @@ GridNode* GridView::FindItem(GridNode* gn, int id)
 
 	return this->FindItem(gn->GetRight(), id);
 }
-
+*/
 void GridView::HighlightRow(GridNode* gn)
 {
 	
@@ -1214,7 +1966,7 @@ void GridView::HighlightCol(GridNode* gn)
 {
 	
 }
-
+/*
 GridNode* GridView::FindGridNode(int id)
 {
 	GridNode* current = this->head;
@@ -1237,7 +1989,7 @@ GridNode* GridView::FindGridNode(int id)
 			return nullptr;
 	}
 }
-
+*/
 GridNode* GridView::GetSummaryRow()
 {
 	return this->summaryrow;
@@ -1278,6 +2030,11 @@ void PortfolioWin::Update()
 	this->Refresh();
 }
 
+void PortfolioWin::OnClick(wxString& val)
+{
+	
+}
+
 void PortfolioWin::Create()
 {
 	// initialize controls...
@@ -1286,6 +2043,10 @@ void PortfolioWin::Create()
 	this->updatebutton = new wxButton(this->panel, wxID_ANY, "Update");
 	this->updatebutton->Bind(wxEVT_BUTTON, &PortfolioWin::OnUpdateButtonPress, this);
 	this->datepcker = new wxTextCtrl(panel, _PortfolioWin::DATEPCKER, this->today.Format(STANDARD_DATE), wxDefaultPosition, wxDefaultSize, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+
+	wxString val = DIV_RE_INVEST;
+	
+	this->canvas = new Gnode((GridView*)this, this->panel, wxSize(204, 30), 0, 0, NULL, NULL, NULL, NULL, val, TOTALROWHEAD);
 
 	this->todaysdate = new wxStaticText(panel, wxID_ANY, "Today's Date");
 	this->todaysdateDisplay = new wxStaticText(panel, wxID_ANY, this->today.Format(STANDARD_DATE));
@@ -1360,6 +2121,10 @@ void PortfolioWin::Create()
 	datepckerH->Add(this->updatebutton, 0, wxLEFT | wxTOP, 10);
 	main->Add(datepckerH, 0, wxALIGN_CENTER_HORIZONTAL);
 	main->Add(this->todaysdate, 0, wxALIGN_LEFT | wxLEFT | wxTOP, 10);
+
+	main->AddSpacer(5);
+	main->Add(this->canvas, 1, wxEXPAND | wxALL, 10);
+
 	main->AddSpacer(5);
 	main->Add(this->todaysdateDisplay, 1, wxALIGN_LEFT | wxLEFT, 10);
 	main->Add(line4H, 0, wxEXPAND | wxALL, 5);
@@ -1487,6 +2252,102 @@ void PortfolioWin::OnUpdateButtonPress(wxCommandEvent& evt)
 		this->m_parent->OnUpdate();
 }
 
+//DivCtrls functions...
+DivCtrls::DivCtrls(wxDialog* parent, Dividend& d) : m_parent(parent), div(d)
+{
+	this->sizerH = new wxBoxSizer(wxHORIZONTAL);
+	this->button_sizerH = new wxBoxSizer(wxHORIZONTAL);
+	this->payment_sizerV = new wxBoxSizer(wxVERTICAL);
+	this->ex_sizerV = new wxBoxSizer(wxVERTICAL);
+	this->amount_sizerV = new wxBoxSizer(wxVERTICAL);
+	this->reinvestment_sizerV = new wxBoxSizer(wxVERTICAL);
+
+	this->ex_div_date = new wxTextCtrl(m_parent, wxID_ANY);
+	this->payment_date = new wxTextCtrl(m_parent, wxID_ANY);
+	this->amount = new wxTextCtrl(m_parent, wxID_ANY);
+	this->reInvestmentShares = new wxTextCtrl(m_parent, wxID_ANY);
+
+	this->_ex_div_date = div.ex_Div.Format(STANDARD_DATE);
+	this->_payment_date = div.payment_date.IsValid() ? div.payment_date.Format(STANDARD_DATE) : "";
+	this->d_amount = div.div;
+	this->d_reInvestmentShares = div.re_invest_shares;
+
+	this->ex_div_date->SetValidator(wxTextValidator(wxFILTER_EMPTY, &this->_ex_div_date));
+	this->payment_date->SetValidator(wxTextValidator(wxFILTER_NONE, &this->_payment_date));
+	this->amount->SetValidator(wxFloatingPointValidator<double>(&this->d_amount,
+		wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY | wxNUM_VAL_NO_TRAILING_ZEROES));
+	this->reInvestmentShares->SetValidator(wxFloatingPointValidator<double>(&this->d_reInvestmentShares,
+		wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY | wxNUM_VAL_NO_TRAILING_ZEROES));
+
+	this->ex_div_date->Disable();
+	this->payment_date->Disable();
+	this->amount->Disable();
+	this->reInvestmentShares->Disable();
+
+	this->s_payment_date = new wxStaticText(m_parent, wxID_ANY, "Dividend Payment Date");
+	this->s_ex_div_date = new wxStaticText(m_parent, wxID_ANY, "Ex-Dividend Date");
+	this->s_amount = new wxStaticText(m_parent, wxID_ANY, "Dividend amount");
+	this->s_reInvestmentShares = new wxStaticText(m_parent, wxID_ANY, "Re-Investment Shares");
+
+	this->s_payment_date->SetFont(this->s_payment_date->GetFont().MakeBold());
+	this->s_ex_div_date->SetFont(this->s_ex_div_date->GetFont().MakeBold());
+	this->s_amount->SetFont(this->s_amount->GetFont().MakeBold());
+	this->s_reInvestmentShares->SetFont(this->s_amount->GetFont().MakeBold());
+
+	this->edit = new wxButton(m_parent, wxID_ANY, "Edit");
+	this->ok = new wxButton(m_parent, wxID_OK, "OK");
+	this->cancel = new wxButton(m_parent, wxID_CANCEL, "Cancel");
+
+	this->payment_sizerV->Add(this->s_payment_date, 0, wxALIGN_LEFT | wxBOTTOM, 5);
+	this->payment_sizerV->Add(this->payment_date, 0, wxALIGN_LEFT);
+	this->ex_sizerV->Add(this->s_ex_div_date, 0, wxALIGN_LEFT | wxBOTTOM, 5);
+	this->ex_sizerV->Add(this->ex_div_date, 0, wxALIGN_LEFT);
+	this->amount_sizerV->Add(this->s_amount, 0, wxALIGN_LEFT | wxBOTTOM, 5);
+	this->amount_sizerV->Add(this->amount, 0, wxALIGN_LEFT);
+	this->reinvestment_sizerV->Add(this->s_reInvestmentShares, 0, wxALIGN_LEFT | wxBOTTOM | wxLEFT, 5);
+	this->reinvestment_sizerV->Add(this->reInvestmentShares, 0, wxALIGN_LEFT | wxLEFT, 5);
+
+	this->sizerH->Add(amount_sizerV, 1, wxALIGN_CENTER_VERTICAL);
+	this->sizerH->Add(ex_sizerV, 1, wxALIGN_CENTER_VERTICAL);
+	this->sizerH->Add(payment_sizerV, 1, wxALIGN_CENTER_VERTICAL);
+	this->sizerH->AddSpacer(5);
+	this->sizerH->Add(reinvestment_sizerV, 1, wxALIGN_CENTER_VERTICAL);
+
+	this->button_sizerH->Add(this->edit, 0, wxRIGHT, 10);
+	this->button_sizerH->Add(this->ok, 0, wxRIGHT, 10);
+	this->button_sizerH->Add(this->cancel, 0);
+}
+
+wxBoxSizer*& DivCtrls::GetTopSizer()
+{
+	return this->sizerH;
+}
+
+wxBoxSizer*& DivCtrls::GetBottomSizer()
+{
+	return this->button_sizerH;
+}
+
+void DivCtrls::OnEdit()
+{
+	if (this->ex_div_date->IsEnabled())
+	{
+		this->ex_div_date->Disable();
+		this->payment_date->Disable();
+		this->amount->Disable();
+		this->reInvestmentShares->Disable();
+		this->payment_date->Disable();
+	}
+	else
+	{
+		this->ex_div_date->Enable();
+		this->payment_date->Enable();
+		this->amount->Enable();
+		if (this->div.DivReinvest)
+			this->reInvestmentShares->Enable();
+		this->payment_date->SetFocus();
+	}
+}
 
 template <typename T>
 Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, wxSize s, wxString msg, T* t) : wxDialog(parent, id, msg, p, s), 
@@ -1514,7 +2375,7 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::ENTER_DEPOSIT: this->CreateDepositWin(); break;
 	case _EnterDialog::ENTER_DEPOSIT_SCHEDULE: this->CreateDepositScheduleWin(); break;
 	case _EnterDialog::WITHDRAWL: this->CreateWithdrawlWin(); break;
-	case _EnterDialog::DIVIDEND_ACTION_WIN: this->generic_kit_template = reinterpret_cast<GenericKitTemplate<Dividend, wxString>*>(t); this->CreateDividendActionWin(); break;
+	case _EnterDialog::DIVIDEND_ACTION_WIN: this->generic_kit_template = reinterpret_cast<GenericKitTemplate<Dividend, wxString>*>(t); this->CreateEditDivWin(); break;
 	case _EnterDialog::ENTER_DIVIDEND: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddDividendWin(); break;
 	case _EnterDialog::DIVIDEND_SHARE_DIALOG: this->_ticker_ptr = reinterpret_cast<wxString*>(t); this->CreateAddReInvestShares(); break;
 	case _EnterDialog::DAY_GAINERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(true); break;
@@ -1522,6 +2383,14 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::SUBSECTORWIN: this->sub = reinterpret_cast<wxVector<SubSector>*>(t); this->CreateSubSectorWin(); break;
 	default: wxFAIL_MSG("_EnterDialog type does not match any types!"); this->Destroy();
 	}
+}
+
+Dialog::~Dialog()
+{
+	if (this->divctrl)
+		delete this->divctrl;
+
+	this->divctrl = NULL;
 }
 
 PurchaseKit Dialog::GetPurchaseKit()
@@ -1559,6 +2428,20 @@ int Dialog::GetDivChoice()
 	return this->dividend_action;
 }
 
+Dividend Dialog::GetDividend()
+{
+	wxDateTime ex;
+	wxDateTime paymentdate;
+
+	ex.ParseFormat(this->divctrl->_ex_div_date);
+	paymentdate.ParseDate(this->divctrl->_payment_date);
+	Dividend div(0, ex, this->divctrl->d_amount);
+	div.payment_date = paymentdate;
+	div.re_invest_shares = this->divctrl->d_reInvestmentShares;
+
+	return div;
+}
+
 void Dialog::CreateStockEntry()
 {
 	wxColour c(205, 209, 206);
@@ -1583,12 +2466,14 @@ void Dialog::CreateStockEntry()
 	wxStaticText* sub_sector = new wxStaticText(this, wxID_ANY, "Choose Industry");
 	this->s_price = new wxStaticText(this, wxID_ANY, "Enter Price");
 	this->m_price = new wxTextCtrl(this, wxID_ANY);
-	this->m_price->SetValidator(wxFloatingPointValidator<double>(&this->_price, wxNumValidatorStyle::wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY));
+	this->m_price->SetValidator(wxFloatingPointValidator<double>(&this->_price, 
+		wxNumValidatorStyle::wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY | wxNUM_VAL_NO_TRAILING_ZEROES));
 	SetColor(*this->m_price, c);
 
 	this->s_shares = new wxStaticText(this, wxID_ANY, "Enter Shares");
 	this->m_shares = new wxTextCtrl(this, wxID_ANY);
-	this->m_shares->SetValidator(wxFloatingPointValidator<double>(&this->_shares, wxNumValidatorStyle::wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY));
+	this->m_shares->SetValidator(wxFloatingPointValidator<double>(&this->_shares, 
+		wxNUM_VAL_ZERO_AS_BLANK | wxFILTER_EMPTY | wxNUM_VAL_NO_TRAILING_ZEROES));
 	SetColor(*this->m_shares, c);
 
 	this->s_date = new wxStaticText(this, wxID_ANY, "Enter Date");
@@ -1736,7 +2621,7 @@ void Dialog::CreateQuoteWin()
 
 	topVbutton->Add(B, 1, wxBOTTOM | wxRIGHT | wxTOP | wxALIGN_RIGHT, 5);
 	topHlongname->Add(longname, 1, wxBOTTOM | wxLEFT | wxTOP | wxALIGN_LEFT, 5);
-	topHlongname->Add(topVbutton, 1);
+	topHlongname->Add(topVbutton, 1, wxBOTTOM | wxLEFT | wxTOP | wxALIGN_LEFT, 5);
 
 	topH->Add(curr_price, 0, wxALIGN_BOTTOM);
 	topH->Add(_dayreturn, 0, wxLEFT | wxALIGN_BOTTOM, 5);
@@ -2244,6 +3129,34 @@ void Dialog::CreateDividendActionWin()
 	this->CenterOnParent();
 }
 
+void Dialog::CreateEditDivWin()
+{
+	wxColour c(205, 209, 206);
+	SetColor(*this, wxColour(157, 157, 163));
+
+	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
+
+	Dividend& div = this->generic_kit_template->thing1;
+	this->s_ticker = new wxStaticText(this, wxID_ANY, this->generic_kit_template->thing2);
+	this->s_ticker->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+
+	this->divctrl = new DivCtrls(this, div);
+
+	this->divctrl->edit->Bind(wxEVT_BUTTON, &Dialog::OnEditClick, this);
+	this->divctrl->ok->Bind(wxEVT_BUTTON, &Dialog::OnOkClick, this);
+	this->divctrl->cancel->Bind(wxEVT_BUTTON, &Dialog::OnCancelDialog, this);
+
+	mainV->Add(this->s_ticker, 1, wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 10);
+	mainV->Add(this->divctrl->GetTopSizer(), 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
+	mainV->Add(this->divctrl->GetBottomSizer(), 0, wxALIGN_RIGHT | wxALL, 10);
+
+	this->SetSizer(mainV);
+	mainV->Fit(this);
+	mainV->SetSizeHints(this);
+	this->Layout();
+	this->CenterOnParent();
+}
+
 void Dialog::CreateChoiceControls()
 {
 	// Create choice controls...
@@ -2324,7 +3237,13 @@ void Dialog::OnOkClick(wxCommandEvent& evt)
 		evt.Skip();
 		break;
 	}
-	case _EnterDialog::DIVIDEND_ACTION_WIN: evt.Skip(); return;
+	case _EnterDialog::DIVIDEND_ACTION_WIN: 
+	{
+		if (!this->OnEditDivWinOK())
+			return;
+		evt.Skip(); 
+		return;
+	}
 	case _EnterDialog::ENTER_DIVIDEND: this->HandleAddDividendOkClick(); break;
 	case _EnterDialog::DIVIDEND_SHARE_DIALOG: 
 	{
@@ -2376,6 +3295,17 @@ void Dialog::OnDividendChoice(wxCommandEvent& evt)
 		this->dividend_action = ADD_DIV_PAYMENT_DATE;
 	if (selection == "Change Dividend Amount")
 		this->dividend_action = ADJUST_DIV_AMOUNT;
+}
+
+void Dialog::OnEditClick(wxCommandEvent& evt)
+{
+	if (!this->divctrl)
+	{
+		wxFAIL_MSG("this->divctrl is NUll in Dialog::OnEditClick!");
+		return;
+	}
+
+	this->divctrl->OnEdit();
 }
 
 void Dialog::OnKeyDown(wxKeyEvent& evt)
@@ -2531,6 +3461,43 @@ bool Dialog::HandleReInvestSharesOkClick()
 	{
 		wxMessageBox("You cannot enter zero shares!");
 		return false;
+	}
+
+	return true;
+}
+
+bool Dialog::OnEditDivWinOK()
+{
+	if (IsNull(this->divctrl, "this->divctrl is NULL in Dialog::OnEditDivWinOK!"))
+		return false;
+
+	Dividend& div = this->generic_kit_template->thing1;
+
+	wxDateTime valid;
+	if (!valid.ParseDate(this->divctrl->_ex_div_date))
+	{
+		wxMessageBox("Invalid date in Ex-Dividend Date!");
+		return false;
+	}
+
+	if (!this->divctrl->_payment_date.IsEmpty())
+	{
+		if (!valid.ParseDate(this->divctrl->_payment_date))
+		{
+			wxMessageBox("Invalid date in Dividend Payment Date!");
+			return false;
+		}
+		else if (div.payment_date.IsValid())
+		{
+			if (valid <= div.payment_date)
+			{
+				wxMessageBox("You are adding a payment date of " + this->divctrl->_payment_date + " which is\nless than or equal to the Ex Dividend Date of " 
+					+ div.payment_date.Format(STANDARD_DATE));
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	return true;
@@ -2732,7 +3699,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	deposits->Append(new wxMenuItem(deposits, VIEW_DEPOSITS, "View Deposits"));
 	deposits->Append(new wxMenuItem(deposits, NEW_DEPOSIT_SCHEDULE, "Add Deposit Schedule"));
 	divs->Append(new wxMenuItem(divs, ENTER_DIVIDEND, "Add Dividend"));
-	divs->Append(new wxMenuItem(divs, REMOVE_DIV, "Remove Dividend"));
+	divs->Append(new wxMenuItem(divs, VIEW_DIVIDENDS, "View Dividend List"));
 	divs->Append(new wxMenuItem(divs, ADD_DIV_SHARES, "Re-Investment Shares"));
 
 	m->Append(new wxMenuItem(m, wxID_SAVE, "Save"));
@@ -2819,8 +3786,8 @@ void mainwindow::OnViewDividendWin(wxString& ticker)
 		wxString item = "";
 		wxString Bool = v.DivReinvest ? "Yes" : "No";
 		wxString payable_date = v.payment_date.IsValid() ? v.payment_date.Format(STANDARD_DATE) : "NA";
-		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "  Payment Date: " + payable_date + "  Amount: " + wxNumberFormatter::ToString(v.div, 4) + "  Re-Invest Elligible: " + Bool +
-			"  Re-Invested amount: " + wxNumberFormatter::ToString(v.re_invest_shares, 4);
+		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "    Payment Date: " + payable_date + "    Amount: " + wxNumberFormatter::ToString(v.div, 4) + "    Re-Invest Elligible: " + Bool +
+			"    Re-Invested amount: " + wxNumberFormatter::ToString(v.re_invest_shares, 4);
 		string.Add(item);
 	}
 
@@ -2838,18 +3805,51 @@ void mainwindow::OnViewDividendWin(wxString& ticker)
 
 void mainwindow::OnModifyDividendWin(Dividend& d, wxString& ticker, wxString& longname)
 {
+	this->port.GetDivWithAllReInvestmentShares(d);
 	GenericKitTemplate<Dividend, wxString> kit(d, longname);
 	this->dialog = new Dialog(_EnterDialog::DIVIDEND_ACTION_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Dividend Modification Window", &kit);
 	if (this->dialog->ShowModal() == wxID_OK)
 	{
-		int selection = this->dialog->GetDivChoice();
-		switch (selection)
+		Dividend div = this->dialog->GetDividend();
+		if (div.payment_date.IsValid())
 		{
-		case REMOVE_DIVIDEND: break;
-		case ADD_DIV_PAYMENT_DATE: this->OnAddDivPayoutDate(d, ticker);  break;
-		case ADJUST_DIV_AMOUNT: break;
+			if (!d.payment_date.IsValid())
+				this->OnAddDivPayoutDate(div, ticker);
+			else if (d.payment_date.IsValid() && d.payment_date != div.payment_date)
+			{
+				wxBell();
+				if (wxYES == wxMessageBox("Are you sure you want to replace payment date: " + d.payment_date.Format(STANDARD_DATE) +
+					" with payment date: " + div.payment_date.Format(STANDARD_DATE) + "?", "", wxYES_NO))
+					this->port.SetDividendPaymentDate(d, div.payment_date);
+			}
+				
+			if (div.re_invest_shares && d.IsPendingReInvestment())
+				this->port.AddReInvestShares(d, div.re_invest_shares);
+			if (d.IsPendingReInvestment())
+			{
+				if (d.re_invest_shares != div.re_invest_shares)
+				{
+					if (!d.re_invest_shares)
+					{
+						this->port.AddReInvestShares(d, div.re_invest_shares);
+						this->UpdateGridView();
+					}
+					else
+					{
+						wxBell();
+						if (wxYES == wxMessageBox("Are you sure you want to change the re-investment shares from: " + wxNumberFormatter::ToString(d.re_invest_shares, 4) +
+							" to re-investment shares: " + wxNumberFormatter::ToString(div.re_invest_shares, 4), "", wxYES_NO))
+						{
+							this->port.AddReInvestShares(d, div.re_invest_shares);
+							this->UpdateGridView();
+						}
+					}
+				}
+			}
 		}
+		
 		this->dialog->Destroy();
+		this->dialog = NULL;
 	}
 
 }
@@ -2864,11 +3864,11 @@ void mainwindow::OnAddDivPayoutDate(Dividend& div, wxString& t)
 	bool first = false;
 
 	do {
+		if (first)
+			wxMessageBox("Invalid date entered for " + t);
+		first = true;
 		if (this->generic_entry->ShowModal() == wxID_OK)
 		{
-			if (first)
-				wxMessageBox("Invalid date entered for " + t);
-			first = true;
 			this->TransferDataFromWindow();
 		}
 		else
@@ -2877,7 +3877,7 @@ void mainwindow::OnAddDivPayoutDate(Dividend& div, wxString& t)
 			this->generic_entry = NULL;
 			return;
 		}
-	} while (!date.ParseDate(stringdate) && div.ex_Div > date);
+	} while (!date.ParseDate(stringdate) || div.ex_Div > date);
 
 	if (div.payment_date.IsValid())
 	{
@@ -2897,6 +3897,11 @@ void mainwindow::OnAddDivPayoutDate(Dividend& div, wxString& t)
 
 	this->generic_entry->Destroy();
 	this->generic_entry = NULL;
+}
+
+void mainwindow::OnAddDivReInvestmentShares(Dividend& div, double& s)
+{
+
 }
 
 void mainwindow::DialogCancel()
@@ -2944,6 +3949,7 @@ void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
 	this->rightclick_ticker = ticker;
 	this->p_sell->SetItemLabel("Sell " + ticker);
 	this->p_buy->SetItemLabel("Purchase " + ticker);
+	this->p_view_dividends->SetItemLabel("View " + ticker + " Dividends");
 	bool result = PopupMenu(this->popup, p);
 }
 
@@ -3402,14 +4408,16 @@ wxWindow* mainwindow::GetLeftWin()
 	return win;
 }
 
+
 wxScrolled<wxPanel>* mainwindow::GetRightWin()
 {
+	int size = port.GetNumItems(_PortfolioType::STOCK);
 	wxScrolled<wxPanel>* P = new wxScrolled<wxPanel>(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
 	P->SetScrollbars(5, 5, 50, 50);
 	P->EnableScrolling(true, true);
 
 	P->SetBackgroundColour(wxColour(0, 0, 0));
-	this->grid_view = new GridView(P, 26);
+	this->grid_view = new GridView(P, 26, size);
 	this->UpdateGridView();
 	
 	P->SetSizer(grid_view);
@@ -3433,17 +4441,17 @@ void mainwindow::UpdateGridView()
 	for (size_t i = 0; i < stocks.size(); ++i)
 	{
 		StockViewerData* svd = stocks[i]->GetStockViewerData();
-		if (this->grid_view->DoesItemExist(svd->ticker))
+		if (this->grid_view->ItemExist(svd->ticker))
 			this->grid_view->UpdateRow(svd);
 		else
 			this->grid_view->SetNewRow(svd);
 	}
 	
 	StockViewerData* svd = this->port.GetStockViewerData();
-	if (this->grid_view->DoesItemExist(svd->ticker))
-		this->grid_view->UpdateRow(svd, true);
+	if (this->grid_view->ItemExist(svd->ticker))
+		this->grid_view->UpdateRow(svd);
 	else
-		this->grid_view->SetNewRow(svd, true);
+		this->grid_view->SetNewRow(svd);
 
 	this->grid_view->LayoutGrid();
 
@@ -3482,7 +4490,7 @@ void mainwindow::CreatePopupMenu()
 	this->p_quote = new wxMenuItem(popup, _MenuItemIDs::P_QUOTE, "Quote Lookup");
 	this->p_add_div_reinvest = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV_REINVEST, "Add Div Re-invest shares");
 	this->p_add_div = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV, "Add Dividend");
-	this->p_remove_div = new wxMenuItem(popup, _MenuItemIDs::P_REMOVE_DIV, "Remove Dividend");
+	this->p_view_dividends = new wxMenuItem(popup, _MenuItemIDs::P_VIEW_DIVIDENDS, "Empty");
 	this->p_ohlc = new wxMenuItem(popup, _MenuItemIDs::P_GET_OHLC, "Open High Low Close");
 
 	this->popup->Append(this->p_buy);
@@ -3490,6 +4498,6 @@ void mainwindow::CreatePopupMenu()
 	this->popup->Append(this->p_quote);
 	this->popup->Append(this->p_add_div_reinvest);
 	this->popup->Append(this->p_add_div);
-	this->popup->Append(this->p_remove_div);
+	this->popup->Append(this->p_view_dividends);
 	this->popup->Append(this->p_ohlc);
 }

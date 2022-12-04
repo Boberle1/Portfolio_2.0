@@ -1302,6 +1302,18 @@ double stock_node::GetPurchasePrice(wxDateTime* date)
 	return 0.0;
 }
 
+void stock_node::AddDivSharesToDiv(Dividend& d)
+{
+	for (auto& v : this->divs)
+	{
+		if (v.ex_Div == d.ex_Div && d.DivReinvest)
+		{
+			d.re_invest_shares += v.re_invest_shares;
+			return;
+		}
+	}
+}
+
 void stock_node::HandleDivReInvest(Dividend& d)
 {
 	if (this->GetPurchaseDate() < d.ex_Div && this->GetShares(&d.ex_Div))
@@ -1433,6 +1445,20 @@ bool stock_node::SetReInvestShares(double& s)
 	for (auto& v : this->divs)
 	{
 		if (v.DivReinvest && v.IsPendingReInvestment())
+		{
+			v.AddReInvestmentShares(s);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool stock_node::SetReInvestShares(Dividend& d, double& s)
+{
+	for (auto& v : this->divs)
+	{
+		if (v.DivReinvest && v.IsPendingReInvestment() && d.ex_Div == v.ex_Div)
 		{
 			v.AddReInvestmentShares(s);
 			return true;
@@ -1838,7 +1864,7 @@ bool StockNode::DistributeReInvestmentShares(double& s)
 	// check to make sure total is not zero. If it is then there is no shares to distribute. Return false;
 	if (!total)
 	{
-		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares! Returning false!");
+		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares(double&)! Returning false!");
 		return false;
 	}
 
@@ -1851,6 +1877,42 @@ bool StockNode::DistributeReInvestmentShares(double& s)
 			double rat = ratio[i] / total;
 			double val = s * rat;
 			result = this->bought[i].SetReInvestShares(val);
+			if (!result && endresult)
+				endresult = false;
+		}
+	}
+
+	this->UpToDate = false;
+	return endresult;
+}
+
+bool StockNode::DistributeReInvestmentShares(Dividend& div, double& s)
+{
+	wxVector<double> ratio;
+	wxDateTime today(wxDateTime::Today());
+	double total = 0.0;
+	for (auto& v : this->bought)
+	{
+		ratio.push_back((v.GetShares(&today) + v.GetDividendShares(&today)) * this->current_Data.marketprice);
+		total += *ratio.rbegin();
+	}
+
+	// check to make sure total is not zero. If it is then there is no shares to distribute. Return false;
+	if (!total)
+	{
+		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares(Dividend&, double&)! Returning false!");
+		return false;
+	}
+
+	bool result = true;
+	bool endresult = true;
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		if (ratio[i])
+		{
+			double rat = ratio[i] / total;
+			double val = s * rat;
+			result = this->bought[i].SetReInvestShares(div, val);
 			if (!result && endresult)
 				endresult = false;
 		}
@@ -2423,6 +2485,20 @@ bool StockNode::SetReInvestShares(double& s)
 	return this->DistributeReInvestmentShares(shares);
 }
 
+bool StockNode::SetReInvestShares(Dividend& div, double& d)
+{
+	wxDateTime date(wxDateTime::Today());
+	double shares = div.re_invest_shares;
+	double my_shares = this->m_GetShares(&date);
+	my_shares += this->GetDividendShares(true);
+	if (shares > my_shares)
+		my_shares = shares - my_shares;
+	else
+		my_shares = shares;
+
+	return this->DistributeReInvestmentShares(div, my_shares);
+}
+
 void StockNode::OnThreadComplete(wxCommandEvent&)
 {
 	this->m_parent->ThreadComplete(this);
@@ -2455,6 +2531,13 @@ wxVector<Dividend> StockNode::GetDividendVec()
 		this->bought[i].GetDividendVec(vec);
 	
 	return vec;
+}
+
+void StockNode::GetDivWithAllReInvestmentShares(Dividend& d)
+{
+	d.re_invest_shares = 0.0;
+	for (auto& v : this->bought)
+		v.AddDivSharesToDiv(d);
 }
 
 wxVector<Dividend> StockNode::GetAllDividends()
@@ -2642,11 +2725,22 @@ bool Sector::AddReInvestShares(double& shares)
 {
 	if (!this->sn)
 	{
-		wxMessageBox("this->sn is NULL in Sector::AddReInvestShares!");
+		wxMessageBox("this->sn is NULL in Sector::AddReInvestShares(double&)!");
 		return false;
 	}
 
 	return this->sn->SetReInvestShares(shares);
+}
+
+bool Sector::AddReInvestShares(Dividend& div, double& d)
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::AddReInvestShares(Dividend&, double&)!");
+		return false;
+	}
+
+	return this->sn->SetReInvestShares(div, shares);
 }
 
 bool Sector::AddDividend(Dividend& div)
@@ -2670,6 +2764,17 @@ void Sector::AddDividendPaymentDate(Dividend& dividend, wxDateTime& date)
 	}
 
 	this->sn->SetPaymentDate(dividend, date);
+}
+
+void Sector::GetDivWithAllReInvestmentShares(Dividend& d)
+{
+	if (!this->sn)
+	{
+		wxMessageBox("this->sn is NULL in Sector::GetDivWithAllReInvestmentShares!");
+		return;
+	}
+
+	this->sn->GetDivWithAllReInvestmentShares(d);
 }
 
 wxVector<Dividend> Sector::GetDividendsFromStagedStock()
@@ -3051,11 +3156,28 @@ bool Portfolio::AddReInvestShares(double& shares)
 {
 	if (!this->sec)
 	{
-		wxMessageBox("this->sec is NULL in Portfolio::AddReInvestShares!");
+		wxMessageBox("this->sec is NULL in Portfolio::AddReInvestShares(double&)!");
 		return false;
 	}
 
 	if (this->sec->AddReInvestShares(shares))
+	{
+		this->Calibrate();
+		return true;
+	}
+
+	return false;
+}
+
+bool Portfolio::AddReInvestShares(Dividend& div, double& shares)
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::AddReInvestShares(Dividend&, double&)!");
+		return false;
+	}
+
+	if (this->sec->AddReInvestShares(div, shares))
 	{
 		this->Calibrate();
 		return true;
@@ -3091,6 +3213,17 @@ void Portfolio::SetDividendPaymentDate(Dividend& dividend, wxDateTime& date)
 
 	this->sec->AddDividendPaymentDate(dividend, date);
 	this->Calibrate();
+}
+
+void Portfolio::GetDivWithAllReInvestmentShares(Dividend& d)
+{
+	if (!this->sec)
+	{
+		wxMessageBox("this->sec is NULL in Portfolio::GetDivWithAllReInvestmentShares!");
+		return;
+	}
+
+	this->sec->GetDivWithAllReInvestmentShares(d);
 }
 
 wxVector<Dividend> Portfolio::GetDividendsFromStagedStock()

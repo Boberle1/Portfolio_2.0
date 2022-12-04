@@ -11,6 +11,9 @@ auto constexpr NA = "NotFound";
 void SetStaticTextColor(wxStaticText&, wxColour, wxColour);
 bool IsStringPositive(wxString&);
 
+// Check if string that represents number or double is a negative, positive or zero...
+int IsStringPNZ(wxString&);
+
 // Function that compares two wxDateTimes and discards the time,
 // So if they are the same year, month, day, regardless of time this will return true
 // Otherwise false...

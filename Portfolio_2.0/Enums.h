@@ -212,6 +212,19 @@ auto constexpr _UTITLITIES_RENEWABLE = "Utilities - Renewable";
 
 auto constexpr _SECTOR_INVALID = "Invalid Sector";
 
+enum GridCanvasFlag
+{
+	TOTALROWHEAD = 2,
+	TOTALROW = 4,
+	ROWHEAD = 8,
+	COLHEAD = 16,
+	COLORDEPENDENT = 32,
+	DATACELL = 64,
+	MEDIUMFONT = 128,
+	LARGEFONT = 256,
+	BACKGROUDNORMAL = 512
+};
+
 enum Action
 {
 	BUY = 0,
@@ -477,6 +490,7 @@ enum _MenuItemIDs
 	P_ADD_DIV_REINVEST,
 	P_ADD_DIV,
 	P_REMOVE_DIV,
+	P_VIEW_DIVIDENDS,
 	P_SELL_STOCK, 
 	P_STOCK_PURCHASE,
 	P_GET_OHLC        // Get Open,High,Low,Close

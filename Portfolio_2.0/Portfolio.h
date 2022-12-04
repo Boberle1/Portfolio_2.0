@@ -495,6 +495,7 @@ public:
 	double GetPurchasePrice(wxDateTime*);
 	// Gets all time purchase price...
 	double GetPurchasePrice();
+	void AddDivSharesToDiv(Dividend&);
 	void HandleDivReInvest(Dividend&);
 	void HandleDivReInvest(Dividend*);
 	void HandlePaymentDate(Dividend&, wxDateTime&);
@@ -505,6 +506,7 @@ public:
 	void GetDividendVec(wxVector<Dividend>&);
 	bool IsPendingDivReInvest();
 	bool SetReInvestShares(double&);
+	bool SetReInvestShares(Dividend&, double&);
 	void Save(DataStream&);
 	void Retrieve(DataStream&);
 
@@ -584,10 +586,12 @@ public:
 	void SetDividends(Dividend);
 	void SetPaymentDate(Dividend&, wxDateTime&);
 	bool SetReInvestShares(double&);
+	bool SetReInvestShares(Dividend&, double&);
 	void OnThreadComplete(wxCommandEvent&);
 	Day_Prices* GetDayPricesOfLastMarketOpen();
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
+	void GetDivWithAllReInvestmentShares(Dividend&);
 
 	// This function differs from get dividends in that it returns all the dividends including the ones that are elligible for dividend re-investment..
 	wxVector<Dividend> GetAllDividends();
@@ -603,6 +607,7 @@ public:
 private:
 	wxString GetLatestEx_Div_Date();
 	bool DistributeReInvestmentShares(double&);
+	bool DistributeReInvestmentShares(Dividend&, double&);
 	bool UpDate(bool force_update = false);
 	bool Historical_prices_UpToDate();
 	double GetDeviation(int);
@@ -666,8 +671,10 @@ public:
 	bool AddToPosition(long&, wxString&, double&, double&, bool&, wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
+	bool AddReInvestShares(Dividend&, double&);
 	bool AddDividend(Dividend&);
 	void AddDividendPaymentDate(Dividend&, wxDateTime&);
+	void GetDivWithAllReInvestmentShares(Dividend&);
 	wxVector<Dividend> GetDividendsFromStagedStock();
 	bool IsId(_Sector);
 	bool IsChild(wxString&);
@@ -723,8 +730,10 @@ public:
 	bool RequestSell(wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
 	bool AddReInvestShares(double&);
+	bool AddReInvestShares(Dividend&, double&);
 	bool AddDividend(Dividend&);
 	void SetDividendPaymentDate(Dividend&, wxDateTime&);
+	void GetDivWithAllReInvestmentShares(Dividend&);
 	wxVector<Dividend> GetDividendsFromStagedStock();
 	wxVector<deposit_pair> GetDepositVector();
 	wxVector<stock_node*> GetLotData();
