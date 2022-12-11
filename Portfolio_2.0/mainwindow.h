@@ -8,6 +8,7 @@
 #include "wx/statline.h"
 #include "wx/graphics.h"
 #include "wx/dcbuffer.h"
+#include "wx/progdlg.h"
 
 struct TextExtent
 {
@@ -61,17 +62,47 @@ struct gridpair
 	
 };
 
+class MotionCanvas : public wxWindow
+{
+public:
+//	MotionCanvas(wxWindow*, wxSize, wxVector<wxString>);
+	MotionCanvas(wxWindow*, wxSize, wxVector<SummaryData>, wxVector<StockViewerData*>);
+	void OnPaint(wxPaintEvent&);
+private:
+	wxColour background = wxColour(21, 41, 46);
+	int iter = 0;
+	wxVector<wxString> vec;
+	wxVector<wxVector<wxString>> str_vec;
+	wxVector<SummaryData> sd_vec;
+	wxVector<StockViewerData*> svd_vec;
+	wxColour textcolor = wxColour(182, 203, 242);
+	wxColour bottom_text_color;
+	wxColour red = wxColour(219, 4, 22);
+	wxColour green = wxColour(16, 82, 31);
+	wxColour yellow = wxColour(176, 194, 16);
+	wxFont textfont = wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+	TextExtent textextent;
+	TextExtent textextent2;
+	TextExtent textextent3;
+	int top_distance = -21000;
+	int bottom_distance = -21000;
+	int iteminfo_iter = 0;
+};
+
 class GridCanvas : public wxWindow
 {
 public:
 	GridCanvas(wxWindow*, wxSize, wxString&, int);
+	void CopyGridCanvas(const GridCanvas&);
 	void OnPaint(wxPaintEvent&);
 	TextExtent* GetTextExtent();
 	bool IsMatch(wxString&);
 	bool IsEmpty();
 	void OnMouseEnter(wxMouseEvent&);
 	void OnMouseLeave(wxMouseEvent&);
+	void SetMotion() { this->motion = true; }
 	wxDECLARE_EVENT_TABLE();
+
 protected:
 	void m_SetValue(wxString&);
 	void m_SetValue(wxString&, bool color);
@@ -92,6 +123,7 @@ private:
 	void SetBackgroundColor();
 private:
 	wxString value = "";
+	bool motion = false;
 
 	// this flag value is used to determine how to display the data...
 	int flag = 0;
@@ -127,6 +159,7 @@ private:
 	wxColour background;
 
 	TextExtent textextent;
+	int distance = 4;
 };
 
 class GridNode;
@@ -137,6 +170,9 @@ public:
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, wxString&, int);
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, int);
 
+	// FOR TESTING MOTION... 
+	void BindMyThread();
+	void CopyGnode(const Gnode&);
 	void SetValue(wxString&);
 	void SetValue(wxString&, bool color);
 
@@ -150,6 +186,7 @@ public:
 	Gnode* GetLeft();
 
 	void OnRightClick(wxMouseEvent&);
+	void OnThreadEvent(wxThreadEvent&);
 	wxDECLARE_EVENT_TABLE();
 private:
 	wxString emptystring = "";
@@ -246,9 +283,8 @@ public:
 	void RightClickAlert(wxString&, wxPoint&);
 	wxString GetRightClickTicker();
 	bool RemoveRow(wxString&);
+	void virtual SetTitleRow();
 private:
-//	wxStaticText* GetNewItem(size_t, size_t, double, bool ispercent = true);
-	void SetTitleRow();
 	void FillGrid();
 	void ClickRowOff();
 	void ClickColOff();
@@ -286,7 +322,10 @@ private:
 //	GridNode* FindGridNode(int);
 	GridNode* GetSummaryRow();
 	void SwapSummaryRow(GridNode*&);
-private:
+protected:
+	wxVector<wxString> headers;
+
+protected:
 	GridNode* head = nullptr;
 	Gnode* Head = NULL;
 	const Portfolio* port = NULL;
@@ -301,8 +340,43 @@ private:
 	bool SummaryRowSet = false;
 	wxString rightclick_ticker = "";
 	wxVector<GridNode*> gridnode;
-	wxVector<wxString> headers;
 	int itemsize = 0;
+};
+
+class GridItemView : public GridView
+{
+public:
+	GridItemView(wxWindow*, _PortfolioType, int, int);
+private:
+	_PortfolioType type = STOCK;
+	wxWindow* m_parent = NULL;
+};
+
+class PortfolioWin;
+
+class MyThread : public wxThread
+{
+public:
+	MyThread(PortfolioWin*, MotionCanvas*);
+	~MyThread();
+	wxThread::ExitCode Entry();
+	void EndAfterEntry() { end = true; }
+private:
+	bool end = false;
+	MotionCanvas* gc = NULL;
+	PortfolioWin* m_parent = NULL;
+};
+
+class MyQuoteThread : public wxThread
+{
+public:
+	MyQuoteThread(Portfolio*, mainwindow*, wxString&);
+	~MyQuoteThread();
+	wxThread::ExitCode Entry();
+private:
+	Portfolio* port = NULL;
+	mainwindow* m_parent = NULL;
+	wxString ticker = "";
 };
 
 class PortfolioWin : public wxWindow
@@ -311,12 +385,15 @@ public:
 	PortfolioWin(mainwindow*, wxWindowID, wxDateTime*, StockViewerData*, Portfolio*);
 	void Update();
 	void OnClick(wxString&);
+	void ClosingSoon();
 private:
 	void Create();
 	void SetControlFonts();
 	void DateChange(wxCommandEvent&);
 	void OnUpdateButtonPress(wxCommandEvent&);
 	wxDECLARE_EVENT_TABLE();
+public:
+	MyThread* thread = NULL;
 private:
 	wxTextCtrl* datepcker = nullptr;
 	wxDateTime* mainclock = nullptr;
@@ -352,14 +429,13 @@ private:
 	Portfolio* port = nullptr;
 	wxButton* updatebutton = nullptr;
 	wxColour Red = wxColour(217, 7, 28);
-//	wxColour Green = wxColour(6, 84, 27);
 	wxColour Green = wxColour(16, 82, 31);
 	wxColour Blue = wxColour(36, 11, 191);
 	wxColour DarkGrey = wxColour(43, 43, 43);
 	wxColour parenths = wxColour(0, 0, 0);
 	wxColour percents = wxColour(41, 47, 227);
 
-	Gnode* canvas = NULL;
+	MotionCanvas* canvas = NULL;
 };
 
 struct PurchaseKit
@@ -621,6 +697,9 @@ public:
 	void OnPurchasePopupClick(wxCommandEvent&);
 	void OnAddReInvestSharesPopup(wxCommandEvent&);
 	void OnQuoteLookupPopup(wxCommandEvent&);
+
+	// thread calls this after OnQuoteLookupPopup...
+	void OnQuoteThread(wxThreadEvent&);
 	void OnAddDividendPopup(wxCommandEvent&);
 	void OnViewDividendPopup(wxCommandEvent&);
 
@@ -639,11 +718,14 @@ public:
 	void OnViewDeposits(wxCommandEvent&);
 
 	//function called by PortfolioWin when user pressed enter after typing in a date...
-	void OnDateChange();
+	void OnDateChange(wxString&);
 
 	// function called by PortfolioWin when user presses update button on left window;
 	void OnUpdate();
 	wxDECLARE_EVENT_TABLE();
+public:
+	MyQuoteThread* quotethread = NULL;
+	SummaryData smd;
 private:
 	wxWindow* GetLeftWin();
 	wxScrolled<wxPanel>* GetRightWin();
@@ -652,6 +734,7 @@ private:
 	void SaveFile();
 	void RetrieveFile();
 	void DeletePopupMenu();
+	void DeleteQuoteThread();
 	void CreatePopupMenu();
 private:
 	wxScrolled<wxPanel>* grid_panel = NULL;

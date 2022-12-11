@@ -1,14 +1,11 @@
 #pragma once
 #include "webdata.h"
 #include "DataStream.h"
-//#include "wx/txtstrm.h"
-//#include "wx/wfstream.h"
-//#include "wx/wfstream.h"
 
-constexpr int DayValue = 86400000;
+//constexpr int DayValue = 86400000;
 
 //auto yahoofinancedate = [](wxLongLong Long)->wxLongLong { return Long / 1000; };
-
+/*
 struct MonthNames
 {
 	wxString jan = "January";
@@ -39,14 +36,14 @@ struct MonthNames
 
 	wxDateTime::Month GetMonth(wxString);
 };
-
-struct month_day_pair
-{
-	month_day_pair(wxDateTime::Month m, int d) : month(m), day(d) {}
-	wxDateTime::Month month = wxDateTime::Month::Inv_Month;
-	int day = 0;
-};
-
+*/
+//struct month_day_pair
+//{
+//	month_day_pair(wxDateTime::Month m, int d) : month(m), day(d) {}
+//	wxDateTime::Month month = wxDateTime::Month::Inv_Month;
+//	int day = 0;
+//};
+/*
 struct Holiday_Pair
 {
 	Holiday_Pair(int y) : year(y) {}
@@ -68,7 +65,7 @@ Holidays& GetHolidays();
 void GetWorkDate(wxDateTime& T, bool B = false);
 void GetForwardWorkDay(wxDateTime& T);
 bool IsMarketOpen();
-
+*/
 enum DataType
 {
 	ANY = 1,
@@ -79,20 +76,25 @@ enum DataType
 class Parser
 {
 public:
-	Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d), 
-		void (*cbs)(void*, SummaryData), void (*cbd)(void*, Dividend), wxString enddate);
+	Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), 
+		void (*cbs)(void*, SummaryData, _PortfolioType), void (*cbd)(void*, Dividend), wxString enddate);
+	Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), _PortfolioType
+		,void (*cbs)(void*, SummaryData, _PortfolioType));
 	Parser(wxString&);
+	Parser() {}
+	void Test();
+	SummaryData PullIndexQuote(int);
 	void UpDateAll();
-	void UpDateSummaryData();
+	void UpDateSummaryData(bool indices = false);
 	wxString GetDescription(wxString);
 	wxVector<DayGainersandLosers> GetStockGainers();
 	wxVector<DayGainersandLosers> GetStockLosers();
 	void PullFinVizOverview(wxString&, wxVector<SectorOverview>&);
 	void PullFinVizPerformance(wxString&, wxVector<SectorPerformance>&);
-	void UpDateHistoricalPrices();
+	void UpDateHistoricalPrices(bool indices = false);
 	void UpDateDiv();
-	void SetLastDateAndCallBack(wxString, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d));
-	void SetSummaryDataCallBack(void (*cb)(void*, SummaryData));
+	void SetLastDateAndCallBack(wxString, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType));
+	void SetSummaryDataCallBack(void (*cb)(void*, SummaryData, _PortfolioType));
 	void SetLatestDividendDateAndCallBack(wxString, void (*cb)(void*, Dividend));
 	SummaryData GetSummaryData();
 
@@ -108,16 +110,16 @@ private:
 
 	int BeginParse(wxString&);
 
-	void InsertDates(wxString& start, wxString& end);
-	void UpDate(bool historical = true, bool div = true);
-	bool PullWebData();
+	void InsertDates(wxString& start, wxString& end, bool indices = false);
+	void UpDate(bool historical = true, bool div = true, bool indices = false);
+	bool PullWebData(bool indices = false);
 	bool PullWebData(wxString& url, wxString& data);
 	void ParseSummaryData(wxString&);
 
 	//CallBack for StockNode...
-	void (*CallBack)(void* v, double o, double h, double l, double c, wxDateTime d) = nullptr;
+	void (*CallBack)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType) = nullptr;
 	// CallBack for StockNode SummaryData...
-	void (*CallBackSummary)(void*, SummaryData) = nullptr;
+	void (*CallBackSummary)(void*, SummaryData, _PortfolioType) = nullptr;
 	// CallBack for StockNode Dividend...
 	void (*CallBackDiv)(void*, Dividend) = nullptr;
 
@@ -214,7 +216,16 @@ private:
 	wxDateTime Deincrement;
 	bool ValidData = true;
 
+	wxString urltemp = "";
 	wxString Normal = "https://query1.finance.yahoo.com/v7/finance/download/TICKER?period1=BEGINDATE&period2=ENDDATE&interval=1d&events=history&includeAdjustedClose=true";
+	wxString indices_url = "https://query1.finance.yahoo.com/v7/finance/download/%5ETICKER?period1=BEGINDATE&period2=ENDDATE&interval=1d&events=history&includeAdjustedClose=true";
+	wxString QQQ_Url_h =
+		"https://query1.finance.yahoo.com/v7/finance/download/%5EIXIC?period1=1638926022&period2=1670462022&interval=1d&events=history&includeAdjustedClose=true";
+
+	wxString SP500_QUOTE_URL = "https://finance.yahoo.com/quote/%5EGSPC?p=%5EGSPC";
+	wxString QQQ_QUOTE_URL = "https://finance.yahoo.com/quote/%5EIXIC?p=%5EIXIC";
+	wxString DOW_QUOTE_URL = "https://finance.yahoo.com/quote/%5EDJI/";
+
 	wxString QURL = "https://finance.yahoo.com/quote/%5ETICKER?p=%5ETICKER";
 	wxString nasdaq_list = "https://datahub.io/core/nasdaq-listings/r/nasdaq-listed.csv";
 	wxString sp500_list = "https://datahub.io/core/s-and-p-500-companies/r/constituents.csv";
@@ -231,6 +242,7 @@ private:
 	wxString ulllr = "https://finviz.com/elite.ashx";
 
 	void* m_parent = nullptr;
+	_PortfolioType type = STOCK;
 };
 
 

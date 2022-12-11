@@ -5,9 +5,9 @@
 #include "wx/thread.h"
 #include "wx/event.h"
 
-constexpr auto STANDARD_DATE = "%m/%d/%G";
-constexpr auto STANDARD_TIME = "%H:%M:%S";
-constexpr auto DATE_KEY = "%G-%m-%d";
+//constexpr auto STANDARD_DATE = "%m/%d/%G";
+//constexpr auto STANDARD_TIME = "%H:%M:%S";
+//constexpr auto DATE_KEY = "%G-%m-%d";
 
 constexpr auto _BONDS = "Bonds";
 constexpr auto _LARGECAP = "Large Cap";
@@ -24,7 +24,7 @@ wxDEFINE_EVENT(ThreadComplete, wxCommandEvent);
 // Global function to check for valid date and is not a date in the future...
 inline wxDateTime IsValidDate(wxString&, wxString);
 unsigned int inline GetEndMonthDay(wxDateTime::Month, int);
-wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month);
+//wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month);
 wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month);
 wxString inline GetSectorName(_Sector);
 
@@ -406,9 +406,9 @@ public:
 struct StockViewerData
 {
 	StockViewerData(){}
-	StockViewerData(Return_node* r, wxString t, wxString e, wxString pd, _Sector S, double s, double pp, double p, double pc, double dg, double wg,
+	StockViewerData(Return_node* r, wxString longn, wxString t, wxString e, wxString pd, _Sector S, double s, double pp, double p, double pc, double dg, double wg,
 		double qg, double yg, double tg, double cb, double mv, double td, double cash = 0.0, wxString ex_div = "NA")
-		: m_parent(r), ticker(t), earnings(e), purchase_date(pd), sec(S), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
+		: m_parent(r), longname(longn), ticker(t), earnings(e), purchase_date(pd), sec(S), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
 		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash), ex_div_date(ex_div)
 	{
 		if (S != _Sector::SECTOR_INVALID)
@@ -418,6 +418,7 @@ struct StockViewerData
 		}
 	}
 	wxString GetTicker() { return this->ticker; }
+	wxString GetLongName() { return this->longname; }
 	wxString GetEarningsDate() { return this->earnings; }
 	wxString GetPurchaseDate() { return this->purchase_date; }
 	wxString GetExDivDate() { return this->ex_div_date; }
@@ -448,6 +449,7 @@ struct StockViewerData
 	wxString Get30Day_Deviation() { return wxNumberFormatter::ToString(m_parent->_30dayDeviation, 2); }
 
 	wxString ticker = "";
+	wxString longname = "";
 	wxString earnings = "";
 	wxString purchase_date = "";
 	wxString ex_div_date = "NA";
@@ -536,12 +538,13 @@ private:
 class Sector;
 class Portfolio;
 class StockNode;
+class Indices;
 
 // CallBackFunctions for StockNode to get info from Parser...
 // Callback for parser to import Day_Prices...
-void SetHistoricalDataCB(void*, double o, double h, double l, double c, wxDateTime d);
+void SetHistoricalDataCB(void*, double o, double h, double l, double c, wxDateTime d, _PortfolioType);
 // CallBack for parser to import SummaryData...
-void SetSummaryDataCB(void*, SummaryData);
+void SetSummaryDataCB(void*, SummaryData, _PortfolioType);
 // Callback for parser to import dividend...
 void SetDividendsCB(void*, Dividend);
 
@@ -576,6 +579,7 @@ public:
 	wxString GetTicker() const;
 	wxString GetLongName();
 	double GetShares();
+	wxDateTime GetPurchaseDate();
 	SummaryData GetSummaryData() { return this->current_Data; }
 	wxString GetNextEarningsDate();
 	bool IsActive() const;
@@ -611,7 +615,7 @@ private:
 	bool UpDate(bool force_update = false);
 	bool Historical_prices_UpToDate();
 	double GetDeviation(int);
-	Day_Prices* GetHistoricalIndexIter();
+//	Day_Prices* GetHistoricalIndexIter();
 	int m_GetStartWeekDay(wxDateTime*);
 	wxDateTime GetLatestMarketOpenDate();
 	double GetClosePrice(wxDateTime*);
@@ -662,6 +666,35 @@ private:
 	_Sector sectorID = _Sector::SECTOR_INVALID;
 };
 
+// class to track the three major indices, sp500, dowjones and nasdaq..
+class Indices : public Return_node
+{
+public:
+	Indices(_INDEX_, wxDateTime&, wxDateTime*);
+	Indices();
+	~Indices();
+	void Calibrate(bool force = false);
+	void SetHistoricalData(Day_Prices);
+	void SetSummaryData(SummaryData);
+	StockViewerData* GetStockViewerData();
+	_INDEX_ GetIndice();
+private:
+	bool UpDate(bool force_update = false);
+	Parser* NewParser();
+	void DeleteParser();
+private:
+	StockViewerData svd;
+	wxDateTime start;
+	wxDateTime* m_parentclock = NULL;
+	wxString ticker = "";
+	wxVector<Day_Prices> historical_prices;
+	int UpToDate = 0;
+	Parser* parser = NULL;
+	SummaryData current_Data;
+	double m_beta = 0.0;
+	_INDEX_ index = _INDEX_::DOW_JONES;
+};
+
 class Sector : public Return_node
 {
 public:
@@ -682,6 +715,7 @@ public:
 	wxString GetLongNameOfStock();
 	bool IsChild(long&);
 	int GetNumItems(_PortfolioType);
+	wxDateTime GetEarliestPurchaseDate();
 	wxVector<StockNode*> GetStockVector();
 	wxVector<stock_node*> GetAllLotData();
 	wxVector<stock_node*> GetLotData();
@@ -739,7 +773,9 @@ public:
 	wxVector<stock_node*> GetLotData();
 	bool NewDepositSchedule(double, int, wxDateTime);
 	int GetNumItems(_PortfolioType);
+	wxDateTime GetEarliestPurchaseDate();
 	const wxVector<StockNode*> GetStockNodeItems();
+	wxVector<Indices*> GetIndices();
 	void Calibrate(bool datechange = false);
 	void CalcRatiosOfAllChildren();
 	StockViewerData* GetStockViewerData();
@@ -781,4 +817,8 @@ private:
 //	StockNode nasdaq;
 //	StockNode dow_jones;
 	wxString url = "https://datahub.io/core/nyse-other-listings/r/0.html";
+
+	Indices dow;
+	Indices nas;
+	Indices sp;
 };

@@ -1,11 +1,12 @@
 #pragma once
-
+#include "Helper_Objects.h"
+/*
 #include "wx/wx.h"
 #include "wx/txtstrm.h"
 #include "wx/wfstream.h"
 #include "wx/wfstream.h"
 #include "Enums.h"
-
+*/
 auto constexpr NA = "NotFound";
 
 void SetStaticTextColor(wxStaticText&, wxColour, wxColour);
@@ -298,18 +299,6 @@ struct SectorPerformance
 	double year = 0.0;
 	double yearToDate = 0.0;
 	wxDateTime stamp;
-};
-
-struct Day_Prices
-{
-	Day_Prices(double o, double h, double l, double c, wxDateTime t)
-		: open(o), high(h), low(l), close(c), date(t) {}
-
-	double open = 0.0;
-	double high = 0.0;
-	double low = 0.0;
-	double close = 0.0;
-	wxDateTime date;
 };
 
 struct pair

@@ -2,6 +2,22 @@
 
 auto yahoofinancedate = [](wxLongLong Long)->wxLongLong { return Long / 1000; };
 
+wxString RemoveCommas(wxString S)
+{
+	int index = S.find(',');
+	while (index != -1)
+	{
+		S = S.Remove(index, 1);
+		index = S.find(',');
+	}
+
+	if (index != -1)
+		S = S.Remove(index, 1);
+
+	return S;
+}
+
+/*
 wxDateTime::Month MonthNames::GetMonth(wxString mon)
 {
 	if (mon == this->jan || mon == this->_jan)
@@ -33,22 +49,7 @@ wxDateTime::Month MonthNames::GetMonth(wxString mon)
 	return wxDateTime::Month::Inv_Month;
 }
 
-wxString RemoveCommas(wxString S)
-{
-	int index = S.find(',');
-	while (index != -1)
-	{
-		S = S.Remove(index, 1);
-		index = S.find(',');
-	}
-
-	if (index != -1)
-		S = S.Remove(index, 1);
-
-	return S;
-}
-
-// HOLIDAYS STRUCT...
+ HOLIDAYS STRUCT...
 void Holidays::Retrieve()
 {
 	wxString Filename = "SavedFiles/Holidays.txt";
@@ -178,6 +179,7 @@ bool IsMarketOpen()
 
 	return false;
 }
+*/
 /*
 Parser::Parser(wxString& data, bool historical)
 {
@@ -191,14 +193,40 @@ Parser::Parser(wxString& Data, void* sh, void (*foo)(void* sh, wxDateTime&, doub
 }
 */
 
-Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d), 
-	void (*cbs)(void* v, SummaryData), void (*cbd)(void* v, Dividend), wxString enddate) : m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), lastDivDate(ldd),
+Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType _type), 
+	void (*cbs)(void* v, SummaryData, _PortfolioType), void (*cbd)(void* v, Dividend), wxString enddate) : m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), lastDivDate(ldd),
 	CallBack(cb), CallBackSummary(cbs), CallBackDiv(cbd), m_enddate(enddate)
 {
 	this->PurchaseDate.ParseDate(this->purchaseDate);
 	this->startDate.ParseDate(this->lastdate);
 	this->LastDivDate.ParseDate(this->lastDivDate);
 	this->end_Date.ParseDate(this->m_enddate);
+}
+
+Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType _type)
+	, _PortfolioType _type, void (*cbs)(void*, SummaryData, _PortfolioType))
+	: m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), CallBack(cb), type(_type), CallBackSummary(cbs)
+{
+	this->PurchaseDate.ParseDate(this->purchaseDate);
+	this->startDate.ParseDate(this->lastdate);
+}
+
+SummaryData Parser::PullIndexQuote(int selection)
+{
+	wxString url = "";
+	switch (selection)
+	{
+	case DOW_JONES: url = this->DOW_QUOTE_URL; break;
+	case NASDAQ: url = this->QQQ_QUOTE_URL; break;
+	case SP_500: url = this->SP500_QUOTE_URL; break;
+	}
+
+	wxString data = "";
+	this->PullWebData(url, data);
+
+	this->ParseSummaryData(data);
+
+	return this->GetSummaryData();
 }
 
 void Parser::UpDateAll()
@@ -217,9 +245,16 @@ Parser::Parser(wxString& data)
 	this->UpDateSummaryData();
 }
 
-void Parser::UpDateSummaryData()
+void Parser::Test()
 {
-	this->PullWebData();
+	wxString data = "";
+	wxString link = "https://query1.finance.yahoo.com/v7/finance/download/%5EDJI?period1=1639177638&period2=1670713638&interval=1d&events=history&includeAdjustedClose=true";
+	this->PullWebData(link, data);
+}
+
+void Parser::UpDateSummaryData(bool indices)
+{
+	this->PullWebData(indices);
 }
 
 wxString Parser::GetDescription(wxString t)
@@ -488,9 +523,9 @@ void Parser::PullFinVizPerformance(wxString& url, wxVector<SectorPerformance>& v
 	}
 }
 
-void Parser::UpDateHistoricalPrices()
+void Parser::UpDateHistoricalPrices(bool indices)
 {
-	this->UpDate(true, false);
+	this->UpDate(true, false, indices);
 }
 
 void Parser::UpDateDiv()
@@ -498,13 +533,13 @@ void Parser::UpDateDiv()
 	this->UpDate(false, true);
 }
 
-void Parser::SetLastDateAndCallBack(wxString date, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d))
+void Parser::SetLastDateAndCallBack(wxString date, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType))
 {
 	this->CallBack = cb;
 	this->lastdate = date;
 }
 
-void Parser::SetSummaryDataCallBack(void (*cb)(void* v, SummaryData))
+void Parser::SetSummaryDataCallBack(void (*cb)(void* v, SummaryData, _PortfolioType))
 {
 	this->CallBackSummary = cb;
 }
@@ -716,10 +751,10 @@ void Parser::GetLine(size_t& index, wxString& Data)
 		++index;
 	}
 
-	if (!data.ToLong(&Volume))
-		return;
+//	if (!data.ToLongLong(&Volume))
+//		return;
 
-	this->CallBack(this->m_parent, Open, High, Low, Close, Date);
+	this->CallBack(this->m_parent, Open, High, Low, Close, Date, this->type);
 }
 
 void Parser::GetToEndline(size_t& index, wxString& Data)
@@ -1138,9 +1173,9 @@ wxString Parser::GetData(int& index, wxString& data, int type)
 	return DATA;
 }
 
-void Parser::InsertDates(wxString& start, wxString& end)
+void Parser::InsertDates(wxString& start, wxString& end, bool indices)
 {
-	wxString hdwd = Normal;
+	wxString hdwd = indices ? this->indices_url : Normal;
 	wxString bd = "BEGINDATE";
 	wxString ed = "ENDDATE";
 	wxString t = "TICKER";
@@ -1160,7 +1195,7 @@ void Parser::InsertDates(wxString& start, wxString& end)
 	HDDURL = hdwd;
 }
 
-void Parser::UpDate(bool historical, bool div)
+void Parser::UpDate(bool historical, bool div, bool indices)
 {
 	wxDateTime today;
 	if (!this->end_Date.IsValid())
@@ -1189,7 +1224,7 @@ void Parser::UpDate(bool historical, bool div)
 	wxDateTime begin(1, wxDateTime::Month::Jan, year, 18);
 	start << yahoofinancedate(begin.GetValue());
 	end << yahoofinancedate(today.GetValue());
-	InsertDates(start, end);
+	InsertDates(start, end, indices);
 
 	wxString Data = "";
 	webdata web;
@@ -1274,10 +1309,12 @@ void Parser::UpDate(bool historical, bool div)
 	*/
 }
 
-bool Parser::PullWebData()
+bool Parser::PullWebData(bool indices)
 {
 	wxString Data = "";
 	wxString URL = "https://finance.yahoo.com/quote/TICKER?p=TICKER&.tsrc=fin-srch";
+	if (indices)
+		URL = "https://finance.yahoo.com/quote/%5ETICKER?p=%5ETICKER";
 	URL.Replace("TICKER", this->ticker);
 	webdata web;
 	web.setpages(1);
@@ -1307,5 +1344,5 @@ void Parser::ParseSummaryData(wxString& data)
 	this->sumdata.date = wxDateTime::Today();
 	this->sumdata.time = wxDateTime::Now();
 	if (this->CallBackSummary)
-		this->CallBackSummary(this->m_parent, this->GetSummaryData());
+		this->CallBackSummary(this->m_parent, this->GetSummaryData(), type);
 }

@@ -136,6 +136,7 @@
     <ClInclude Include="CashAccount.h" />
     <ClInclude Include="DataStream.h" />
     <ClInclude Include="Enums.h" />
+    <ClInclude Include="Helper_Objects.h" />
     <ClInclude Include="mainwindow.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="Portfolio.h" />
@@ -145,6 +146,7 @@
   <ItemGroup>
     <ClCompile Include="CashAccount.cpp" />
     <ClCompile Include="DataStream.cpp" />
+    <ClCompile Include="Helper_Objects.cpp" />
     <ClCompile Include="mainwindow.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="Portfolio.cpp" />

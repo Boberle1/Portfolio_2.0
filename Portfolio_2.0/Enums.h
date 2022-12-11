@@ -1,5 +1,15 @@
 #pragma once
 
+constexpr auto STANDARD_DATE = "%m/%d/%G";
+constexpr auto STANDARD_TIME = "%H:%M:%S";
+constexpr auto DATE_KEY = "%G-%m-%d";
+
+constexpr auto _DOW = "DJI";
+constexpr auto _NAS = "IXIC";
+constexpr auto _SP = "GSPC";
+
+constexpr int DayValue = 86400000;
+
 // Market close
 const wxDateTime _MarketClose(wxDateTime::wxDateTime_t(15));
 const wxDateTime _MarketOpen(wxDateTime::wxDateTime_t(8), 30);
@@ -447,6 +457,7 @@ enum _PortfolioType
 	PORTFOLIO,
 	LOT_PURCHASE,
 	SOLD,
+	INDICES,
 	OPTIONS
 };
 
@@ -499,4 +510,11 @@ enum _MenuItemIDs
 enum _PortfolioWin
 {
 	DATEPCKER = P_GET_OHLC + 1
+};
+
+enum _INDEX_
+{
+	DOW_JONES = DATEPCKER + 1,
+	NASDAQ,
+	SP_500
 };
