@@ -211,6 +211,40 @@ Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(voi
 	this->startDate.ParseDate(this->lastdate);
 }
 
+Parser::Parser(void* parent, _Sector S) : m_parent(parent), sector_type(S)
+{
+	wxString url = this->idustrie_stocks_url;
+	wxString key = "";
+	switch (this->sector_type)
+	{
+	case _Sector::COMMUNICATION_SERVICES: key = ms_cOMMUNICATION_SERVICES; break;
+	case _Sector::CONSUMER_DESCRETIONARY: key = ms_cONSUMER_DESCRETIONARY; break;
+	case _Sector::CONSUMER_STAPLES: key = ms_cONSUMER_STAPLES; break;
+	case _Sector::ENERGY: key = ms_eNERGY; break;
+	case _Sector::FINANCIALS: key = ms_fINANCIAL; break;
+	case _Sector::HEALTH_CARE: key = ms_hEALTH_CARE; break;
+	case _Sector::INDUSTRIALS: key = ms_iNDUSTRIALS; break;
+	case _Sector::INFORMATION_TECHNOLOGY: key = ms_tECHNOLOGY; break;
+	case _Sector::MATERIALS: key = ms_bASIC_MATERIALS; break;
+	case _Sector::REAL_ESTATE: key = ms_rEAL_ESTATE; break;
+	case _Sector::UTILITIES: key = ms_uTILITIES; break;
+	default: wxFAIL_MSG("_Sector passed to Parser constructor did not match anything in the switch statement!"); return;
+	}
+
+	wxString data = "";
+	url.Replace("TICKER", key);
+	this->PullWebData(url, data);
+}
+
+Parser::Parser(wxString& data)
+{
+	if (!data.size())
+		return;
+
+	this->ticker = data;
+	this->UpDateSummaryData();
+}
+
 SummaryData Parser::PullIndexQuote(int selection)
 {
 	wxString url = "";
@@ -233,16 +267,6 @@ void Parser::UpDateAll()
 {
 	this->UpDateSummaryData();
 	this->UpDate(true, true);
-}
-
-
-Parser::Parser(wxString& data)
-{
-	if (!data.size())
-		return;
-
-	this->ticker = data;
-	this->UpDateSummaryData();
 }
 
 void Parser::Test()

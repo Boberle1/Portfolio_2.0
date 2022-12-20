@@ -9,6 +9,7 @@
 #include "wx/graphics.h"
 #include "wx/dcbuffer.h"
 #include "wx/progdlg.h"
+#include "wx/popupwin.h"
 
 struct TextExtent
 {
@@ -66,14 +67,13 @@ class MotionCanvas : public wxWindow
 {
 public:
 //	MotionCanvas(wxWindow*, wxSize, wxVector<wxString>);
-	MotionCanvas(wxWindow*, wxSize, wxVector<SummaryData>, wxVector<StockViewerData*>);
+	MotionCanvas(wxWindow*, wxSize, wxVector<StockViewerData*>);
 	void OnPaint(wxPaintEvent&);
 private:
 	wxColour background = wxColour(21, 41, 46);
 	int iter = 0;
 	wxVector<wxString> vec;
 	wxVector<wxVector<wxString>> str_vec;
-	wxVector<SummaryData> sd_vec;
 	wxVector<StockViewerData*> svd_vec;
 	wxColour textcolor = wxColour(182, 203, 242);
 	wxColour bottom_text_color;
@@ -89,23 +89,33 @@ private:
 	int iteminfo_iter = 0;
 };
 
+struct GridCanvasData;
+
 class GridCanvas : public wxWindow
 {
 public:
 	GridCanvas(wxWindow*, wxSize, wxString&, int);
-	void CopyGridCanvas(const GridCanvas&);
 	void OnPaint(wxPaintEvent&);
 	TextExtent* GetTextExtent();
 	bool IsMatch(wxString&);
 	bool IsEmpty();
 	void OnMouseEnter(wxMouseEvent&);
 	void OnMouseLeave(wxMouseEvent&);
-	void SetMotion() { this->motion = true; }
 	wxDECLARE_EVENT_TABLE();
 
 protected:
+	// Copies everything...
+	void CopyGridCanvas(const GridCanvas&);
+	void CopyGridCanvasFromBackup(const GridCanvas&);
+
+	// Copies everything but the string displayed...
+	void CopyGridCanvasAttributes(const GridCanvas&);
+
+	// Copies everything...
+	void CopyGridCanvasData(GridCanvasData&);
+
+	void Clear(int flags = -1);
 	void m_SetValue(wxString&);
-	void m_SetValue(wxString&, bool color);
 	wxString m_GetValue();
 	void SetToTotalCanvas();
 	void SetTotTotalStartRowCanvas();
@@ -117,16 +127,26 @@ protected:
 	void SetToLargeFont();
 	void LeftClick();
 	void RightClick();
+	int Getflags();
+	wxString GetCanvasStringValue();
+	double GetCanvasDoubleValue();
+	wxString GetCanvasStringBackupValue();
+	double GetCanvasDoubleBackupValue();
 private:
 	void Initialize();
 	void SetTextColor(int);
 	void SetBackgroundColor();
 private:
 	wxString value = "";
-	bool motion = false;
+
+	// This string stores the value that was replaced when a new value was copied over...
+	wxString backup_value = "";
 
 	// this flag value is used to determine how to display the data...
 	int flag = 0;
+
+	// This flag stores the value that was replaced when a new value was copied over...
+	int backup_flag = 0;
 
 	// Possible fonts..
 	wxFont rowStartFont = wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
@@ -162,19 +182,27 @@ private:
 	int distance = 4;
 };
 
-class GridNode;
-
 class Gnode : public GridCanvas
 {
 public:
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, wxString&, int);
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, int);
 
-	// FOR TESTING MOTION... 
-	void BindMyThread();
+	// Copies everything..
 	void CopyGnode(const Gnode&);
+
+	// Copies everything but the string displayed...
+	void CopyGnodeAttributes(const Gnode&);
+	void CopyRow(Gnode&);
+	void CopyRowFromBackup(Gnode&);
+	void CopyFromTopNeighbor();
+	void CopyFromBottomNeighbor();
+	void CopyGnodeData(wxVector<GridCanvasData>&, GridCanvasData*);
+	void ClearSelf(bool from_bottom = false);
+	void ClearSelf(Gnode*);
+	int GetMyFlags();
 	void SetValue(wxString&);
-	void SetValue(wxString&, bool color);
+	void GetRowData(wxVector<GridCanvasData>&);
 
 	void SetUP(Gnode*);
 	void SetRight(Gnode*);
@@ -184,10 +212,19 @@ public:
 	Gnode* GetRight();
 	Gnode* GetDown();
 	Gnode* GetLeft();
+	Gnode* GetFarthestLeft();
+	wxString GetStringBackupValue();
+	double GetDoubleBackupValue();
+	wxString GetStringValue();
+	double GetDoubleValue();
 
 	void OnRightClick(wxMouseEvent&);
-	void OnThreadEvent(wxThreadEvent&);
+	void OnSortClick(wxMouseEvent&);
+	void OnLeftClick(wxMouseEvent&);
+//	void OnThreadEvent(wxThreadEvent&);
 	wxDECLARE_EVENT_TABLE();
+private:
+	void SetNodeToolTip();
 private:
 	wxString emptystring = "";
 	Gnode* m_up = nullptr;
@@ -198,68 +235,17 @@ private:
 	GridView* m_parent = NULL;
 };
 
-class GridNode : public wxStaticText
+struct GridCanvasData
 {
-public:
-	GridNode(GridView*, wxWindow*, size_t, size_t, GridNode*, GridNode*, GridNode*, GridNode*, wxString, int);
-	GridNode(const GridNode&);
-	void operator=(const GridNode&);
-	~GridNode();
-	bool CopyText(const GridNode&);
-	void SetMySizer(wxSizer* sizer) { this->mySizer = sizer; }
-	void LayoutMySizer() { this->mySizer->Layout(); }
+	GridCanvasData(Gnode* g) : gn(g)
+	{
+		this->flags = gn->GetMyFlags();
+		this->value = gn->GetStringValue();
+	}
 
-	bool SetNewVal(gridpair, bool total_row = false);
-	void SetUP(GridNode*);
-	void SetRight(GridNode*);
-	void SetDown(GridNode*);
-	void SetLeft(GridNode*);
-	GridNode* GetUP();
-	GridNode* GetRight();
-	GridNode* GetDown();
-	GridNode* GetLeft();
-	bool IsEmpty();
-	bool Clear();
-//	bool IsID(int);
-	bool IsMatch(wxString);
-	void OnClickEvent(wxMouseEvent&);
-	void OnRightClick(wxMouseEvent&);
-	void OnClickRowOff();
-	void OnClickColOff();
-	void OnClickItemOff();
-	void OnClickColON();
-	void OnClickRowON();
-	void ChangeColorToClicked(int);
-	void UnClick();
-	wxDECLARE_EVENT_TABLE();
-private:
-	void InitializeGridNode();
-	void SetBackGroundColor();
-private:
-	GridNode* m_up = nullptr;
-	GridNode* m_right = nullptr;
-	GridNode* m_down = nullptr;
-	GridNode* m_left = nullptr;
-	bool is_empty = true;
-	wxString t_val = "";
-	size_t m_row = 0;
-	size_t m_col = 0;
-
-	// Background Colours...
-	wxColour normal = wxColour(13, 10, 36);
-	wxColour summaryitem = wxColour(21, 41, 46);
-	wxColour onclick;
-
-	//Foreground Colours...
-	wxColour red = wxColour(217, 7, 28);
-	wxColour green = wxColour(13, 158, 20);
-	wxColour textcolor;
-
-	wxWindow* m_parent = nullptr;
-	GridView* m_grid_view = nullptr;
-	bool SummaryItem = false;
-	int Gridtype = -1;
-	wxSizer* mySizer = NULL;
+	Gnode* gn = NULL;
+	int flags = 0;
+	wxString value = "";
 };
 
 class mainwindow;
@@ -269,6 +255,7 @@ class GridView : public wxGridSizer
 public:
 	GridView(wxWindow*, int, int);
 	~GridView();
+	void SetNumOfItems(int);
 	void SetNewRow(StockViewerData*);
 	void UpdateRow(StockViewerData*);
 //	void SetNewRow(StockViewerData*, bool total_row = false);
@@ -276,15 +263,18 @@ public:
 	bool DoesItemExist(wxString);
 	bool ItemExist(wxString&);
 	void Cleanup();
-	void OnClickColItem(GridNode*);
-	void OnClickRowItem(GridNode*);
-	void OnClickItem(GridNode*);
+	void OnClickColItem(Gnode*);
+	void OnClickRowItem(Gnode*);
+	void OnClickItem(Gnode*);
 	void LayoutGrid();
 	void RightClickAlert(wxString&, wxPoint&);
 	wxString GetRightClickTicker();
 	bool RemoveRow(wxString&);
 	void virtual SetTitleRow();
+	void OnSortClick(Gnode*);
 private:
+	void SortStrings(Gnode*);
+	void SortDouble(Gnode*);
 	void FillGrid();
 	void ClickRowOff();
 	void ClickColOff();
@@ -294,16 +284,7 @@ private:
 	int GetGridNodeFlags(size_t&, size_t&);
 	Gnode* GetEmptyRow();
 	Gnode* GetMatch(wxString&);
-	GridNode* GetFirstEmptyRow();
-	GridNode* GetFirstMatch(wxString);
-	GridNode* GetFarthestRight(GridNode*);
-	GridNode* GetFarthestLeft(GridNode*);
-	GridNode* GetFarthestTop(GridNode*);
-	GridNode* GetFarthestBottom(GridNode*);
-	GridNode* GetRight(GridNode*, size_t, size_t start = 0);
-	GridNode* GetLeft(GridNode*, size_t, size_t start = 0);
-	GridNode* GetUp(GridNode*, size_t, size_t start = 0);
-	GridNode* GetDown(GridNode*, size_t, size_t start = 0);
+	Gnode* GetFirstEmptyRow();
 
 	Gnode* GetFarthestRight(Gnode*);
 	Gnode* GetRight(Gnode*, size_t, size_t start = 0);
@@ -312,35 +293,36 @@ private:
 	Gnode* GetDown(Gnode*, size_t, size_t start = 0);
 
 private:
-	void RemoveRow(GridNode*);
-	void MoveRowUp(GridNode*);
-	void ClearRow(GridNode*);
-	void DeleteRow(GridNode*);
+//	void RemoveRow(GridNode*);
+//	void MoveRowUp(GridNode*);
+//	void ClearRow(GridNode*);
+//	void DeleteRow(GridNode*);
 //	GridNode* FindItem(GridNode*, int);
-	void HighlightRow(GridNode*);
-	void HighlightCol(GridNode*);
+//	void HighlightRow(GridNode*);
+//	void HighlightCol(GridNode*);
 //	GridNode* FindGridNode(int);
-	GridNode* GetSummaryRow();
-	void SwapSummaryRow(GridNode*&);
+//	GridNode* GetSummaryRow();
+//	void SwapSummaryRow(GridNode*&);
 protected:
 	wxVector<wxString> headers;
 
 protected:
-	GridNode* head = nullptr;
-	Gnode* Head = NULL;
+//	GridNode* head = nullptr;
+	Gnode* head = NULL;
 	const Portfolio* port = NULL;
 	wxWindow* m_parent;
 	int gridnode_Size = 0;
 	size_t filledrows = 0;
 	size_t filledNodes = 0;
-	GridNode* grid_col = nullptr;
-	GridNode* grid_row = nullptr;
-	GridNode* clicked_node = nullptr;
-	GridNode* summaryrow = nullptr;
+//	GridNode* grid_col = nullptr;
+//	GridNode* grid_row = nullptr;
+//	GridNode* clicked_node = nullptr;
+	Gnode* summaryrow = nullptr;
 	bool SummaryRowSet = false;
 	wxString rightclick_ticker = "";
-	wxVector<GridNode*> gridnode;
+//	wxVector<GridNode*> gridnode;
 	int itemsize = 0;
+	bool acending = false;
 };
 
 class GridItemView : public GridView
@@ -677,10 +659,13 @@ public:
 	void SectorClick(wxVector<SubSector>*, wxString&);
 	void RightClickGrid(wxString&, wxPoint&);
 
+	// OnThreadCompletion callback function for portfolio to call after it retrieves all of its data...
+	void OnThreadCompletion();
+	void OnThreadCompletion(wxThreadEvent&);
+
 	// Event functions...
 	void CloseEvent(wxCloseEvent&);
 	void ClosePanelEvent(wxCloseEvent&);
-	void OnThreadCompletion(wxThreadEvent&);
 
 	// Helper functions for OnPurchaseMenu...
 	void PurchaseWin(wxString&);
@@ -728,7 +713,7 @@ public:
 	SummaryData smd;
 private:
 	wxWindow* GetLeftWin();
-	wxScrolled<wxPanel>* GetRightWin();
+	wxScrolledCanvas* GetRightWin();
 	wxWindow* GetBottomFrame();
 	void UpdateGridView();
 	void SaveFile();
@@ -737,7 +722,7 @@ private:
 	void DeleteQuoteThread();
 	void CreatePopupMenu();
 private:
-	wxScrolled<wxPanel>* grid_panel = NULL;
+	wxScrolledCanvas* grid_panel = NULL;
 	GridView* grid_view = NULL;
 	PortfolioWin* portwin = nullptr;
 	BottomFrame* bottom_frame = nullptr;

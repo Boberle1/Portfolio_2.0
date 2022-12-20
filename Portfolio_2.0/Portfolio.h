@@ -236,9 +236,9 @@ class Return_node
 {
 public:
 	Return_node(double* p, double* s, double* a) : PortfolioMarketValue(p), SectorMarketValue(s), StockMarketValue(a) {}
-	Return_node(double ocb, double dcb, double wcb, double qcb, double ycb, double m, double s, double divshares) 
+	Return_node(double ocb, double dcb, double wcb, double qcb, double ycb, double m, double s, double divshares, double b = 0.0) 
 		: original_cost_basis(ocb), day_cost_basis(dcb), week_cost_basis(wcb), 
-		quarter_cost_basis(qcb), year_cost_basis(ycb), market_value(m), shares(s), div_shares(divshares)
+		quarter_cost_basis(qcb), year_cost_basis(ycb), market_value(m), shares(s), div_shares(divshares), beta(b)
 	{
 		this->ReturnCalibarate();
 	}
@@ -250,6 +250,29 @@ public:
 		this->week_cost_basis = wcb;
 		this->quarter_cost_basis = qcb;
 		this->year_cost_basis = ycb;
+		this->day_market_value = m;
+		this->week_market_value = m;
+		this->quarter_market_value = m;
+		this->year_market_value = m;
+		this->market_value = m;
+		this->shares = s;
+		this->div_shares = divshares;
+		this->dividends = divs;
+		this->ReturnCalibarate();
+	}
+
+	void SetNewValues(double ocb, double dcb, double wcb, double qcb, double ycb, 
+		double dmv, double wmv, double qmv, double ymv, double m, double s, double divshares, double divs)
+	{
+		this->original_cost_basis = ocb;
+		this->day_cost_basis = dcb;
+		this->week_cost_basis = wcb;
+		this->quarter_cost_basis = qcb;
+		this->year_cost_basis = ycb;
+		this->day_market_value = dmv;
+		this->week_market_value = wmv;
+		this->quarter_market_value = qmv;
+		this->year_market_value = ymv;
 		this->market_value = m;
 		this->shares = s;
 		this->div_shares = divshares;
@@ -264,6 +287,10 @@ public:
 		this->week_cost_basis += rn->week_cost_basis;
 		this->quarter_cost_basis += rn->quarter_cost_basis;
 		this->year_cost_basis += rn->year_cost_basis;
+		this->day_market_value += rn->day_market_value;
+		this->week_market_value += rn->week_market_value;
+		this->quarter_market_value += rn->quarter_market_value;
+		this->year_market_value += rn->year_market_value;
 		this->market_value += rn->market_value;
 		this->shares += rn->shares;
 		this->div_shares += rn->div_shares;
@@ -274,17 +301,17 @@ public:
 	{
 		// Percent returns...
 		this->price_per_share = shares ? market_value / shares - 1 : 0.0;
-		this->day_return = day_cost_basis ? market_value / day_cost_basis - 1 : 0.0;
-		this->week_return = week_cost_basis ? market_value / week_cost_basis - 1 : 0.0;
-		this->quarter_return = quarter_cost_basis ? market_value / quarter_cost_basis - 1 : 0.0;
-		this->year_return = year_cost_basis ? market_value / year_cost_basis - 1 : 0.0;
+		this->day_return = day_cost_basis ? day_market_value / day_cost_basis - 1 : 0.0;
+		this->week_return = week_cost_basis ? week_market_value / week_cost_basis - 1 : 0.0;
+		this->quarter_return = quarter_cost_basis ? quarter_market_value / quarter_cost_basis - 1 : 0.0;
+		this->year_return = year_cost_basis ? year_market_value / year_cost_basis - 1 : 0.0;
 		this->total_return = original_cost_basis ? market_value / original_cost_basis - 1 : 0.0;
 
 		// $ Returns...
-		this->day_return$ = market_value - day_cost_basis;
-		this->week_return$ = market_value - week_cost_basis;
-		this->quarter_return$ = market_value - quarter_cost_basis;
-		this->year_return$ = market_value - year_cost_basis;
+		this->day_return$ = day_market_value - day_cost_basis;
+		this->week_return$ = week_market_value - week_cost_basis;
+		this->quarter_return$ = quarter_market_value - quarter_cost_basis;
+		this->year_return$ = year_market_value - year_cost_basis;
 		this->total_return$ = market_value - original_cost_basis;
 	}
 
@@ -299,6 +326,13 @@ public:
 		this->PortfolioPerc = this->PortfolioMarketValue && *this->PortfolioMarketValue ? this->market_value / *this->PortfolioMarketValue : 0.0;
 		this->SectorPerc = this->SectorMarketValue && *this->SectorMarketValue ? this->market_value / *this->SectorMarketValue : 0.0;
 		this->AssetPerc = this->StockMarketValue && *this->StockMarketValue ? this->market_value / *this->StockMarketValue : 0.0;
+
+		if (this->StockMarketValue)
+			this->asset_beta = this->AssetPerc * this->beta;
+		if (this->SectorMarketValue)
+			this->sector_beta = this->beta * this->SectorPerc;
+		if (this->PortfolioMarketValue)
+			this->portfolio_beta = this->PortfolioPerc * this->beta;
 	}
 
 	Return_node* GetReturnNode() { return this; }
@@ -374,6 +408,10 @@ public:
 	double quarter_cost_basis = 0.0;
 	double year_cost_basis = 0.0;
 	double market_value = 0.0;
+	double day_market_value = 0.0;
+	double week_market_value = 0.0;
+	double quarter_market_value = 0.0;
+	double year_market_value = 0.0;
 	double shares = 0.0;
 	double price_per_share = 0.0;
 	double day_return = 0.0;
@@ -401,20 +439,40 @@ public:
 	double _52weekDeviation = 0.0;
 	double _90dayDeviation = 0.0;
 	double _30dayDeviation = 0.0;
+
+	double asset_beta = 0.0;
+	double sector_beta = 0.0;
+	double portfolio_beta = 0.0;
+	double beta = 0.0;
 };
 
 struct StockViewerData
 {
 	StockViewerData(){}
 	StockViewerData(Return_node* r, wxString longn, wxString t, wxString e, wxString pd, _Sector S, double s, double pp, double p, double pc, double dg, double wg,
-		double qg, double yg, double tg, double cb, double mv, double td, double cash = 0.0, wxString ex_div = "NA")
+		double qg, double yg, double tg, double cb, double mv, double td, double b, double cash = 0.0, wxString ex_div = "NA")
 		: m_parent(r), longname(longn), ticker(t), earnings(e), purchase_date(pd), sec(S), shares(s), purchase_price(pp), price(p), previous_close(pc), day_gain(dg),
-		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), m_cash(cash), ex_div_date(ex_div)
+		week_gain(wg), quarter_gain(qg), year_gain(yg), total_gain(tg), cost_basis(cb), market_value(mv), total_divs(td), beta(b), m_cash(cash), ex_div_date(ex_div)
 	{
 		if (S != _Sector::SECTOR_INVALID)
 		{
 			SectorClass& sc = GetSectorClass();
 			this->SectorName = sc.GetSectorString(sec);
+		}
+		// find how many chars are necessary to show to put into wxNumberFormatter...
+		wxString num = "";
+		num << shares;
+		int end = 0;
+		int decimal = 0;
+		bool enter = false;
+		int index = num.find('.');
+		if (index == -1)
+			return;
+		else
+		{
+			if (!num.size() || num.size() == 1)
+				return;
+			this->trailing_decimals = (num.size() - 1) - index;
 		}
 	}
 	wxString GetTicker() { return this->ticker; }
@@ -423,12 +481,13 @@ struct StockViewerData
 	wxString GetPurchaseDate() { return this->purchase_date; }
 	wxString GetExDivDate() { return this->ex_div_date; }
 	wxString GetSectorName() { return this->SectorName; }
-	wxString GetShares() { return wxNumberFormatter::ToString(this->shares, 2); }
+	wxString GetShares() { return wxNumberFormatter::ToString(this->shares, this->trailing_decimals); }
 	wxString GetPurchasePrice() { return wxNumberFormatter::ToString(this->purchase_price, 2); }
 	wxString GetPrice(){ return wxNumberFormatter::ToString(this->price, 2); }
 	wxString GetPreviousClose(){ return wxNumberFormatter::ToString(this->previous_close, 2); }
 	wxString GetDayGain(){ return wxNumberFormatter::ToString(this->day_gain * 100, 2); }
-	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
+//	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
+	wxString GetWeekGain();
 	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2) + "%"; }
 	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2) + "%"; }
 	wxString GetTotalGain(){ return wxNumberFormatter::ToString(this->total_gain * 100, 2); }
@@ -447,6 +506,8 @@ struct StockViewerData
 	wxString Get52Week_Deviation() { return wxNumberFormatter::ToString(m_parent->_52weekDeviation, 2); }
 	wxString Get90Day_Deviation() { return wxNumberFormatter::ToString(m_parent->_90dayDeviation, 2); }
 	wxString Get30Day_Deviation() { return wxNumberFormatter::ToString(m_parent->_30dayDeviation, 2); }
+
+	wxString GetBeta() { return wxNumberFormatter::ToString(this->beta, 2); }
 
 	wxString ticker = "";
 	wxString longname = "";
@@ -470,7 +531,9 @@ struct StockViewerData
 	double portfolio_perc = 0.0;
 	double sector_perc = 0.0;
 	double m_cash = 0.0;
+	double beta = 0.0;
 	Return_node* m_parent = nullptr;
+	int trailing_decimals = 2;
 };
 
 class stock_node
@@ -509,6 +572,8 @@ public:
 	bool IsPendingDivReInvest();
 	bool SetReInvestShares(double&);
 	bool SetReInvestShares(Dividend&, double&);
+	void SetSiblingRatio(double);
+	double GetSiblingRatio();
 	void Save(DataStream&);
 	void Retrieve(DataStream&);
 
@@ -526,6 +591,9 @@ private:
 	double m_price_per_share = 0.0;
 	double m_shares = 0.0;
 	double m_average_sold_price = 0.0;
+
+	// for calculating what percent this lot is of all its siblings...
+	double ratio_of_siblings = 0.0;
 	Action action = UNDEFINED;
 	int active = 0;
 
@@ -551,17 +619,12 @@ void SetDividendsCB(void*, Dividend);
 class StockThread : public wxThread
 {
 public:
-	StockThread(wxThreadKind tk, StockNode*, long, wxDateTime, double, double);
+	StockThread(wxThreadKind tk, Sector*, StockNode*);
 	~StockThread();
 	wxThread::ExitCode Entry();
-	bool GetResult();
 private:
 	StockNode* m_parent = nullptr;
-	long m_id = 0;
-	wxDateTime m_date;
-	double m_price = 0.0;
-	double m_shares = 0.0;
-	bool result = false;
+	Sector* m_grand_parent = NULL;
 };
 
 class StockNode : public Return_node, public wxEvtHandler
@@ -609,6 +672,7 @@ public:
 	wxVector<stock_node*> GetChildren();
 
 private:
+	void CalcRatiosOfChildren(wxDateTime*);
 	wxString GetLatestEx_Div_Date();
 	bool DistributeReInvestmentShares(double&);
 	bool DistributeReInvestmentShares(Dividend&, double&);
@@ -674,10 +738,13 @@ public:
 	Indices();
 	~Indices();
 	void Calibrate(bool force = false);
+	void ClockChange();
 	void SetHistoricalData(Day_Prices);
 	void SetSummaryData(SummaryData);
 	StockViewerData* GetStockViewerData();
 	_INDEX_ GetIndice();
+	void Save();
+	void Retrieve();
 private:
 	bool UpDate(bool force_update = false);
 	Parser* NewParser();
@@ -721,6 +788,7 @@ public:
 	wxVector<stock_node*> GetLotData();
 	Pair GetPair();
 	void Calibrate(bool datechange = false);
+	void OnClockChange();
 	void CalcRatiosOfChildren();
 	const StockViewerData* GetStockViewerData() const;
 	void Save();
@@ -777,7 +845,7 @@ public:
 	const wxVector<StockNode*> GetStockNodeItems();
 	wxVector<Indices*> GetIndices();
 	void Calibrate(bool datechange = false);
-	void CalcRatiosOfAllChildren();
+	double CalcRatiosOfAllChildren();
 	StockViewerData* GetStockViewerData();
 	void Save();
 	void Retrieve();
@@ -787,6 +855,7 @@ public:
 	SummaryData QuoteLookup(wxString);
 	bool AddDeposit(wxDateTime&, double&);
 	bool AddWithdrawl(wxDateTime&, double&);
+	void ForceUpdate();
 	void DateChange();
 	void Update();
 	bool IsStockActive(wxString&);
@@ -794,7 +863,8 @@ public:
 	const Sector* GetConstSector(wxString&);
 
 	// call back for sector after one of its stocks completes a thread...
-	void ThreadComplete(StockNode*);
+	void ThreadComplete(Sector*);
+	void OnThreadRetrieveComplete(Sector*);
 private:
 	bool m_Purchase(long, _Sector, wxString, wxString, double, double, bool, wxString);
 	bool m_AddToPosition(long&, wxString&, double&, double&, bool&, wxString&);

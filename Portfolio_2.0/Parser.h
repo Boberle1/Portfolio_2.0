@@ -80,6 +80,7 @@ public:
 		void (*cbs)(void*, SummaryData, _PortfolioType), void (*cbd)(void*, Dividend), wxString enddate);
 	Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), _PortfolioType
 		,void (*cbs)(void*, SummaryData, _PortfolioType));
+	Parser(void* parent, _Sector S);
 	Parser(wxString&);
 	Parser() {}
 	void Test();
@@ -221,7 +222,8 @@ private:
 	wxString indices_url = "https://query1.finance.yahoo.com/v7/finance/download/%5ETICKER?period1=BEGINDATE&period2=ENDDATE&interval=1d&events=history&includeAdjustedClose=true";
 	wxString QQQ_Url_h =
 		"https://query1.finance.yahoo.com/v7/finance/download/%5EIXIC?period1=1638926022&period2=1670462022&interval=1d&events=history&includeAdjustedClose=true";
-
+	wxString idustrie_stocks_url =
+		"https://finance.yahoo.com/screener/predefined/TICKER/?offset=0&count=100";
 	wxString SP500_QUOTE_URL = "https://finance.yahoo.com/quote/%5EGSPC?p=%5EGSPC";
 	wxString QQQ_QUOTE_URL = "https://finance.yahoo.com/quote/%5EIXIC?p=%5EIXIC";
 	wxString DOW_QUOTE_URL = "https://finance.yahoo.com/quote/%5EDJI/";
@@ -243,6 +245,7 @@ private:
 
 	void* m_parent = nullptr;
 	_PortfolioType type = STOCK;
+	_Sector sector_type = _Sector::SECTOR_INVALID;
 };
 
 

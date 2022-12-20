@@ -549,8 +549,7 @@ bool CashAccount::m_AddDividends(Pair& p)
 	auto index = this->m_FindDiv(p.ticker);
 	if(!index)
 		this->divs.push_back(p);
-
-	index->amount = p.amount;
+	
 	this->UpdateCash();
 	return true;
 }

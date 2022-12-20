@@ -39,6 +39,19 @@ auto constexpr _rEAL_ESTATE = "realestate";
 auto constexpr _tECHNOLOGY = "technology";
 auto constexpr _uTILITIES = "utilities";
 
+// words to insert int url for fetching stocks from a certain industries...
+auto constexpr ms_bASIC_MATERIALS = "ms_basic_materials";
+auto constexpr ms_cOMMUNICATION_SERVICES = "ms_communication_services";
+auto constexpr ms_cONSUMER_DESCRETIONARY = "ms_consumer_cyclica";
+auto constexpr ms_cONSUMER_STAPLES = "ms_consumer_defensive";
+auto constexpr ms_eNERGY = "ms_energy";
+auto constexpr ms_fINANCIAL = "ms_financial_services";
+auto constexpr ms_hEALTH_CARE = "ms_healthcare";
+auto constexpr ms_iNDUSTRIALS = "ms_industrials";
+auto constexpr ms_rEAL_ESTATE = "ms_real_estate";
+auto constexpr ms_tECHNOLOGY = "ms_technology";
+auto constexpr ms_uTILITIES = "ms_utilities";
+
 // etf is its own subsector
 auto constexpr _ETF = "Exchange Traded Fund";
 

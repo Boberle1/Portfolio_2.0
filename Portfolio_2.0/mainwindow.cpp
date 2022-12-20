@@ -28,9 +28,6 @@ wxEND_EVENT_TABLE()
 wxBEGIN_EVENT_TABLE(Gnode, wxWindow)
 wxEND_EVENT_TABLE()
 
-wxBEGIN_EVENT_TABLE(GridNode, wxStaticText)
-wxEND_EVENT_TABLE()
-
 wxBEGIN_EVENT_TABLE(PortfolioWin, wxWindow)
 	EVT_TEXT_ENTER(_PortfolioWin::DATEPCKER, DateChange)
 wxEND_EVENT_TABLE()
@@ -71,6 +68,9 @@ auto constexpr PORTFOLIO_PERC = "Portfolio Percent";
 auto constexpr _52WEEK_DEVIATION = "52Week Deviation";
 auto constexpr _90DAY_DEVIATION = "90Day Deviation";
 auto constexpr _30DAY_DEVIATION = "30Day Deviation";
+auto constexpr WEEK_START_CLOSE = "W/start close";
+auto constexpr WEEK_END_CLOSE = "W/end close";
+auto constexpr BETA = "Beta";
 auto constexpr GRIDROW = 1;
 auto constexpr GRIDCOL = 2;
 auto constexpr GRIDROWHEAD = 3;
@@ -262,12 +262,9 @@ void VirtualListView::UpdateItemsCount()
 
 // MotionCanvas Functions..
 
-MotionCanvas::MotionCanvas(wxWindow* w, wxSize size, wxVector<SummaryData> sd, wxVector<StockViewerData*> _svd_vec) : wxWindow(w, wxID_ANY, wxDefaultPosition, size),
-	sd_vec(sd), svd_vec(_svd_vec), textextent(0.0, 0.0), textextent2(0.0, 0.0), textextent3(0.0, 0.0)
+MotionCanvas::MotionCanvas(wxWindow* w, wxSize size, wxVector<StockViewerData*> _svd_vec) : wxWindow(w, wxID_ANY, wxDefaultPosition, size),
+	svd_vec(_svd_vec), textextent(0.0, 0.0), textextent2(0.0, 0.0), textextent3(0.0, 0.0)
 {
-	for (auto& v : this->sd_vec)
-		v.Longname = Decipherhtmlcodes(v.Longname);
-
 	this->SetBackgroundColour(w->GetBackgroundColour());
 	this->SetBackgroundStyle(wxBackgroundStyle::wxBG_STYLE_PAINT);
 	this->Bind(wxEVT_PAINT, &MotionCanvas::OnPaint, this);
@@ -279,7 +276,6 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 	dc.Clear();
 
 	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
-//	wxGraphicsContext* gc2 = wxGraphicsContext::Create(dc);
 	if (!gc)
 		return;
 
@@ -310,7 +306,7 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 		bottom_in_motion = true;
 		// we pause the motion for the top graphic and re print it at this position until all of
 		// its information has passed on the screen on the bottom of the rect...
-		if (iter >= this->sd_vec.size())
+		if (iter >= this->svd_vec.size())
 			iter = 0;
 
 		// we begin with the first element of info to pass across the screen...
@@ -335,9 +331,8 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 		else if (iteminfo_iter == 2)
 		{
 
-			double val = this->sd_vec[iter].previousclose ? ((this->sd_vec[iter].marketprice / this->sd_vec[iter].previousclose) - 1) * 100 : 0.0;
+			value3 = this->svd_vec[iter]->GetDayGain();
 			value2 = day_gain_literal;
-			value3 = wxNumberFormatter::ToString(val, 2);
 			int result = IsStringPNZ(value3);
 			if (result == 0)
 				this->bottom_text_color = this->yellow;
@@ -398,23 +393,26 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 	}
 	else if (top_distance == -21000)
 	{
-		value = this->sd_vec[iter].Longname;
+		value = this->svd_vec[iter]->GetLongName();
+		value = Decipherhtmlcodes(value);
 		gc->GetTextExtent(value, &textextent.w, &textextent.h);
 		top_distance = textextent.w * -1;
 	}
 	else if (top_distance > rectSize.GetWidth())
 	{
-		if (iter + 1 >= this->sd_vec.size())
+		if (iter + 1 >= this->svd_vec.size())
 			iter = 0;
 		else 
 			++iter;
-		value = this->sd_vec[iter].Longname;
+		value = this->svd_vec[iter]->GetLongName();
+		value = Decipherhtmlcodes(value);
 		gc->GetTextExtent(value, &textextent.w, &textextent.h);
 		top_distance = textextent.w * -1;
 	}
 	else
 	{
-		value = this->sd_vec[iter].Longname;
+		value = this->svd_vec[iter]->GetLongName();
+		value = Decipherhtmlcodes(value);
 		gc->GetTextExtent(value, &textextent.w, &textextent.h);
 	}
 
@@ -447,43 +445,6 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 	}
 	delete gc;
 	return;
-	/*
-	else if (top_distance > rectSize.GetWidth())
-	{
-		if (iter + 1 < this->sd_vec.size())
-			++iter;
-		else
-			iter = 0;
-		value = this->sd_vec[iter].Longname;
-		value2 = this->sd_vec[iter].curr_price;
-		gc->GetTextExtent(value, &textextent.w, &textextent.h);
-		gc->GetTextExtent(value2, &textextent2.w, &textextent2.h);
-		top_distance = textextent.w * -1;
-	}
-	else if(top_distance == -21000)
-	{
-		value = this->sd_vec[iter].Longname;
-		value2 = this->sd_vec[iter].curr_price;
-		gc->GetTextExtent(value, &textextent.w, &textextent.h);
-		gc->GetTextExtent(value2, &textextent2.w, &textextent2.h);
-		top_distance = textextent.w * -1;
-		++top_distance;
-	}
-	else
-	{
-		value = this->sd_vec[iter].Longname;
-		value2 = this->sd_vec[iter].curr_price;
-		gc->GetTextExtent(value, &textextent.w, &textextent.h);
-		gc->GetTextExtent(value2, &textextent2.w, &textextent2.h);
-		++top_distance;
-	}
-	*/
-	gc->DrawText(value, rectOrigin.x + this->top_distance, (rectOrigin.y + ((rectSize.GetHeight() / 2.0) / 2.0)) - textextent.h / 2.0); //Draw in top half of rect
-	gc->SetFont(gc->CreateFont(this->textfont, this->green));
-	gc->DrawText(value2, rectOrigin.x + this->bottom_distance, (((rectOrigin.y + rectSize.GetHeight()) * (3.0 / 4.0)) - textextent2.h / 2.0)); // Draw in bottom half of rect
-//	gc->DrawText(value, rectOrigin.x + this->distance, (rectOrigin.y + rectSize.GetHeight() / 2.0) - textextent.h / 2.0); Draw in middle of rect
-
-	delete gc;
 }
 
 GridCanvas::GridCanvas(wxWindow* w, wxSize size, wxString& val, int flags) : wxWindow(w, wxID_ANY, wxDefaultPosition, size),
@@ -496,14 +457,6 @@ GridCanvas::GridCanvas(wxWindow* w, wxSize size, wxString& val, int flags) : wxW
 	this->SetBackgroundColour(w->GetBackgroundColour());
 	this->SetBackgroundStyle(wxBackgroundStyle::wxBG_STYLE_PAINT);
 	this->Bind(wxEVT_PAINT, &GridCanvas::OnPaint, this);
-
-	this->Initialize();
-}
-
-void GridCanvas::CopyGridCanvas(const GridCanvas& gc)
-{
-	this->flag = gc.flag;
-	this->value = gc.value;
 
 	this->Initialize();
 }
@@ -533,14 +486,6 @@ void GridCanvas::OnPaint(wxPaintEvent& evt)
 	gc->SetFont(gc->CreateFont(this->textfont, this->textcolor));
 
 	gc->GetTextExtent(this->value, &textextent.w, &textextent.h);
-
-	if (this->motion)
-	{
-		if (distance > rectSize.GetWidth())
-			distance = textextent.w * -1;
-		else
-			++distance;
-	}
 
 	gc->DrawText(this->value, rectOrigin.x + this->distance, (rectOrigin.y + rectSize.GetHeight() / 2.0) - textextent.h / 2.0);
 
@@ -634,20 +579,62 @@ void GridCanvas::OnMouseLeave(wxMouseEvent& evt)
 	this->Refresh();
 }
 
-void GridCanvas::m_SetValue(wxString& val)
+void GridCanvas::CopyGridCanvasData(GridCanvasData& gcd)
 {
-	if (this->value == val)
-		return;
+	this->flag = gcd.flags;
+	this->value = gcd.value;
 
-	this->value = val;
+	this->Initialize();
+	this->Refresh();
+}
 
-	if (flag & GridCanvasFlag::COLORDEPENDENT)
-		this->SetTextColor(IsStringPNZ(this->value));
+void GridCanvas::CopyGridCanvas(const GridCanvas& gc)
+{
+	this->backup_flag = this->flag;
+	this->backup_value = this->value;
+
+	this->flag = gc.flag;
+	this->value = gc.value;
+
+	this->Initialize();
+	this->Refresh();
+}
+
+void GridCanvas::CopyGridCanvasFromBackup(const GridCanvas& gc)
+{
+	this->backup_flag = this->flag;
+	this->backup_value = this->value;
+
+	this->flag = gc.backup_flag;
+	this->value = gc.backup_value;
+
+	this->Initialize();
+	this->Refresh();
+}
+
+void GridCanvas::CopyGridCanvasAttributes(const GridCanvas& gc)
+{
+	this->flag = gc.flag;
+	this->value = "";
+	this->Initialize();
+}
+
+void GridCanvas::Clear(int flags)
+{
+	this->value = "";
+
+	if (flags == -1)
+		this->SetToNormalBackground();
+	else
+	{
+		this->flag = flags;
+		this->Initialize();
+	}
 
 	this->Refresh();
 }
 
-void GridCanvas::m_SetValue(wxString& val, bool color)
+void GridCanvas::m_SetValue(wxString& val)
 {
 	if (this->value == val)
 		return;
@@ -722,6 +709,57 @@ void GridCanvas::RightClick()
 
 }
 
+int GridCanvas::Getflags()
+{
+	return this->flag;
+}
+
+wxString GridCanvas::GetCanvasStringValue()
+{
+	return this->value;
+}
+
+double GridCanvas::GetCanvasDoubleValue()
+{
+	double d = 0.0;
+	wxString temp = this->value;
+
+	int index = temp.find('%');
+	if (index != -1)
+		temp = temp.Mid(0, index);
+
+	index = temp.find('$');
+	if (index != -1)
+		temp = temp.Mid(1);
+
+	if (temp.ToDouble(&d))
+		return d;
+
+	wxFAIL_MSG("ToDouble failed in GridCanvas::GetDoubleValue! value is: " + value);
+	return 0.0;
+}
+
+wxString GridCanvas::GetCanvasStringBackupValue()
+{
+	return this->backup_value;
+}
+
+double GridCanvas::GetCanvasDoubleBackupValue()
+{
+	double d = 0.0;
+	if (this->backup_value.IsEmpty())
+		return 0.0;
+
+	wxString temp = this->backup_value;
+	int index = temp.find('%');
+	if (index != -1)
+		temp = temp.Mid(0, index);
+	if (temp.ToDouble(&d))
+		return d;
+
+	return 0.0;
+}
+
 void GridCanvas::Initialize()
 {
 	if (flag & GridCanvasFlag::COLHEAD)
@@ -745,18 +783,6 @@ void GridCanvas::Initialize()
 		if (this->value.length())
 			this->SetTextColor(IsStringPNZ(this->value));
 	}
-
-	if (this->value.empty())
-		return;
-
-	wxClientDC dc(this);
-	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
-	if (!gc)
-		return;
-	
-	gc->SetFont(gc->CreateFont(this->textfont, this->textcolor));
-	gc->GetTextExtent(this->value, &textextent.w, &textextent.h);
-	delete gc;
 }
 
 void GridCanvas::SetTextColor(int i)
@@ -791,6 +817,8 @@ Gnode::Gnode(GridView* gv, wxWindow* w, wxSize size, size_t row, size_t col, Gno
 {
 	if(flags & GridCanvasFlag::ROWHEAD)
 		this->Bind(wxEVT_RIGHT_DOWN, &Gnode::OnRightClick, this);
+	if (flags & GridCanvasFlag::COLHEAD)
+		this->Bind(wxEVT_LEFT_DCLICK, &Gnode::OnSortClick, this);
 }
 
 Gnode::Gnode(GridView* gv, wxWindow* w, wxSize size, size_t row, size_t col, Gnode* up, Gnode* right, Gnode* down, Gnode* left, int flags)
@@ -798,27 +826,140 @@ Gnode::Gnode(GridView* gv, wxWindow* w, wxSize size, size_t row, size_t col, Gno
 {
 	if (flags & GridCanvasFlag::ROWHEAD)
 		this->Bind(wxEVT_RIGHT_DOWN, &Gnode::OnRightClick, this);
+	if (flags & GridCanvasFlag::COLHEAD)
+		this->Bind(wxEVT_LEFT_DCLICK, &Gnode::OnSortClick, this);
 }
 
-void Gnode::BindMyThread()
-{
-	this->Bind(wxEVT_THREAD, &Gnode::OnThreadEvent, this);
-	this->SetMotion();
-}
+//void Gnode::BindMyThread()
+//{
+//	this->Bind(wxEVT_THREAD, &Gnode::OnThreadEvent, this);
+//	this->SetMotion();
+//}
 
 void Gnode::CopyGnode(const Gnode& gn)
 {
 	this->CopyGridCanvas(gn);
 }
 
+void Gnode::CopyGnodeAttributes(const Gnode& gn)
+{
+	this->CopyGridCanvasAttributes(gn);
+}
+
+void Gnode::CopyRow(Gnode& gn)
+{
+	this->CopyGridCanvas(gn);
+
+	this->SetNodeToolTip();
+
+	Gnode* swapto = this->GetRight();
+	Gnode* swapfrom = gn.GetRight();
+
+	if(swapto && swapfrom)
+		swapto->CopyRow(*swapfrom);
+}
+
+void Gnode::CopyRowFromBackup(Gnode& gn)
+{
+	this->CopyGridCanvasFromBackup(gn);
+
+	Gnode* swapto = this->GetRight();
+	Gnode* swapfrom = gn.GetRight();
+
+	if (swapto && swapfrom)
+		swapto->CopyRowFromBackup(*swapfrom);
+}
+
+void Gnode::CopyFromTopNeighbor()
+{
+	Gnode* neighbor = this->GetUP();
+	if (neighbor)
+		this->CopyGnode(*neighbor);
+
+	this->SetNodeToolTip();
+
+	neighbor = this->GetRight();
+	if (neighbor)
+		neighbor->CopyFromTopNeighbor();
+}
+
+void Gnode::CopyFromBottomNeighbor()
+{
+	Gnode* neighbor = this->GetDown();
+	if (neighbor)
+		this->CopyGnode(*neighbor);
+
+	this->SetNodeToolTip();
+
+	neighbor = this->GetRight();
+	if (neighbor)
+		neighbor->CopyFromBottomNeighbor();
+}
+
+void Gnode::CopyGnodeData(wxVector<GridCanvasData>& v, GridCanvasData* gcd)
+{
+	if (gcd == v.end())
+		return;
+
+	this->CopyGridCanvasData(*gcd);
+
+	this->SetNodeToolTip();
+
+	Gnode* neighbor = this->GetRight();
+	if (neighbor)
+		neighbor->CopyGnodeData(v, ++gcd);
+}
+
+void Gnode::ClearSelf(bool from_bottom)
+{
+	int flags = -1;
+	Gnode* neighbor = from_bottom ? this->GetDown() : this->GetUP();
+	if (neighbor)
+		flags = neighbor->Getflags();
+	else if (this->GetDown())
+		flags = this->GetDown()->Getflags();
+	this->Clear(flags);
+
+	neighbor = this->GetRight();
+	if (neighbor)
+		neighbor->ClearSelf(from_bottom);
+
+	this->SetToolTip(NULL);
+}
+
+void Gnode::ClearSelf(Gnode* gn)
+{
+	if (IsNull(gn, "Gnode* in Gnode::ClearSelf is nullptr!"))
+		return;
+
+	this->Clear(gn->Getflags());
+
+	gn = gn->GetRight();
+	Gnode* neighbor = this->GetRight();
+
+	if (gn && neighbor)
+		neighbor->ClearSelf(gn);
+
+	this->SetToolTip(NULL);
+}
+
+int Gnode::GetMyFlags()
+{
+	return this->Getflags();
+}
+
 void Gnode::SetValue(wxString& s)
 {
 	this->m_SetValue(s);
+	this->SetNodeToolTip();
 }
 
-void Gnode::SetValue(wxString& s, bool color)
+void Gnode::GetRowData(wxVector<GridCanvasData>& v)
 {
-	this->m_SetValue(s, color);
+	v.push_back(this);
+	Gnode* neighbor = this->GetRight();
+	if (neighbor)
+		neighbor->GetRowData(v);
 }
 
 void Gnode::SetUP(Gnode* gn)
@@ -861,6 +1002,44 @@ Gnode* Gnode::GetLeft()
 	return this->m_left;
 }
 
+Gnode* Gnode::GetFarthestLeft()
+{
+	Gnode* neighbor = this->GetLeft();
+	Gnode* temp = NULL;
+
+	// If null return self;
+	if (!neighbor)
+		return this;
+
+	while (neighbor)
+	{
+		temp = neighbor;
+		neighbor = neighbor->GetLeft();
+	}
+
+	return temp;
+}
+
+wxString Gnode::GetStringValue()
+{
+	return this->GetCanvasStringValue();
+}
+
+wxString Gnode::GetStringBackupValue()
+{
+	return this->GetCanvasStringBackupValue();
+}
+
+double Gnode::GetDoubleBackupValue()
+{
+	return this->GetCanvasDoubleBackupValue();
+}
+
+double Gnode::GetDoubleValue()
+{
+	return this->GetCanvasDoubleValue();
+}
+
 void Gnode::OnRightClick(wxMouseEvent& evt)
 {
 	wxString ticker = this->m_GetValue();
@@ -877,44 +1056,43 @@ void Gnode::OnRightClick(wxMouseEvent& evt)
 	this->m_parent->RightClickAlert(ticker, p);
 }
 
-void Gnode::OnThreadEvent(wxThreadEvent& evt)
+void Gnode::OnSortClick(wxMouseEvent& evt)
 {
-	this->Refresh();
+	this->m_parent->OnSortClick(this);
 }
+
+void Gnode::OnLeftClick(wxMouseEvent& evt)
+{
+	Gnode* left = this->GetFarthestLeft();
+	this->SetToolTip(left->GetStringValue());
+}
+
+void Gnode::SetNodeToolTip()
+{
+	int flags = this->Getflags();
+	if (!(flags & GridCanvasFlag::TOTALROW || flags & GridCanvasFlag::TOTALROWHEAD)
+		&& !(flags & GridCanvasFlag::COLHEAD || flags & GridCanvasFlag::ROWHEAD))
+	{
+		Gnode* left = this->GetFarthestLeft();
+		wxString left_value = left->GetStringValue();
+		this->SetToolTip(left_value);
+	}
+}
+
+//void Gnode::OnThreadEvent(wxThreadEvent& evt)
+//{
+//	this->Refresh();
+//}
 
 // GridView functions...
 
+/*
 GridNode::GridNode(GridView* gv, wxWindow* w, size_t row, size_t col, GridNode* up, GridNode* right, GridNode* down, GridNode* left, wxString tval, int gridtype)
 	: wxStaticText(w, wxID_ANY, tval), m_grid_view(gv), m_parent(w), m_row(row), m_col(col), m_up(up), m_right(right), m_down(down), m_left(left), t_val(tval), Gridtype(gridtype)
 {
 	this->InitializeGridNode();
 
-	/*
-	this->SetBackgroundColour(this->normal);
-	this->Bind(wxEVT_LEFT_DOWN, &GridNode::OnClickEvent, this);
-	this->onclick = wxColour(39, 38, 51);
-
-	if (this->t_val.size())
-	{
-		this->is_empty = false;
-	}
-
-	if (GRIDROW == this->Gridtype)
-	{
-		this->Bind(wxEVT_RIGHT_DOWN, &GridNode::OnRightClick, this);
-		this->textcolor = wxColour(182, 203, 242);
-		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
-		this->SetForegroundColour(this->textcolor);
-	}
-	if (GRIDCOL == this->Gridtype)
-	{
-		this->textcolor = wxColour(213, 220, 227);
-		this->SetFont(wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
-		this->SetForegroundColour(this->textcolor);
-	}
-	if (this->Gridtype == -1)
-		this->SetFont(wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM));
-	*/
+	
 }
 
 GridNode::GridNode(const GridNode& gn) 
@@ -1065,15 +1243,7 @@ bool GridNode::Clear()
 	this->Refresh();
 	return true;
 }
-/*
-bool GridNode::IsID(int id)
-{
-	if (this->GetId() == id)
-		return true;
 
-	return false;
-}
-*/
 bool GridNode::IsMatch(wxString s)
 {
 	// If t_val has the * in the ticker because there is an upcoming dividend reinvestment date than the tickerw wont match so we need to add one to it...
@@ -1243,7 +1413,7 @@ void GridNode::InitializeGridNode()
 	if (this->Gridtype == -1)
 		this->SetFont(wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM));
 }
-
+*/
 // Private VirtualListView functions....
 void VirtualListView::m_SetItemCount()
 {
@@ -1263,6 +1433,31 @@ GridView::GridView(wxWindow* w, int cols, int _itemsize) : wxGridSizer(cols), m_
 GridView::~GridView()
 {
 	
+}
+
+void GridView::SetNumOfItems(int items)
+{
+	if (this->itemsize == items)
+		return;
+
+	if (itemsize < items)
+	{
+		Gnode* neighbor = this->summaryrow->GetDown();
+		if (neighbor)
+			neighbor->CopyFromTopNeighbor();
+		this->summaryrow->ClearSelf();
+		this->summaryrow = neighbor;
+	}
+	else
+	{
+		Gnode* neighbor = this->summaryrow->GetUP();
+		if (neighbor)
+			neighbor->CopyFromBottomNeighbor();
+		this->summaryrow->ClearSelf(true);
+		this->summaryrow = neighbor;
+	}
+
+	itemsize = items;
 }
 
 void GridView::SetNewRow(StockViewerData* svd)
@@ -1359,10 +1554,11 @@ void GridView::UpdateRow(StockViewerData* svd, bool total_row)
 */
 bool GridView::DoesItemExist(wxString s)
 {
-	GridNode* first = this->GetFirstMatch(s);
-	if (first)
-		return true;
+//	GridNode* first = this->GetFirstMatch(s);
+//	if (first)
+//		return true;
 
+//	return false;
 	return false;
 }
 
@@ -1377,56 +1573,44 @@ bool GridView::ItemExist(wxString& s)
 
 void GridView::Cleanup()
 {
-	GridNode* nextrow = nullptr;
-	GridNode* currentrow = this->head;
-	while (1)
-	{
-		if (currentrow)
-			nextrow = currentrow->GetDown();
-		this->DeleteRow(currentrow);
-		if (nextrow)
-			currentrow = nextrow;
-		
-		else
-			break;
-	}
+
 }
 
-void GridView::OnClickRowItem(GridNode* gn)
+void GridView::OnClickRowItem(Gnode* gn)
 {
-	this->ClickColOff();
-	if (this->grid_row)
-		this->grid_row->OnClickRowOff();
+	//this->ClickColOff();
+	//if (this->grid_row)
+	//	this->grid_row->OnClickRowOff();
 
-	this->grid_row = gn;
+	//this->grid_row = gn;
 }
 
-void GridView::OnClickColItem(GridNode* gn)
+void GridView::OnClickColItem(Gnode* gn)
 {
-	this->ClickRowOff();
-	if (this->grid_col)
-		this->grid_col->OnClickColOff();
+	//this->ClickRowOff();
+	//if (this->grid_col)
+	//	this->grid_col->OnClickColOff();
 
-	this->grid_col = gn;
+	//this->grid_col = gn;
 }
 
-void GridView::OnClickItem(GridNode* gn)
+void GridView::OnClickItem(Gnode* gn)
 {
-	if (this->clicked_node)
-		this->clicked_node->OnClickItemOff();
+	//if (this->clicked_node)
+	///	this->clicked_node->OnClickItemOff();
 
-	this->clicked_node = gn;
+	//this->clicked_node = gn;
 }
 
 void GridView::LayoutGrid()
 {
-	if (this->filledNodes = this->gridnode.size())
-		this->Layout();
-	else
-	{
-		for (auto v : this->gridnode)
-			v->LayoutMySizer();
-	}
+	//if (this->filledNodes = this->gridnode.size())
+	//	this->Layout();
+	//else
+	//{
+	//	for (auto v : this->gridnode)
+	//		v->LayoutMySizer();
+	//}
 }
 
 void GridView::RightClickAlert(wxString& ticker, wxPoint& point)
@@ -1443,13 +1627,49 @@ wxString GridView::GetRightClickTicker()
 
 bool GridView::RemoveRow(wxString& t)
 {
-	GridNode* match = this->GetFirstMatch(t);
+	Gnode* match = this->GetMatch(t);
 	if (!match)
+	{
+		wxFAIL_MSG("GridView::RemoveRow could not find match for ticker: " + t);
 		return false;
+	}
 
-	this->RemoveRow(match);
-	mainwindow* m = (mainwindow*)this->m_parent;
-	this->LayoutGrid();
+	Gnode* temp = NULL;
+	while (1)
+	{
+		match->CopyFromBottomNeighbor();
+		temp = match->GetDown();
+		if (!temp)
+			break;
+		if (temp == this->summaryrow)
+			break;
+
+		match = temp;
+	}
+
+	if (temp)
+	{
+		temp->ClearSelf(true);
+		this->summaryrow = temp->GetUP();
+	}
+	else
+	{
+		temp = match->GetUP();
+		if (temp)
+			temp = temp->GetUP();
+
+		if (temp)
+			match->ClearSelf(temp);
+	}
+	
+//	GridNode* match = this->GetFirstMatch(t);
+//	if (!match)
+//		return false;
+
+//	this->RemoveRow(match);
+//	mainwindow* m = (mainwindow*)this->m_parent;
+//	this->LayoutGrid();
+//	return true;
 	return true;
 }
 
@@ -1466,30 +1686,320 @@ void GridView::SetTitleRow()
 		val = this->GetColTitle(i);
 		if (i == 0)
 		{
-			this->Head = new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, NULL, NULL, NULL, NULL, val, GridCanvasFlag::COLHEAD);
-			this->Add(this->Head, 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
+			this->head = new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, NULL, NULL, NULL, NULL, val, GridCanvasFlag::COLHEAD);
+			this->Add(this->head, 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
 		}
 		else if (i == 1)
 		{
-			this->Head->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, nullptr, nullptr, nullptr, this->Head, val, GridCanvasFlag::COLHEAD));
-			this->Add(Head->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
-			last = this->Head->GetRight();
+			this->head->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, nullptr, nullptr, nullptr, this->head, val, GridCanvasFlag::COLHEAD));
+			this->Add(head->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
+			last = this->head->GetRight();
 		}
 		else
 		{
 			last->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), (size_t)0, i, nullptr, nullptr, nullptr, last, val, GridCanvasFlag::COLHEAD));
 			wxSizerItem* sizer = this->Add(last->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT, 4);
 			last = last->GetRight();
+
 		}
 		this->filledNodes++;
 		++this->gridnode_Size;
 	}
 }
 
+void GridView::OnSortClick(Gnode* gn)
+{
+	wxString collabel = gn->GetStringValue();
+
+	if (collabel == TICKER)
+	{
+		this->SortStrings(gn);
+		return;
+	}
+	if (collabel == SHARES)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == PRICE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == PURCHASE_PRICE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == _PREVIOUS_CLOSE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == DAY_GAIN)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == WEEK_GAIN)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == QUARTER_GAIN)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == YEAR_GAIN)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == TOTAL_GAIN)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == DAY_GAIN$)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == WEEK_GAIN$)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == QUARTER_GAIN$)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == YEAR_GAIN$)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == TOTAL_GAIN$)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == COST_BASIS)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == _MARKET_VALUE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == PURCHASE_PRICE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == TOTAL_DIVIDENDS)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == EARNINGS_DATE)
+	{
+		return;
+	}
+	if (collabel == PURCHASE_DATE)
+	{
+		return;
+	}
+	if (collabel == _EX_DIV)
+	{
+		return;
+	}
+	if (collabel == _SECTOR)
+	{
+		this->SortStrings(gn);
+		return;
+	}
+	if (collabel == PORTFOLIO_PERC)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == _52WEEK_DEVIATION)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == _90DAY_DEVIATION)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == _30DAY_DEVIATION)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == WEEK_START_CLOSE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == WEEK_END_CLOSE)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+	if (collabel == BETA)
+	{
+		this->SortDouble(gn);
+		return;
+	}
+}
+
+void GridView::SortStrings(Gnode* gn)
+{
+	acending = acending ? false : true;
+	wxVector<GridCanvasData> first;
+	wxVector<GridCanvasData> second;
+	Gnode* sorting_node = gn->GetDown();
+	while (sorting_node)
+	{
+		Gnode* temp = sorting_node->GetFarthestLeft();
+		if (temp == this->summaryrow)
+			break;
+
+		second.push_back(GridCanvasData(temp));
+		first.push_back(GridCanvasData(sorting_node));
+
+		sorting_node = sorting_node->GetDown();
+	}
+
+	bool sWitch = true;
+	while (sWitch)
+	{
+		sWitch = false;
+		for (size_t i = 0; i < first.size(); ++i)
+		{
+			if (i + 1 < first.size())
+			{
+				if (this->acending)
+				{
+					if ((first[i].gn->GetStringValue() > first[i + 1].gn->GetStringValue()))
+					{
+						sWitch = true;
+						GridCanvasData temp = first[i];
+						first[i] = first[i + 1];
+						first[i + 1] = temp;
+					}
+				}
+				else
+				{
+					if ((first[i].gn->GetStringValue() < first[i + 1].gn->GetStringValue()))
+					{
+						sWitch = true;
+						GridCanvasData temp = first[i];
+						first[i] = first[i + 1];
+						first[i + 1] = temp;
+					}
+				}
+			}
+		}
+	}
+
+	wxVector<wxVector<GridCanvasData>> sorted;
+	for (size_t i = 0; i < first.size(); ++i)
+	{
+		first[i].gn = first[i].gn->GetFarthestLeft();
+		wxVector<GridCanvasData> temp;
+		first[i].gn->GetRowData(temp);
+		sorted.push_back(temp);
+	}
+
+	for (size_t i = 0; i < sorted.size(); ++i)
+	{
+		if (sorted[i].begin() != sorted[i].end() && sorted[i].begin()->gn == second[i].gn)
+			continue;
+
+		second[i].gn->CopyGnodeData(sorted[i], sorted[i].begin());
+	}
+}
+
+void GridView::SortDouble(Gnode* gn)
+{
+	acending = acending ? false : true;
+	wxVector<GridCanvasData> first;
+	wxVector<GridCanvasData> second;
+	Gnode* sorting_node = gn->GetDown();
+	while (sorting_node)
+	{
+		Gnode* temp = sorting_node->GetFarthestLeft();
+		if (temp == this->summaryrow)
+			break;
+
+		second.push_back(GridCanvasData(temp));
+		first.push_back(GridCanvasData(sorting_node));
+
+		sorting_node = sorting_node->GetDown();
+	}
+
+	bool sWitch = true;
+	while (sWitch)
+	{
+		sWitch = false;
+		for (size_t i = 0; i < first.size(); ++i)
+		{
+			if (i + 1 < first.size())
+			{
+				if (this->acending)
+				{
+					if ((first[i].gn->GetDoubleValue() > first[i + 1].gn->GetDoubleValue()))
+					{
+						sWitch = true;
+						GridCanvasData temp = first[i];
+						first[i] = first[i + 1];
+						first[i + 1] = temp;
+					}
+				}
+				else
+				{
+					if ((first[i].gn->GetDoubleValue() < first[i + 1].gn->GetDoubleValue()))
+					{
+						sWitch = true;
+						GridCanvasData temp = first[i];
+						first[i] = first[i + 1];
+						first[i + 1] = temp;
+					}
+				}
+			}
+		}
+	}
+
+	wxVector<wxVector<GridCanvasData>> sorted;
+	for (size_t i = 0; i < first.size(); ++i)
+	{
+		first[i].gn = first[i].gn->GetFarthestLeft();
+		wxVector<GridCanvasData> temp;
+		first[i].gn->GetRowData(temp);
+		sorted.push_back(temp);
+	}
+
+	for (size_t i = 0; i < sorted.size(); ++i)
+	{
+		if (sorted[i].begin() != sorted[i].end() && sorted[i].begin()->gn == second[i].gn )
+			continue;
+
+		second[i].gn->CopyGnodeData(sorted[i], sorted[i].begin());
+	}
+}
+
 void GridView::FillGrid()
 {
 	Gnode* last = nullptr;
-	Gnode* last_row = this->Head;
+	Gnode* last_row = this->head;
 	Gnode* current_row = nullptr;
 	size_t rowsize = this->GetCols();
 	size_t size = rowsize * 2;
@@ -1506,6 +2016,8 @@ void GridView::FillGrid()
 				last_row->SetDown(new Gnode(this, this->m_parent, wxSize(204, 30), i + 1, (size_t)j, last_row, nullptr, nullptr, nullptr, flags));
 				this->Add(last_row->GetDown(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 				last = current_row = last_row->GetDown();
+				if (i == this->itemsize + 1)
+					this->summaryrow = last_row;
 			}
 			else
 			{
@@ -1513,35 +2025,31 @@ void GridView::FillGrid()
 				Gnode* currentrowitem = this->GetFarthestRight(current_row);
 				if (currentrowitem)
 				{
-					currentrowitem->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), i + 1, j, lastrowitem, nullptr, nullptr, last, flags));
+					currentrowitem->SetRight(new Gnode(this, this->m_parent, wxSize(204, 30), i + 1, j, lastrowitem, nullptr, nullptr, currentrowitem, flags));
 					wxSizerItem* sizer2 = this->Add(currentrowitem->GetRight(), 0, wxALIGN_TOP | wxTOP | wxLEFT | wxEXPAND, 4);
 					if (lastrowitem)
 						lastrowitem->SetDown(currentrowitem->GetRight());
-
-					Gnode* lastitem = currentrowitem->GetRight();
 				}
 			}
 			++this->gridnode_Size;
 		}
 	}
-
-	this->Head->CopyGnode(*this->Head->GetRight());
 }
 
 void GridView::ClickRowOff()
 {
-	if (this->grid_row)
-		this->grid_row->OnClickRowOff();
+//	if (this->grid_row)
+//		this->grid_row->OnClickRowOff();
 
-	this->grid_row = nullptr;
+//	this->grid_row = nullptr;
 }
 
 void GridView::ClickColOff()
 {
-	if (this->grid_col)
-		this->grid_col->OnClickColOff();
+//	if (this->grid_col)
+//		this->grid_col->OnClickColOff();
 
-	this->grid_col = nullptr;
+//	this->grid_col = nullptr;
 }
 
 gridpair GridView::GetLabelText(size_t& index, StockViewerData* svd)
@@ -1621,6 +2129,9 @@ wxString GridView::GetStringLabel(size_t& col, StockViewerData* svd)
 	}
 
 	wxString collabel = this->GetColTitle(col);
+	if (collabel.IsEmpty())
+		return "";
+
 	if (collabel == TICKER)
 		return svd->GetTicker();
 	if (collabel == SHARES)
@@ -1677,6 +2188,8 @@ wxString GridView::GetStringLabel(size_t& col, StockViewerData* svd)
 		return svd->Get90Day_Deviation();
 	if (collabel == _30DAY_DEVIATION)
 		return svd->Get30Day_Deviation();
+	if (collabel == BETA)
+		return svd->GetBeta();
 	return "";
 }
 
@@ -1721,7 +2234,10 @@ wxString GridView::GetColTitle(size_t col)
 	case 23: return _52WEEK_DEVIATION;
 	case 24: return _90DAY_DEVIATION;
 	case 25: return _30DAY_DEVIATION;
-	case 26: return "";
+	case 26: return WEEK_START_CLOSE;
+	case 27: return WEEK_END_CLOSE;
+	case 28: return BETA;
+	default: return "";
 	}
 
 	return "";
@@ -1757,7 +2273,7 @@ int GridView::GetGridNodeFlags(size_t& col, size_t& row)
 
 Gnode* GridView::GetEmptyRow()
 {
-	Gnode* next = this->Head->GetDown();
+	Gnode* next = this->head->GetDown();
 	if (!next)
 		return next;
 
@@ -1779,7 +2295,7 @@ Gnode* GridView::GetEmptyRow()
 
 Gnode* GridView::GetMatch(wxString& s)
 {
-	Gnode* next = this->Head->GetDown();
+	Gnode* next = this->head->GetDown();
 	if (!next)
 		return next;
 	while (1)
@@ -1798,199 +2314,21 @@ Gnode* GridView::GetMatch(wxString& s)
 	return NULL;
 }
 
-GridNode* GridView::GetFirstEmptyRow()
+Gnode* GridView::GetFirstEmptyRow()
 {
-	GridNode* next = this->head->GetDown();
+	Gnode* next = this->head->GetDown();
 	if (!next)
 		return next;
 	while (1)
 	{
-		if (next)
-		{
-			if (next->IsEmpty())
-				return next;
-
-			next = next->GetDown();
-		}
-		else 
-			return nullptr;
-	}
-
-	return nullptr;
-}
-
-GridNode* GridView::GetFirstMatch(wxString s)
-{
-	GridNode* next = this->head->GetDown();
-	if (!next)
-		return next;
-	while (1)
-	{
-		if (next)
-		{
-			if (next->IsMatch(s))
-				return next;
-
-			next = next->GetDown();
-		}
-		else
+		if (next->IsEmpty())
+			return next;
+		next = next->GetDown();
+		if (!next)
 			return NULL;
 	}
 
 	return NULL;
-}
-
-GridNode* GridView::GetFarthestRight(GridNode* g)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetFarthestRight is nullptr!");
-		return nullptr;
-	}
-
-	while (1)
-	{
-		if (!g->GetRight())
-			return g;
-
-		g = g->GetRight();
-	}
-
-	return nullptr;
-}
-
-GridNode* GridView::GetFarthestLeft(GridNode* g)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetFarthestLeft is nullptr!");
-		return nullptr;
-	}
-
-	while (1)
-	{
-		if (!g->GetLeft())
-			return g;
-
-		g = g->GetLeft();
-	}
-
-	return nullptr;
-}
-
-GridNode* GridView::GetFarthestTop(GridNode* g)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetFarthestTop is nullptr!");
-		return nullptr;
-	}
-
-	while (1)
-	{
-		if (!g->GetUP())
-			return g;
-
-		g = g->GetUP();
-	}
-
-	return nullptr;
-}
-
-GridNode* GridView::GetFarthestBottom(GridNode* g)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetFarthestBottom is nullptr!");
-		return nullptr;
-	}
-
-	while (1)
-	{
-		if (!g->GetDown())
-			return g;
-
-		g = g->GetDown();
-	}
-
-	return nullptr;
-}
-
-GridNode* GridView::GetRight(GridNode* g, size_t i, size_t start)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetRight is nullptr!");
-		return nullptr;
-	}
-
-	GridNode* next = nullptr;
-	while (start < i)
-	{
-		if (!g->GetRight())
-			return g;
-		g = g->GetRight();
-		++start;
-	}
-
-	return g;
-}
-
-GridNode* GridView::GetLeft(GridNode* g, size_t i, size_t start)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetLeft is nullptr!");
-		return nullptr;
-	}
-
-	while (start < i)
-	{
-		if (!g->GetLeft())
-			return g;
-		g = g->GetLeft();
-		++start;
-	}
-
-	return g;
-}
-
-GridNode* GridView::GetUp(GridNode* g, size_t i, size_t start)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetUP is nullptr!");
-		return nullptr;
-	}
-
-	while (start < i)
-	{
-		if (!g->GetUP())
-			return g;
-		g = g->GetUP();
-		++start;
-	}
-
-	return g;
-}
-
-GridNode* GridView::GetDown(GridNode* g, size_t i, size_t start)
-{
-	if (!g)
-	{
-		wxFAIL_MSG("GridNode* passed to GridView::GetDown is nullptr!");
-		return nullptr;
-	}
-
-	while (start < i)
-	{
-		if (!g->GetDown())
-			return g;
-		g = g->GetDown();
-		++start;
-	}
-
-	return g;
 }
 
 Gnode* GridView::GetFarthestRight(Gnode* g)
@@ -2087,7 +2425,7 @@ Gnode* GridView::GetDown(Gnode* g, size_t i, size_t start)
 
 	return g;
 }
-
+/*
 void GridView::RemoveRow(GridNode* g)
 {
 	GridNode* remove = g;
@@ -2149,17 +2487,7 @@ void GridView::DeleteRow(GridNode* g)
 	g = nullptr;
 	--this->gridnode_Size;
 }
-/*
-GridNode* GridView::FindItem(GridNode* gn, int id)
-{
-	if (!gn)
-		return nullptr;
-	if (gn->IsID(id))
-		return gn;
 
-	return this->FindItem(gn->GetRight(), id);
-}
-*/
 void GridView::HighlightRow(GridNode* gn)
 {
 	
@@ -2169,30 +2497,7 @@ void GridView::HighlightCol(GridNode* gn)
 {
 	
 }
-/*
-GridNode* GridView::FindGridNode(int id)
-{
-	GridNode* current = this->head;
-	GridNode* nextrow = nullptr;
 
-	while (1)
-	{
-		if (current)
-			nextrow = current->GetDown();
-
-		GridNode* item = this->FindItem(current, id);
-
-		if (item)
-			return item;
-
-		if (nextrow)
-			current = nextrow;
-
-		else 
-			return nullptr;
-	}
-}
-*/
 GridNode* GridView::GetSummaryRow()
 {
 	return this->summaryrow;
@@ -2206,7 +2511,7 @@ void GridView::SwapSummaryRow(GridNode*& gn)
 	this->summaryrow = gn;
 	gn = gn->GetUP();
 }
-
+*/
 // GridItemView functions...
 GridItemView::GridItemView(wxWindow* w, _PortfolioType t, int col, int _itemsize)
 	: GridView(w, col, _itemsize), m_parent(w), type(t)
@@ -2283,6 +2588,7 @@ void PortfolioWin::Update()
 	SetStaticTextColor(*this->TotalReturnDisplay, this->Green, this->Red);
 	SetStaticTextColor(*this->TotalReturnDollar, this->Green, this->Red);
 
+	this->Layout();
 	this->Refresh();
 }
 
@@ -2314,16 +2620,11 @@ void PortfolioWin::Create()
 
 	wxString val = DIV_RE_INVEST;
 	
-	wxVector<SummaryData> vec;
-	Parser parser;
-	vec.push_back(parser.PullIndexQuote(DOW_JONES));
-	vec.push_back(parser.PullIndexQuote(NASDAQ));
-	vec.push_back(parser.PullIndexQuote(SP_500));
 	wxVector<Indices*> in_vec = this->port->GetIndices();
 	wxVector<StockViewerData*> s_vec;
 	for (auto& v : in_vec)
 		s_vec.push_back(v->GetStockViewerData());
-	this->canvas = new MotionCanvas(this->panel, wxSize(204, 60), vec, s_vec);
+	this->canvas = new MotionCanvas(this->panel, wxSize(204, 60), s_vec);
 
 	this->thread = new MyThread(this, this->canvas);
 	this->todaysdate = new wxStaticText(panel, wxID_ANY, "Today's Date");
@@ -3961,8 +4262,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 {
 	SectorClass& sc = GetSectorClass();
 	sc.ActivateData();
-	Parser parser;
-	parser.Test();
+	Parser parser(this, _Sector::INDUSTRIALS);
 	this->CreatePopupMenu();
 	wxMenuBar* bar = new wxMenuBar();
 	wxMenu* m = new wxMenu();
@@ -4011,6 +4311,7 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	main->Add(top, 3, wxEXPAND);
 	main->Add(bottom_frame, 1, wxEXPAND);
 	this->SetSizer(main);
+	this->UpdateGridView();
 	this->Layout();
 	this->Show(true);
 }
@@ -4022,8 +4323,10 @@ mainwindow::~mainwindow()
 
 void mainwindow::PurchaseWin(wxString& ticker, wxString& longname)
 {
+	wxString sector_name;
 	const Sector* s = this->port.GetConstSector(ticker); 
-	wxString sector_name = s->GetSectorName();
+	if(s)
+		sector_name = s->GetSectorName();
 
 	string_three st(ticker, longname, sector_name);
 	this->dialog = new Dialog(STOCK_PURCHASE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Stock Data", &st);
@@ -4053,15 +4356,15 @@ void mainwindow::AddDividendWin(wxString& ticker, wxString& longname)
 void mainwindow::OnViewDividendWin(wxString& ticker)
 {
 	wxString longname = this->port.StageStockandGetLongName(ticker);
-	wxVector<Dividend> vec = this->port.GetDividendsFromStagedStock();
-	if (!vec.size())
+	wxVector<Dividend> sorted = this->port.GetDividendsFromStagedStock();
+	if (!sorted.size())
 	{
 		wxMessageBox("No dividends to list for " + ticker);
 		return;
 	}
 
 	wxArrayString string;
-	for (auto& v : vec)
+	for (auto& v : sorted)
 	{
 		wxString item = "";
 		wxString Bool = v.DivReinvest ? "Yes" : "No";
@@ -4075,7 +4378,7 @@ void mainwindow::OnViewDividendWin(wxString& ticker)
 	if (this->generic_list->ShowModal() == wxID_OK)
 	{
 		int selection = this->generic_list->GetSelection();
-		Dividend& dev = vec[selection];
+		Dividend& dev = sorted[selection];
 		this->generic_list->Destroy();
 		this->OnModifyDividendWin(dev, ticker, longname);
 	}
@@ -4154,7 +4457,7 @@ void mainwindow::OnModifyDividendWin(Dividend& d, wxString& ticker, wxString& lo
 		this->dialog = NULL;
 		return;
 	}
-	this->dialog->Destroy();
+//	this->dialog->Destroy();
 	this->dialog = NULL;
 }
 
@@ -4257,6 +4560,18 @@ void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
 	bool result = PopupMenu(this->popup, p);
 }
 
+void mainwindow::OnThreadCompletion()
+{
+	this->UpdateGridView();
+	this->Layout();
+	this->Show(true);
+}
+
+void mainwindow::OnThreadCompletion(wxThreadEvent& evt)
+{
+	this->OnThreadCompletion();
+}
+
 void mainwindow::CloseEvent(wxCloseEvent& evt)
 {
 	if (this->quotethread)
@@ -4271,29 +4586,6 @@ void mainwindow::CloseEvent(wxCloseEvent& evt)
 	this->Hide();
 	this->Destroy();
 }
-
-void mainwindow::OnThreadCompletion(wxThreadEvent& evt)
-{
-//	wxVector<StockNode*> stn = this->port.GetStockNodeItems();
-//	for (size_t i = 0; i < stn.size(); ++i)
-//		this->grid_view->SetNewRow(stn[i]->GetTicker(), stn[i]->GetShares(), stn[i]->GetPrice(), stn[i]->GetPreviousClose(),
-//			stn[i]->GetDayReturn(), stn[i]->GetWeekReturn(), stn[i]->GetQuarterReturn(), stn[i]->GetYearReturn(), stn[i]->GetTotalReturn(true));
-//	this->Refresh();
-}
-
-/*
-void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
-{
-	this->dialog = new Dialog(STOCK_PURCHASE_DIALOG, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Enter Stock Data", (int*)nullptr);
-	if (this->dialog->ShowModal() == wxID_OK)
-	{
-		PurchaseKit kit = this->dialog->GetPurchaseKit();
-		this->port.Purchase(kit.m_sect, kit.m_ticker, kit.m_date, kit.m_price, kit.m_shares, kit.m_reinvest, kit.m_reinvest_date);
-		dialog = nullptr;
-		this->UpdateGridView();
-	}
-}
-*/
 
 void mainwindow::PurchaseWin(wxString& ticker)
 {
@@ -4314,6 +4606,9 @@ void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 	this->generic_entry->SetTextValidator(wxTextValidator(wxFILTER_ALPHA | wxFILTER_EMPTY, &ticker));
 	this->generic_entry->GetTextValidator()->Bind(wxEVT_KEY_DOWN, &mainwindow::OnKeyDown, this);
 	this->generic_entry->CenterOnParent();
+
+	// check to see if we already own some of the stock being purchased...
+	bool insystem = false;
 	
 	if (this->generic_entry->ShowModal() == wxID_OK)
 	{
@@ -4325,7 +4620,6 @@ void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 		if (longname.IsEmpty())
 		{
 			sd = port.QuoteLookup(ticker);
-			longname = sd.Longname;
 			if (sd.Longname == "NotFound" || sd.marketprice == 0.00)
 			{
 				// Not a valid ticker, notify the user and return...
@@ -4339,11 +4633,14 @@ void mainwindow::OnPurchaseMenu(wxCommandEvent& evt)
 		}
 
 		this->generic_entry = NULL;
-		longname = Decipherhtmlcodes(longname);
-		if (sd.Longname != "NotFound")
-			this->PurchaseWin(longname);
+		if (longname == "")
+			this->PurchaseWin(ticker);
 		else
+		{
+			longname = sd.Longname;
+			longname = Decipherhtmlcodes(longname);
 			this->PurchaseWin(ticker, longname);
+		}
 	}
 
 	this->generic_entry = NULL;
@@ -4648,17 +4945,17 @@ void mainwindow::OnAddDividend(wxCommandEvent& evt)
 
 void mainwindow::OnViewDeposits(wxCommandEvent& evt)
 {
-	wxVector<deposit_pair> vec = this->port.GetDepositVector();
+	wxVector<deposit_pair> sorted = this->port.GetDepositVector();
 
 	wxArrayString string;
-	if (!vec.size())
+	if (!sorted.size())
 	{
 		wxMessageBox("There are no deposits to view.");
 		return;
 	}
 
 	double total = 0.0;
-	for (auto& v : vec)
+	for (auto& v : sorted)
 	{
 		total += v.value;
 		wxString item = "";
@@ -4680,16 +4977,16 @@ void mainwindow::OnMarketGainers(wxCommandEvent&)
 {
 	wxDateTime T(wxDateTime::Today());
 	GetWorkDate(T);
-	wxVector<DayGainersandLosers> vec = this->port.GetDayGainers();
-	this->dialog = new Dialog(_EnterDialog::DAY_GAINERS_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Losers as of " + T.Format(STANDARD_DATE), &vec);
+	wxVector<DayGainersandLosers> sorted = this->port.GetDayGainers();
+	this->dialog = new Dialog(_EnterDialog::DAY_GAINERS_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Losers as of " + T.Format(STANDARD_DATE), &sorted);
 }
 
 void mainwindow::OnMarketLosers(wxCommandEvent&)
 {
 	wxDateTime T(wxDateTime::Today());
 	GetWorkDate(T);
-	wxVector<DayGainersandLosers> vec = this->port.GetDayLosers();
-	this->dialog = new Dialog(_EnterDialog::DAY_LOSERS_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Losers as of " + T.Format(STANDARD_DATE), &vec);
+	wxVector<DayGainersandLosers> sorted = this->port.GetDayLosers();
+	this->dialog = new Dialog(_EnterDialog::DAY_LOSERS_WIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, "Losers as of " + T.Format(STANDARD_DATE), &sorted);
 }
 
 void mainwindow::OnAddDepositSchdule(wxCommandEvent& evt)
@@ -4707,19 +5004,20 @@ void mainwindow::OnDateChange(wxString& date)
 	wxString title = "Updating to date: ";
 	title += date;
 	wxString msg = "Updating...";
-	wxGenericProgressDialog pr(title, msg, 200, this, wxPD_APP_MODAL|wxPD_AUTO_HIDE|wxPD_SMOOTH);
-	pr.CenterOnScreen();
-	pr.Show();
-	bool b = pr.Update(50);
+//	wxGenericProgressDialog pr(title, msg, 200, this, wxPD_APP_MODAL|wxPD_AUTO_HIDE|wxPD_SMOOTH);
+//	pr.CenterOnScreen();
+//	pr.Show();
+//	bool b = pr.Update(50);
 	this->port.DateChange();
-	pr.Update(200, "Finished...");
+//	pr.Update(200, "Finished...");
+//	pr.Refresh();
 	this->UpdateGridView();
 	this->portwin->Update();
 }
 
 void mainwindow::OnUpdate()
 {
-	this->port.Update();
+	this->port.ForceUpdate();
 	this->UpdateGridView();
 	this->portwin->Update();
 }
@@ -4729,22 +5027,18 @@ void mainwindow::OnUpdate()
 wxWindow* mainwindow::GetLeftWin()
 {
 	PortfolioWin* win = new PortfolioWin(this, wxID_ANY, &this->main_clock, this->port.GetStockViewerData(), &this->port);
-//	wxWindow* w = new wxWindow(this, wxID_ANY);
-//	w->SetBackgroundColour(wxColour(100,100,100));
 	return win;
 }
 
 
-wxScrolled<wxPanel>* mainwindow::GetRightWin()
+wxScrolledCanvas* mainwindow::GetRightWin()
 {
 	int size = port.GetNumItems(_PortfolioType::STOCK);
-	wxScrolled<wxPanel>* P = new wxScrolled<wxPanel>(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
-	P->SetScrollbars(5, 5, 50, 50);
+	wxScrolled<wxWindow>* P = new wxScrolled<wxWindow>(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
+	P->SetScrollbars(25, 25, 50, 50);
 	P->EnableScrolling(true, true);
-
 	P->SetBackgroundColour(wxColour(0, 0, 0));
-	this->grid_view = new GridView(P, 26, size);
-	this->UpdateGridView();
+	this->grid_view = new GridView(P, 30, size);
 	
 	P->SetSizer(grid_view);
 	return P;
@@ -4764,6 +5058,7 @@ void mainwindow::UpdateGridView()
 	}
 
 	const wxVector<StockNode*> stocks = this->port.GetStockNodeItems();
+	this->grid_view->SetNumOfItems(stocks.size());
 	for (size_t i = 0; i < stocks.size(); ++i)
 	{
 		StockViewerData* svd = stocks[i]->GetStockViewerData();

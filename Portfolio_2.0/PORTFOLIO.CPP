@@ -1181,6 +1181,11 @@ SectorClass& GetSectorClass()
 	return sc;
 }
 
+wxString StockViewerData::GetWeekGain()
+{
+	return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%";
+}
+
 // stock_node functions...
 stock_node::stock_node(long id, wxString ticker, wxDateTime date, double price_per_share, double shares, Action a, wxDateTime reinvest)
 	: m_id(id), m_ticker(ticker), m_date(date), m_price_per_share(price_per_share), m_shares(shares), action(a), m_reinvest_start(reinvest), active(1)
@@ -1476,6 +1481,16 @@ bool stock_node::SetReInvestShares(Dividend& d, double& s)
 	return false;
 }
 
+void stock_node::SetSiblingRatio(double ratio)
+{
+	this->ratio_of_siblings = ratio;
+}
+
+double stock_node::GetSiblingRatio()
+{
+	return this->ratio_of_siblings;
+}
+
 void stock_node::Save(DataStream& ds)
 {
 	int valid = 1;
@@ -1584,7 +1599,9 @@ void stock_node::FillClientDividendVec(wxVector<Dividend>& v)
 
 double stock_node::m_GetShares(wxDateTime* T)
 {
-	double shares = this->m_shares;
+	double shares = 0.0;
+	if (!T || *T >= this->m_date)
+		shares = this->m_shares;
 	for (size_t i = 0; i < this->sold.size(); ++i)
 	{
 		if (!T || sold[i].m_date <= *T)
@@ -1623,8 +1640,8 @@ bool ExecutePurchase(StockNode* S, long id, wxDateTime date, double price, doubl
 }
 
 // StockThread functions...
-StockThread::StockThread(wxThreadKind tk, StockNode* S, long id, wxDateTime date, double price, double shares) 
-	: wxThread(tk), m_parent(S), m_id(id),  m_date(date), m_price(price), m_shares(shares)
+StockThread::StockThread(wxThreadKind tk, Sector* sec, StockNode* S) 
+	: wxThread(tk), m_parent(S)
 {
 	
 }
@@ -1633,23 +1650,15 @@ wxThread::ExitCode StockThread::Entry()
 {
 	if (TestDestroy())
 		return (wxThread::ExitCode)0;
-
-	result = ExecutePurchase(this->m_parent, this->m_id, this->m_date, this->m_price, this->m_shares);
-
-	wxThreadEvent evt(ThreadComplete, 0);
-	wxPostEvent(this->m_parent, evt);
-
+	
+	this->m_parent->ClockChange();
+	wxPostEvent(this->m_parent, wxCommandEvent());
 	return (wxThread::ExitCode)0;
 }
 
 StockThread::~StockThread()
 {
 
-}
-
-bool StockThread::GetResult()
-{
-	return this->result;
 }
 
 // StockNode functions...
@@ -1814,6 +1823,23 @@ void StockNode::Calibrate(bool force)
 	this->_30dayDeviation = this->GetDeviation(30);
 
 	wxDateTime T = *this->m_parentclock;
+
+	double _shares = this->m_GetShares(&T);
+	double divshares = this->GetDividendShares();
+	if (!_shares)
+	{
+		// not active at this date..
+	//	this->m_active = 0;
+		this->SetNewValues(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+		this->svd = StockViewerData(this, this->current_Data.Longname, this->m_ticker, "", "",
+			this->sectorID, _shares + divshares, 0.0, 0.0, 0.0,
+			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, this->GetDividends(), 0.0);
+
+		this->UpToDate = 1;
+		return;
+	}
+
 	double daycostbasis = this->GetDayCostBasis(&T);
 	double weekcostbasis = this->GetWeekCostBasis(&T);
 	double quartercostbasis = this->GetQuarterCostBasis(&T);
@@ -1822,13 +1848,12 @@ void StockNode::Calibrate(bool force)
 	double originalcostbasis = this->GetTotalCostBasis(&T);
 	double marketvalue = this->GetMarketValue(&T);
 	T = *this->m_parentclock;
-	double _shares = this->m_GetShares(&T);
-	double divshares = this->GetDividendShares();
 	double _dividends = this->GetDividends();
 
 	wxString ex_div = this->GetLatestEx_Div_Date();
 
 	this->SetNewValues(originalcostbasis, daycostbasis, weekcostbasis, quartercostbasis, yearcostbasis, marketvalue, _shares, divshares, _dividends);
+	this->beta = this->current_Data.Beta;
 	this->UpToDate = 1;
 	double _marketprice = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.marketprice : marketvalue / this->GetShares();
 	double _previous_close = wxDateTime::Today() == *this->m_parentclock ? this->current_Data.previousclose : this->GetPreviousClose(&T);
@@ -1840,7 +1865,7 @@ void StockNode::Calibrate(bool force)
 	this->svd = StockViewerData(this, this->current_Data.Longname, t, this->current_Data.earningsdate, this->inital_purchase.Format(STANDARD_DATE),
 		this->sectorID, _shares + divshares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
-		marketvalue, this->GetDividends(), 0.0, ex_div);
+		marketvalue, this->GetDividends(), this->current_Data.Beta, 0.0, ex_div);
 
 	this->UpToDate = 1;
 }
@@ -1848,10 +1873,39 @@ void StockNode::Calibrate(bool force)
 void StockNode::ClockChange()
 {
 	UpToDate = 0;
-	this->Calibrate(true);
+	this->Calibrate();
 }
 
 // StockNode private functions...
+
+void StockNode::CalcRatiosOfChildren(wxDateTime* T)
+{
+	wxDateTime today;
+	if (!T)
+		today = *this->m_parentclock;
+	else
+		today = wxDateTime::Today();
+	wxVector<double> ratio;
+	double total = 0.0;
+	for (auto& v : this->bought)
+	{
+		ratio.push_back((v.GetShares(&today) + v.GetDividendShares(&today)) * this->current_Data.marketprice);
+		total += *ratio.rbegin();
+	}
+
+	// check to make sure total is not zero. If it is then there is no shares to distribute. Return false;
+	if (!total)
+	{
+		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares(Dividend&, double&)! Returning false!");
+		return;
+	}
+
+	for (size_t i = 0; i < this->bought.size(); ++i)
+	{
+		if (ratio[i])
+			this->bought[i].SetSiblingRatio(ratio[i] / total);
+	}
+}
 
 wxString StockNode::GetLatestEx_Div_Date()
 {
@@ -1907,38 +1961,20 @@ bool StockNode::DistributeReInvestmentShares(double& s)
 
 bool StockNode::DistributeReInvestmentShares(Dividend& div, double& s)
 {
-	wxVector<double> ratio;
 	wxDateTime today(wxDateTime::Today());
-	double total = 0.0;
+	if (*this->m_parentclock != wxDateTime::Today())
+		this->CalcRatiosOfChildren(&today);
+
+	wxVector<double> ratio;
 	for (auto& v : this->bought)
 	{
-		ratio.push_back((v.GetShares(&today) + v.GetDividendShares(&today)) * this->current_Data.marketprice);
-		total += *ratio.rbegin();
-	}
-
-	// check to make sure total is not zero. If it is then there is no shares to distribute. Return false;
-	if (!total)
-	{
-		wxFAIL_MSG("total market value is zero in StockNode::DistributeReInvestmentShares(Dividend&, double&)! Returning false!");
-		return false;
-	}
-
-	bool result = true;
-	bool endresult = false;
-	for (size_t i = 0; i < this->bought.size(); ++i)
-	{
-		if (ratio[i])
-		{
-			double rat = ratio[i] / total;
-			double val = s * rat;
-			result = this->bought[i].SetReInvestShares(div, val);
-			if (result)
-				endresult = true;
-		}
+		double val = s * v.GetSiblingRatio();
+		if (val)
+			v.SetReInvestShares(div, val);
 	}
 
 	this->UpToDate = false;
-	return endresult;
+	return true;
 }
 
 bool StockNode::UpDate(bool force_update)
@@ -2192,6 +2228,7 @@ double StockNode::GetWeekCostBasis(wxDateTime* T)
 	double temp = 0.0;
 	for (size_t i = 0; i < this->bought.size(); ++i)
 	{
+		double s = this->bought[i].GetShares(&copy);
 		temp = this->bought[i].GetPurchasePrice(this->m_GetStartWeekDay(&copy), copy.GetDayOfYear(), copy.GetYear());
 		if (!temp)
 			cost_basis += price * this->bought[i].GetShares(&copy);
@@ -2272,13 +2309,13 @@ double StockNode::GetMarketValue(wxDateTime* T)
 		wxMessageBox("wxDateTime* in StockNode::GetMarketValue is nullptr!");
 		return 0.0;
 	}
+	wxDateTime copy = *T;
 
 	if (*T == wxDateTime::Today())
 		return this->current_Data.marketprice * this->m_GetShares(T) + this->GetDividendShares();
 
-	wxDateTime copy = *T;
 	GetWorkDate(copy);
-	return this->GetClosePrice(&copy) * this->m_GetShares(T) + this->GetDividendShares();
+	return this->GetClosePrice(&copy) * (this->m_GetShares(&copy) + this->GetDividendShares());
 }
 
 void StockNode::m_CheckActive()
@@ -2728,9 +2765,15 @@ void Indices::Calibrate(bool force)
 	this->svd = StockViewerData(this, this->current_Data.Longname, t, this->current_Data.earningsdate, this->start.Format(STANDARD_DATE),
 		SECTOR_INVALID, _shares + divshares, originalcostbasis / _shares, _marketprice, _previous_close,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, originalcostbasis,
-		marketvalue, _dividends, 0.0, ex_div);
+		marketvalue, _dividends, this->current_Data.Beta, 0.0, ex_div);
 
 	this->UpToDate = 1;
+}
+
+void Indices::ClockChange()
+{
+	UpToDate = 0;
+	this->Calibrate();
 }
 
 void Indices::SetHistoricalData(Day_Prices day)
@@ -2762,6 +2805,32 @@ StockViewerData* Indices::GetStockViewerData()
 _INDEX_ Indices::GetIndice()
 {
 	return this->index;
+}
+
+void Indices::Save()
+{
+	DataStream ds("SavedFiles/" + this->ticker + ".bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::write);
+	if (!ds.IsOK())
+		return;
+
+	ds.WritewxDateTime(this->start);
+
+	ds.WriteSummaryData(this->current_Data);
+	ds.WriteData(this->m_beta);
+	ds.WriteDayPricesVector(this->historical_prices);
+}
+
+void Indices::Retrieve()
+{
+	DataStream ds("SavedFiles/" + this->ticker + ".bin", wxPosixPermissions::wxS_DEFAULT, wxFile::OpenMode::read);
+	if (!ds.IsOK())
+		return;
+
+	ds.ReadwxDateTime(this->start);
+
+	ds.ReadSummaryData(this->current_Data);
+	ds.ReadData(this->m_beta);
+	ds.ReadDayPricesVector(this->historical_prices);
 }
 
 bool Indices::UpDate(bool force_update)
@@ -3008,9 +3077,9 @@ void Sector::Calibrate(bool datechange)
 
 	this->ReturnCalibarate();
 	this->svd = StockViewerData(this, "", this->Sector_Name, "", "",
-		this->GetID(), this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		this->GetID(), this->shares + this->div_shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
-		this->market_value, this->dividends);
+		this->market_value, this->dividends, 0.0);
 }
 
 const StockViewerData* Sector::GetStockViewerData() const
@@ -3018,11 +3087,30 @@ const StockViewerData* Sector::GetStockViewerData() const
 	return &this->svd;
 }
 
+void Sector::OnClockChange()
+{
+	this->threads_running = 0;
+	wxVector<StockThread*> threads;
+	for (auto& v : this->stocks)
+	{
+		threads.push_back(new StockThread(wxThreadKind::wxTHREAD_DETACHED, this, &v));
+		++this->threads_running;
+	}
+
+	for (auto& v : threads)
+		v->Run();
+}
+
 void Sector::CalcRatiosOfChildren()
 {
+	this->beta = 0.0;
 	for (size_t i = 0; i < this->stocks.size(); ++i)
+	{
 		this->stocks[i].CalcRatios();
+		this->beta += this->stocks[i].GetReturnNode()->sector_beta;
+	}
 
+	this->svd.beta = beta;
 	this->CalcRatios();
 }
 
@@ -3100,7 +3188,19 @@ wxString Sector::GetSectorName() const
 void Sector::ThreadComplete(StockNode* sn)
 {
 	this->threads_running--;
-	this->m_parent->ThreadComplete(sn);
+	if (sn->IsActive())
+		this->AddNewValues(sn->GetReturnNode());
+
+	if (!this->threads_running)
+	{
+		this->ReturnCalibarate();
+		this->svd = StockViewerData(this, "", this->Sector_Name, "", "",
+			this->GetID(), this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+			this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
+			this->market_value, this->dividends, 0.0);
+
+			this->m_parent->ThreadComplete(this);
+	}
 }
 
 bool Sector::IsChild(wxString& ticker)
@@ -3475,9 +3575,18 @@ wxVector<Indices*> Portfolio::GetIndices()
 void Portfolio::Calibrate(bool datechange)
 {
 	this->Reset();
-	this->dow.Calibrate(datechange);
-	this->nas.Calibrate(datechange);
-	this->sp.Calibrate(datechange);
+	if (datechange)
+	{
+		this->dow.ClockChange();
+		this->nas.ClockChange();
+		this->sp.ClockChange();
+	}
+	else
+	{
+		this->dow.Calibrate();
+		this->nas.Calibrate();
+		this->sp.Calibrate();
+	}
 	for (size_t i = 0; i < this->sectors.size(); ++i)
 	{
 		this->sectors[i].Calibrate(datechange);
@@ -3485,21 +3594,27 @@ void Portfolio::Calibrate(bool datechange)
 	}
 
 	this->ReturnCalibarate();
-	this->CalcRatiosOfAllChildren();
+	double temp_beta = this->CalcRatiosOfAllChildren();
 
 	this->svd = StockViewerData(this, "", "Total", "", "",
-		_Sector::SECTOR_INVALID, this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+		_Sector::SECTOR_INVALID, this->shares + this->div_shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
 		this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
-		this->market_value, this->dividends, this->cash.GetFreeCash());
+		this->market_value, this->dividends, temp_beta, this->cash.GetFreeCash());
 }
 
-void Portfolio::CalcRatiosOfAllChildren()
+double Portfolio::CalcRatiosOfAllChildren()
 {
+	this->beta = 0.0;
 	for (auto& v : this->sectors)
+	{
 		v.CalcRatiosOfChildren();
+		this->beta += v.GetReturnNode()->portfolio_beta;
+	}
 
 	if (this->GetFreeCash())
 		this->PortfolioPerc = this->market_value / this->GetFreeCash();
+
+	return beta;
 }
 
 StockViewerData* Portfolio::GetStockViewerData()
@@ -3523,6 +3638,10 @@ void Portfolio::Save()
 
 	for (size_t i = 0; i < this->sectors.size(); ++i)
 		this->sectors[i].Save();
+
+	this->dow.Save();
+	this->nas.Save();
+	this->sp.Save();
 }
 
 void Portfolio::Retrieve()
@@ -3545,6 +3664,11 @@ void Portfolio::Retrieve()
 	dow = Indices(DOW_JONES, earliest, m_parentclock);
 	nas = Indices(NASDAQ, earliest, m_parentclock);
 	sp = Indices(SP_500, earliest, m_parentclock);
+
+	this->dow.Retrieve();
+	this->nas.Retrieve();
+	this->sp.Retrieve();
+
 	this->Calibrate();
 }
 
@@ -3581,9 +3705,27 @@ bool Portfolio::AddWithdrawl(wxDateTime& date, double& amount)
 	return this->cash.Withdrawl(date, amount);
 }
 
+void Portfolio::ForceUpdate()
+{
+	this->Calibrate(true);
+}
+
 void Portfolio::DateChange()
 {
 	this->Calibrate(true);
+	return;
+
+	this->threads_running = 0;
+
+	this->dow.ClockChange();
+	this->nas.ClockChange();
+	this->sp.ClockChange();
+
+	for (auto& v : this->sectors)
+	{
+		v.OnClockChange();
+		++this->threads_running;
+	}
 }
 
 void Portfolio::Update()
@@ -3591,12 +3733,33 @@ void Portfolio::Update()
 	this->DateChange();
 }
 
-void Portfolio::ThreadComplete(StockNode* sn)
+void Portfolio::ThreadComplete(Sector* s)
+{
+	this->threads_running--;
+	this->AddNewValues(s->GetReturnNode());
+
+	if (!this->threads_running)
+	{
+		this->ReturnCalibarate();
+		this->CalcRatiosOfAllChildren();
+
+		this->svd = StockViewerData(this, "", "Total", "", "",
+			_Sector::SECTOR_INVALID, this->shares, this->original_cost_basis / this->shares, this->market_value / this->shares, 0.0,
+			this->day_return, this->week_return, this->quarter_return, this->year_return, this->total_return, this->original_cost_basis,
+			this->market_value, this->dividends, this->cash.GetFreeCash());
+
+		wxPostEvent(this->m_parent, wxThreadEvent());
+	}
+}
+
+void Portfolio::OnThreadRetrieveComplete(Sector* s)
 {
 	this->threads_running--;
 	if (!this->threads_running)
-		wxPostEvent(this->m_parent, wxThreadEvent());
-	
+	{
+		this->Calibrate();
+		wxPostEvent(this->m_parent, wxThreadEvent(1));
+	}
 }
 
 bool Portfolio::IsStockActive(wxString& ticker)
