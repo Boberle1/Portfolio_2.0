@@ -76,16 +76,28 @@ struct Holidays
 // Simple struct for sectorstock data...
 struct SectorStock
 {
-	SectorStock(wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&);
+	SectorStock(_Sector, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&);
 
 	wxString ticker = "";
 	wxString longname = "";
+	wxString sectorname = "";
 	wxString price = "";
 	wxString change = "";
 	wxString percent_change = "";
 	wxString reg_mar_vol = "";
 	wxString avg_vol = "";
 	wxString market_cap = "";
+
+	double d_price = 0.0;
+	double d_previous_close = 0.0;
+	double d_change = 0.0;
+	double d_change_perc = 0.0;
+	double d_vol = 0.0;
+	double d_avg_vol = 0.0;
+	int Market_cap = 0.0;
+
+	_Sector sec;
+	wxVector<Day_Prices> days;
 };
 
 Holidays& GetHolidays();

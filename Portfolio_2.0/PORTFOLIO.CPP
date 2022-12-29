@@ -333,6 +333,10 @@ ParentSector::ParentSector(SectorClass* parent, _Sector secid, wxString URL, wxS
 
 void ParentSector::SetAllData(wxString& _name, double& m_cap, double& change, SectorPerformance& sp)
 {
+	_Sector s = m_parent->GetSectorID(_name);
+	wxVector<SectorStock> vecf;
+//	Parser parser;
+//	parser.PullSectorStocks(s, vecf);
 	this->sectorName = _name;
 	this->_SetAllData(m_cap, change, sp);
 }
@@ -398,7 +402,11 @@ void ParentSector::Read(DataStream& ds)
 	{
 		this->subsecs.push_back(SubSector(this));
 		this->subsecs.rbegin()->Read(ds);
-	}	
+	}
+
+	_Sector s = m_parent->GetSectorID(this->sectorName);
+	Parser parser;
+	parser.PullSectorStocks(s, this->myvec);
 }
 
 void ParentSector::Write(DataStream& ds)
@@ -1006,6 +1014,15 @@ wxVector<SubSector>* SectorClass::GetSubSectorVec(_Sector s)
 		return ps->GetSubSector();
 
 	return NULL;
+}
+
+wxVector<SectorStock>* SectorClass::GetSectorStockVEc(_Sector s)
+{
+	ParentSector* ps = this->GetSector(s);
+	if (!ps)
+		return NULL;
+
+	return ps->GetSectorStockVec();
 }
 
 bool SectorClass::Read()
@@ -1962,8 +1979,7 @@ bool StockNode::DistributeReInvestmentShares(double& s)
 bool StockNode::DistributeReInvestmentShares(Dividend& div, double& s)
 {
 	wxDateTime today(wxDateTime::Today());
-	if (*this->m_parentclock != wxDateTime::Today())
-		this->CalcRatiosOfChildren(&today);
+	this->CalcRatiosOfChildren(&today);
 
 	wxVector<double> ratio;
 	for (auto& v : this->bought)
@@ -2000,15 +2016,10 @@ bool StockNode::UpDate(bool force_update)
 
 bool StockNode::Historical_prices_UpToDate()
 {
-	size_t size = this->historical_prices.size();
-	if (!size)
+	if (!this->historical_prices.size())
 		return false;
 
-	wxDateTime latest = this->GetLatestMarketOpenDate();
-	if (this->historical_prices.rbegin()->date == latest)
-		return true;
-
-	return false;
+	return this->historical_prices.rbegin()->date == this->GetLatestMarketOpenDate() ? true : false;
 }
 
 double StockNode::GetDeviation(int days)
@@ -2039,21 +2050,10 @@ double StockNode::GetDeviation(int days)
 		standardDiv += std::pow((it->close - mean), 2);
 		++it;
 	}
-
+	
 	return std::sqrt(standardDiv / (size - 1));
 }
-/*
-Day_Prices* StockNode::GetHistoricalIndexIter()
-{
-	for (auto it = this->historical_prices.begin(); it != this->historical_prices.end(); ++it)
-	{
-		if (it->date == *this->m_parentclock)
-			return it;
-	}
 
-	return this->historical_prices.end();
-}
-*/
 int StockNode::m_GetStartWeekDay(wxDateTime* T)
 {
 	if (!T)
@@ -2431,6 +2431,7 @@ wxDateTime StockNode::GetFirstDayOfTheWeekDate(wxDateTime* date)
 		T = T - wxDateSpan(0, 0, 0, 1);
 	}
 
+	GetForwardWorkDay(T);
 	return T;
 }
 
@@ -3062,7 +3063,7 @@ Pair Sector::GetPair()
 	return p;
 }
 
-void Sector::Calibrate(bool datechange)
+void Sector::Calibrate(bool datechange, bool force)
 {
 	this->Reset();
 	for (size_t i = 0; i < this->stocks.size(); ++i)
@@ -3070,7 +3071,7 @@ void Sector::Calibrate(bool datechange)
 		if (datechange)
 			this->stocks[i].ClockChange();
 		else
-			this->stocks[i].Calibrate();
+			this->stocks[i].Calibrate(force);
 		if (this->stocks[i].IsActive())
 			this->AddNewValues(stocks[i].GetReturnNode());
 	}
@@ -3572,7 +3573,7 @@ wxVector<Indices*> Portfolio::GetIndices()
 	return vec;
 }
 
-void Portfolio::Calibrate(bool datechange)
+void Portfolio::Calibrate(bool datechange, bool force)
 {
 	this->Reset();
 	if (datechange)
@@ -3583,13 +3584,13 @@ void Portfolio::Calibrate(bool datechange)
 	}
 	else
 	{
-		this->dow.Calibrate();
-		this->nas.Calibrate();
-		this->sp.Calibrate();
+		this->dow.Calibrate(force);
+		this->nas.Calibrate(force);
+		this->sp.Calibrate(force);
 	}
 	for (size_t i = 0; i < this->sectors.size(); ++i)
 	{
-		this->sectors[i].Calibrate(datechange);
+		this->sectors[i].Calibrate(datechange, force);
 		this->AddNewValues(this->sectors[i].GetReturnNode());
 	}
 
@@ -3707,7 +3708,7 @@ bool Portfolio::AddWithdrawl(wxDateTime& date, double& amount)
 
 void Portfolio::ForceUpdate()
 {
-	this->Calibrate(true);
+	this->Calibrate(false, true);
 }
 
 void Portfolio::DateChange()

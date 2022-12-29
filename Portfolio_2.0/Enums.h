@@ -42,7 +42,7 @@ auto constexpr _uTILITIES = "utilities";
 // words to insert int url for fetching stocks from a certain industries...
 auto constexpr ms_bASIC_MATERIALS = "ms_basic_materials";
 auto constexpr ms_cOMMUNICATION_SERVICES = "ms_communication_services";
-auto constexpr ms_cONSUMER_DESCRETIONARY = "ms_consumer_cyclica";
+auto constexpr ms_cONSUMER_DESCRETIONARY = "ms_consumer_cyclical";
 auto constexpr ms_cONSUMER_STAPLES = "ms_consumer_defensive";
 auto constexpr ms_eNERGY = "ms_energy";
 auto constexpr ms_fINANCIAL = "ms_financial_services";
@@ -268,11 +268,9 @@ enum Returns
 enum _Sector
 {
 	BOND = ALL_TIME + 1,
-//	REIT,
 	SMALLCAP,
 	MIDCAP,
 	LARGECAP,
-//	TECH,
 	CRYPTO,
 	FOREIGN,
 	COMMUNICATION_SERVICES,
@@ -491,12 +489,13 @@ enum _EnterDialog
 	ADJUST_DIV_AMOUNT,
 	DAY_GAINERS_WIN,
 	DAY_LOSERS_WIN,
-	SUBSECTORWIN
+	SUBSECTORWIN,
+	SECTORSTOCKWIN
 };
 
 enum _MenuItemIDs
 {
-	QUOTE_LOOKUP = SUBSECTORWIN + 1,
+	QUOTE_LOOKUP = SECTORSTOCKWIN + 1,
 	ADD_DIV,
 	REMOVE_DIV,
 	NEW_DEPOSIT,

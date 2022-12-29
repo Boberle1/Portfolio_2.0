@@ -38,6 +38,9 @@ wxEND_EVENT_TABLE()
 wxBEGIN_EVENT_TABLE(BottomFrame, wxWindow)
 wxEND_EVENT_TABLE()
 
+wxBEGIN_EVENT_TABLE(SectorStockWindow, wxFrame)
+wxEND_EVENT_TABLE()
+
 auto constexpr TICKER = "Ticker";
 auto constexpr SHARES = "Shares";
 auto constexpr PRICE = "Price";
@@ -2960,6 +2963,7 @@ Dialog::Dialog(_EnterDialog type, mainwindow* parent, wxWindowID id, wxPoint p, 
 	case _EnterDialog::DAY_GAINERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(true); break;
 	case _EnterDialog::DAY_LOSERS_WIN: this->gainers = reinterpret_cast<wxVector<DayGainersandLosers>*>(t); this->CreateDayGainers_LosersWin(false); break;
 	case _EnterDialog::SUBSECTORWIN: this->sub = reinterpret_cast<wxVector<SubSector>*>(t); this->CreateSubSectorWin(); break;
+	case _EnterDialog::SECTORSTOCKWIN: this->secstock = reinterpret_cast<wxVector<SectorStock>*>(t); this->CreateSectorStockWin(); break;
 	default: wxFAIL_MSG("_EnterDialog type does not match any types!"); this->Destroy();
 	}
 }
@@ -3309,6 +3313,12 @@ void Dialog::OnCheckClick(wxCommandEvent& evt)
 		this->m_reinvest_date->Enable(false);
 		this->m_reinvest_date->SetLabel("");
 	}
+}
+
+void Dialog::CreateSectorStockWin()
+{
+	SetColor(*this, wxColour(207, 208, 212));
+	wxColour green(5, 166, 10), red(201, 4, 27);
 }
 
 void Dialog::CreateSubSectorWin()
@@ -4162,6 +4172,25 @@ void BottomFrame::OnMouseDown(wxMouseEvent& evt)
 	}
 }
 
+void BottomFrame::OnMouseRightDown(wxMouseEvent& evt)
+{
+	int id = evt.GetId();
+	SectorClass& sc = GetSectorClass();
+	ParentSector* ps = sc.GetSector(_Sector(id));
+	wxString name = ps ? ps->GetSectorName() : "Sector";
+
+	wxVector<SectorStock>* v = ps ? ps->GetSectorStockVec() : NULL;
+
+	if (v != NULL)
+		this->m_parent->SectorRightClick(v, name);
+	else
+	{
+		wxString Id = "";
+		Id << id;
+		wxFAIL_MSG("Switch failed in BottomFrame::OnMouseDown! No matching number for: " + Id);
+	}
+}
+
 void BottomFrame::Create()
 {
 	this->SetBackgroundColour(wxColour(28, 56, 100));
@@ -4253,6 +4282,193 @@ void BottomFrame::BindEvents(wxStaticText& t)
 	t.Bind(wxEVT_ENTER_WINDOW, &BottomFrame::OnMouseEnter, this);
 	t.Bind(wxEVT_LEAVE_WINDOW, &BottomFrame::OnMouseLeave, this);
 	t.Bind(wxEVT_LEFT_DOWN, &BottomFrame::OnMouseDown, this);
+	t.Bind(wxEVT_RIGHT_DOWN, &BottomFrame::OnMouseRightDown, this);
+}
+
+// SectorStockWindow Functions...
+SectorStockWindow::SectorStockWindow(mainwindow* m, wxVector<SectorStock>* v, wxString& s) : wxFrame(m, wxID_ANY, s),
+	m_parent(m), myvec(v), sectorname(s)
+{
+	this->Bind(wxEVT_CLOSE_WINDOW, &SectorStockWindow::CloseEvent, this);
+	this->Create();
+}
+
+void SectorStockWindow::CloseEvent(wxCloseEvent& evt)
+{
+	this->m_parent->Enable();
+	evt.Skip();
+}
+
+void SectorStockWindow::ScrollBottom(wxScrollWinEvent& evt)
+{
+	int orientation = evt.GetOrientation();
+	
+	int x = 0, y = 0;
+	P->GetScrollPixelsPerUnit(&x, &y);
+	
+	int ysize = P->GetScrollHelper()->GetScrollPageSize(wxVERTICAL);
+	int position = P->GetScrollPos(orientation) + ysize;
+
+	int scrolled = (y * position);
+	wxPoint point = this->lastticker->GetPosition();
+	wxPoint unscrolledpoint = P->CalcUnscrolledPosition(point);
+	if (unscrolledpoint.y > scrolled)
+	{
+		evt.Skip();
+		return;
+	}
+
+	wxColour green = wxColour(5, 166, 10), red = wxColour(201, 4, 27);
+	wxFont plain = wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
+
+	int i = 0;
+	if (it == myvec->end())
+	{
+		evt.Skip();
+		return;
+	}
+
+	P->Hide();
+	this->it++;
+	for (this->it; it != this->myvec->end(); ++it)
+	{
+		if (i > 100)
+			break;
+		wxStaticText* temp = new wxStaticText(P, wxID_ANY, it->ticker);
+		temp->SetFont(plain);
+		this->vert1->Add(temp, 0, wxALIGN_LEFT | wxALL, 5);
+		this->lastticker = temp;
+
+		wxStaticText* price = new wxStaticText(P, wxID_ANY, it->price);
+		price->SetFont(plain);
+		this->vert2->Add(price, 0, wxALIGN_LEFT | wxALL, 5);
+
+		wxStaticText* change = new wxStaticText(P, wxID_ANY, it->change);
+		change->SetFont(plain);
+		this->vert3->Add(change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*change, green, red);
+
+		wxStaticText* percent_change = new wxStaticText(P, wxID_ANY, it->percent_change + '%');
+		percent_change->SetFont(plain);
+		this->vert4->Add(percent_change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*percent_change, green, red);
+
+		wxStaticText* market_cap = new wxStaticText(P, wxID_ANY, it->market_cap);
+		market_cap->SetFont(plain);
+		this->vert5->Add(market_cap, 1, wxALIGN_LEFT | wxALL, 5);
+		++i;
+	}
+
+	P->Show();
+	this->Layout();
+	this->Refresh();
+}
+
+void SectorStockWindow::Create()
+{
+	wxColour green = wxColour(5, 166, 10), red = wxColour(201, 4, 27);
+	wxFont plain = wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
+	wxFont title = wxFont(20, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
+
+	P = new wxScrolled<wxWindow>(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
+	P->SetScrollbars(25, 25, 50, 50);
+	P->EnableScrolling(true, true);
+
+	P->Bind(wxEVT_SCROLLWIN_BOTTOM, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_TOP, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_LINEDOWN, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_LINEUP, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_PAGEDOWN, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_PAGEUP, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_THUMBRELEASE, &SectorStockWindow::ScrollBottom, this);
+	P->Bind(wxEVT_SCROLLWIN_THUMBTRACK, &SectorStockWindow::ScrollBottom, this);
+
+	P->SetMinSize(wxSize(wxGetDisplaySize().x / 2, wxGetDisplaySize().y / 2));
+	wxBoxSizer* scrmain = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
+
+	this->vert1 = new wxBoxSizer(wxVERTICAL);
+	this->vert2 = new wxBoxSizer(wxVERTICAL);
+	this->vert3 = new wxBoxSizer(wxVERTICAL);
+	this->vert4 = new wxBoxSizer(wxVERTICAL);
+	this->vert5 = new wxBoxSizer(wxVERTICAL);
+
+	wxStaticText* sectortext = new wxStaticText(this, wxID_ANY, this->sectorname);
+	sectortext->SetFont(title);
+
+	main->Add(sectortext, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
+
+	int i = 0;
+	for (this->it = this->myvec->begin(); it != this->myvec->end(); ++it)
+	{
+		if (i > 100)
+			break;
+		if (it == this->myvec->begin())
+		{
+			wxStaticText* t = new wxStaticText(P, wxID_ANY, "Ticker");
+			t->SetFont(plain);
+			this->vert1->Add(t, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* p = new wxStaticText(P, wxID_ANY, "Price");
+			p->SetFont(plain);
+			this->vert2->Add(p, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* c = new wxStaticText(P, wxID_ANY, "Change");
+			c->SetFont(plain);
+			this->vert3->Add(c, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* pc = new wxStaticText(P, wxID_ANY, "Percent Change");
+			pc->SetFont(plain);
+			this->vert4->Add(pc, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* mc = new wxStaticText(P, wxID_ANY, "Market Cap");
+			mc->SetFont(plain);
+			this->vert5->Add(mc, 0, wxALIGN_LEFT | wxALL, 5);
+		}
+
+		wxStaticText* temp = new wxStaticText(P, wxID_ANY, it->ticker);
+		temp->SetFont(plain);
+		this->vert1->Add(temp, 0, wxALIGN_LEFT | wxALL, 5);
+		this->lastticker = temp;
+
+		wxStaticText* price = new wxStaticText(P, wxID_ANY, it->price);
+		price->SetFont(plain);
+		this->vert2->Add(price, 0, wxALIGN_LEFT | wxALL, 5);
+
+		wxStaticText* change = new wxStaticText(P, wxID_ANY, it->change);
+		change->SetFont(plain);
+		this->vert3->Add(change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*change, green, red);
+
+		wxStaticText* percent_change = new wxStaticText(P, wxID_ANY, it->percent_change + '%');
+		percent_change->SetFont(plain);
+		this->vert4->Add(percent_change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*percent_change, green, red);
+
+		wxStaticText* market_cap = new wxStaticText(P, wxID_ANY, it->market_cap);
+		market_cap->SetFont(plain);
+		this->vert5->Add(market_cap, 1, wxALIGN_LEFT | wxALL, 5);
+		++i;
+	}
+
+	sectortext->IsShownOnScreen();
+	wxPoint point = this->lastticker->GetPosition();
+
+	scrmain->Add(vert1, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert2, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert3, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert4, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert5, 1, wxALIGN_CENTER_VERTICAL);
+
+	P->SetSizer(scrmain);
+	scrmain->Fit(P);
+	main->Add(P, 4, wxEXPAND | wxALL, 10);
+
+	this->SetSizer(main);
+	main->Fit(this);
+	this->CenterOnParent();
+	this->Layout();
+	this->Show();
 }
 
 // mainwindow functions...
@@ -4549,6 +4765,106 @@ bool mainwindow::ValidateExistingTicker(wxString& t)
 void mainwindow::SectorClick(wxVector<SubSector>* v, wxString& name)
 {
 	this->dialog = new Dialog(_EnterDialog::SUBSECTORWIN, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, name, v);
+}
+
+void mainwindow::SectorRightClick(wxVector<SectorStock>* v, wxString& sector)
+{
+
+	this->sectorstockwin = new SectorStockWindow(this, v, sector);
+	this->Disable();
+	return;
+
+	wxColour green = wxColour(5, 166, 10),  red = wxColour(201, 4, 27);
+	wxFont plain = wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
+	wxFont title = wxFont(20, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
+
+	wxFrame* frame = new wxFrame(this, wxID_ANY, "SectorStocks");
+	wxScrolled<wxWindow>* P = new wxScrolled<wxWindow>(frame, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
+	P->SetScrollbars(25, 25, 50, 50);
+	P->EnableScrolling(true, true);
+
+	P->SetMinSize(wxSize(wxGetDisplaySize().x / 2, wxGetDisplaySize().y / 2));
+	wxBoxSizer* scrmain = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
+
+	wxStaticText* sectortext = new wxStaticText(frame, wxID_ANY, sector);
+	sectortext->SetFont(title);
+
+	main->Add(sectortext, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
+
+	wxBoxSizer* vert1 = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* vert2 = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* vert3 = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* vert4 = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* vert5 = new wxBoxSizer(wxVERTICAL);
+
+	int i = 0;
+	for (auto it = v->begin(); it != v->end(); ++it)
+	{
+		if (i > 99)
+			break;
+		if (it == v->begin())
+		{
+			wxStaticText* t = new wxStaticText(P, wxID_ANY, "Ticker");
+			t->SetFont(plain);
+			vert1->Add(t, 0, wxALIGN_LEFT | wxALL, 5);
+			 
+			wxStaticText* p = new wxStaticText(P, wxID_ANY, "Price");
+			p->SetFont(plain);
+			vert2->Add(p, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* c = new wxStaticText(P, wxID_ANY, "Change");
+			c->SetFont(plain);
+			vert3->Add(c, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* pc = new wxStaticText(P, wxID_ANY, "Percent Change");
+			pc->SetFont(plain);
+			vert4->Add(pc, 0, wxALIGN_LEFT | wxALL, 5);
+
+			wxStaticText* mc = new wxStaticText(P, wxID_ANY, "Market Cap");
+			mc->SetFont(plain);
+			vert5->Add(mc, 0, wxALIGN_LEFT | wxALL, 5);
+		}
+
+		wxStaticText* temp = new wxStaticText(P, wxID_ANY, it->ticker);
+		temp->SetFont(plain);
+		vert1->Add(temp, 0, wxALIGN_LEFT | wxALL, 5);
+
+		wxStaticText* price = new wxStaticText(P, wxID_ANY, it->price);
+		price->SetFont(plain);
+		vert2->Add(price, 0, wxALIGN_LEFT | wxALL, 5);
+
+		wxStaticText* change = new wxStaticText(P, wxID_ANY, it->change);
+		change->SetFont(plain);
+		vert3->Add(change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*change, green, red);
+
+		wxStaticText* percent_change = new wxStaticText(P, wxID_ANY, it->percent_change + '%');
+		percent_change->SetFont(plain);
+		vert4->Add(percent_change, 0, wxALIGN_LEFT | wxALL, 5);
+		SetStaticTextColor(*percent_change, green, red);
+
+		wxStaticText* market_cap = new wxStaticText(P, wxID_ANY, it->market_cap);
+		market_cap->SetFont(plain);
+		vert5->Add(market_cap, 1, wxALIGN_LEFT | wxALL, 5);
+		++i;
+	}
+
+	scrmain->Add(vert1, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert2, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert3, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert4, 1, wxALIGN_CENTER_VERTICAL);
+	scrmain->Add(vert5, 1, wxALIGN_CENTER_VERTICAL);
+
+	P->SetSizer(scrmain);
+	scrmain->Fit(P);
+	main->Add(P, 4, wxEXPAND | wxALL, 10);
+
+	frame->SetSizer(main);
+	main->Fit(frame);
+	frame->CenterOnParent();
+	frame->Layout();
+	frame->Show();
 }
 
 void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)

@@ -538,6 +538,7 @@ private:
 	void CreateChoiceControls();
 	void CreateDayGainers_LosersWin(bool gainers = true);
 	void CreateSubSectorWin();
+	void CreateSectorStockWin();
 	void OnCheckClick(wxCommandEvent&);
 	void OnCancelDialog(wxCommandEvent&);
 	void OnCloseDialog(wxCloseEvent&);
@@ -598,6 +599,7 @@ private:
 	GenericKit* sellkit = NULL;
 	wxVector<DayGainersandLosers>* gainers = nullptr;
     wxVector<SubSector>* sub = NULL;
+	wxVector<SectorStock>* secstock = NULL;
 	string_three string_t;
 	GenericKitTemplate<Dividend, wxString>* generic_kit_template = NULL;
 
@@ -622,6 +624,7 @@ public:
 	void OnMouseEnter(wxMouseEvent&);
 	void OnMouseLeave(wxMouseEvent&);
 	void OnMouseDown(wxMouseEvent&);
+	void OnMouseRightDown(wxMouseEvent&);
 private:
 	void Create();
 	void BindEvents(wxStaticText&);
@@ -641,6 +644,33 @@ private:
 	wxStaticText* textenter = NULL;
 };
 
+class SectorStockWindow : public wxFrame
+{
+public: 
+	SectorStockWindow(mainwindow*, wxVector<SectorStock>*, wxString&);
+	wxDECLARE_EVENT_TABLE();
+	void CloseEvent(wxCloseEvent&);
+	void ScrollBottom(wxScrollWinEvent&);
+private:
+	void Create();
+private:
+	wxVector<SectorStock>* myvec = NULL;
+	mainwindow* m_parent = NULL;
+	wxString sectorname = "Sector";
+
+	wxBoxSizer* vert1 = NULL;
+	wxBoxSizer* vert2 = NULL;
+	wxBoxSizer* vert3 = NULL;
+	wxBoxSizer* vert4 = NULL;
+	wxBoxSizer* vert5 = NULL;
+
+	wxScrolled<wxWindow>* P = NULL;
+
+	// this will be the last one prited to the screen...
+	SectorStock* it = NULL;
+	wxStaticText* lastticker = NULL;
+};
+
 class mainwindow : public wxFrame
 {
 public:
@@ -657,6 +687,7 @@ public:
 	void ReInvestSharesWin(wxString&, wxString&);
 	bool ValidateExistingTicker(wxString&);
 	void SectorClick(wxVector<SubSector>*, wxString&);
+	void SectorRightClick(wxVector<SectorStock>*, wxString&);
 	void RightClickGrid(wxString&, wxPoint&);
 
 	// OnThreadCompletion callback function for portfolio to call after it retrieves all of its data...
@@ -728,6 +759,7 @@ private:
 	BottomFrame* bottom_frame = nullptr;
 	Dialog* dialog = nullptr;
 	GenericListWin* generic_list = NULL;
+	SectorStockWindow* sectorstockwin = NULL;
 
 	// For entering ticker to perform an action on it example: sell, buy add dividend ect...
 	wxTextEntryDialog* generic_entry = NULL;

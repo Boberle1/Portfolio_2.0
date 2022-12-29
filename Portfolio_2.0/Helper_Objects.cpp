@@ -111,12 +111,64 @@ Holiday_Pair* Holidays::Find(int y)
 }
 
 // SectorStock functions...
-SectorStock::SectorStock(wxString& _ticker, wxString& _longname, wxString& _price, wxString& _change, 
-	wxString& _percent_change, wxString& _reg_mar_vol, wxString& _avg_vol, wxString& _market_cap)
-	: ticker(_ticker), longname(_longname), price(_price), change(_change), percent_change(_percent_change),
+SectorStock::SectorStock(_Sector s, wxString& sector, wxString& _ticker, wxString& _longname, wxString& _price, wxString& _change, 
+	 wxString& _percent_change, wxString& _reg_mar_vol, wxString& _avg_vol, wxString& _market_cap)
+	: sec(s), sectorname(sector), ticker(_ticker), longname(_longname), price(_price), change(_change), percent_change(_percent_change),
 	reg_mar_vol(_reg_mar_vol), avg_vol(_avg_vol), market_cap(_market_cap)
 {
+	if (ticker.size() > 15)
+		int Catch = 0;
+	if (longname.size() > 70)
+		int Catch = 0;
+	if (reg_mar_vol.size() > 15)
+		int Catch = 0;
+	if (avg_vol.size() > 40)
+		int Catch = 0;
+	if (market_cap.size() > 15)
+		market_cap = "N/A";
 
+	int index = change.find('+');
+	if (index != -1)
+		change = change.Mid(index + 1);
+
+	index = this->price.find(',');
+	if (index != -1)
+	{
+		wxString temp = "";
+		temp = this->price.Mid(0, index);
+		temp += this->price.Mid(index + 1);
+		this->price = temp;
+	}
+
+	index = this->change.find(',');
+	if (index != -1)
+	{
+		wxString temp = "";
+		temp = this->change.Mid(0, index);
+		temp += this->change.Mid(index + 1);
+		this->change = temp;
+	}
+
+	index = this->percent_change.find(',');
+	if (index != -1)
+	{
+		wxString temp = "";
+		temp = this->percent_change.Mid(0, index);
+		temp += this->percent_change.Mid(index + 1);
+		this->percent_change = temp;
+	}
+
+	index = this->percent_change.find('%');
+	if (index != -1)
+		this->percent_change = this->percent_change.Mid(0, index);
+
+	if (!change.ToDouble(&this->d_change))
+		wxFAIL_MSG("ToDouble failed in SectorStock constructor change, change is: " + change);
+	if (!percent_change.ToDouble(&this->d_change_perc))
+		wxFAIL_MSG("ToDouble failed in SectorStock constructor percent_change, percent_change is: " + percent_change);
+	if (!price.ToDouble(&this->d_price))
+		wxFAIL_MSG("ToDouble failed in SectorStock constructor price, price is: " + price);
+	this->d_previous_close = d_price + d_change;
 }
 
 // global Holidays instance

@@ -547,6 +547,131 @@ void Parser::PullFinVizPerformance(wxString& url, wxVector<SectorPerformance>& v
 	}
 }
 
+void Parser::PullSectorStocks(_Sector s, wxVector<SectorStock>& v)
+{
+	wxString sec = "";
+	wxString sectorname = "";
+	switch (s)
+	{
+	case COMMUNICATION_SERVICES: sec = ms_cOMMUNICATION_SERVICES; sectorname = _COMMUNICATION_SERVICES; break;
+	case CONSUMER_DESCRETIONARY: sec = ms_cONSUMER_DESCRETIONARY; sectorname = _CONSUMER_DESCRETIONARY; break;
+	case CONSUMER_STAPLES:		 sec = ms_cONSUMER_STAPLES; sectorname = _CONSUMER_STAPLES; break;
+	case ENERGY:				 sec = ms_eNERGY; sectorname = _ENERGY; break;
+	case FINANCIALS:			 sec = ms_fINANCIAL; sectorname = _FINANCIALS; break;
+	case HEALTH_CARE:			 sec = ms_hEALTH_CARE; sectorname = _HEALTH_CARE; break;
+	case INDUSTRIALS:			 sec = ms_iNDUSTRIALS; sectorname = _INDUSTRIALS; break;
+	case INFORMATION_TECHNOLOGY: sec = ms_tECHNOLOGY; sectorname = _INFORMATION_TECHNOLOGY; break;
+	case MATERIALS:				 sec = ms_bASIC_MATERIALS; sectorname = _MATERIALS; break;
+	case REAL_ESTATE:			 sec = ms_rEAL_ESTATE; sectorname = _REAL_ESTATE; break;
+	case UTILITIES:				 sec = ms_uTILITIES; sectorname = _UTILITIES; break;
+	default:
+		wxFAIL_MSG("switch failed in Parser::PullSectorStocks! Returning!"); return;
+	}
+	
+	int start = 0;
+	int rows = 0;
+	int total = 0;
+	long lstart = 0;
+	long lrows = 0;
+	long ltotal = 0;
+	int first = 0;
+	wxString _start = "";
+	wxString _rows = "";
+	wxString _total = "";
+	wxString result = "";
+
+	wxString offset_count = "0";
+	int N_offset_count = 0;
+	wxString count = "100";
+
+	wxString url = this->idustrie_stocks_url;
+	url.Replace("TICKER", sec);
+	url.Replace("OFFSETCOUNT", "0");
+	url.Replace("COUNT", "100");
+	wxString data = "";
+	this->PullWebData(url, data);
+
+	wxString match = "<span>Matching <span>Stocks";
+	int index = this->FindItem(match, data);
+	if (index == -1)
+		return;
+
+	index += match.size();
+	index = this->FindItem("<span>", data, index);
+	if (index == -1)
+		return;
+
+	result = this->GetData(index, data, 1);
+
+	for (size_t i = 0; i < result.size(); ++i)
+	{
+		if (isdigit(result[i]))
+		{
+			switch (first)
+			{
+			case 0: _start += result[i]; break;
+			case 1: _rows  += result[i]; break;
+			case 2: _total += result[i]; break;
+			}
+		}
+		else
+		{
+			if (_start.size() && !first)
+				first++;
+			else if (_rows.size() && first == 1)
+				first++;
+		}
+	}
+
+	_start.ToLong(&lstart);
+	_rows.ToLong(&lrows);
+	_total.ToLong(&ltotal);
+
+	start = lstart;
+	rows = lrows;
+	total = ltotal;
+
+	do
+	{
+		if (N_offset_count)
+		{
+			wxString match = "<span>Matching <span>Stocks";
+			index = this->FindItem(match, data);
+			if (index == -1)
+				return;
+
+			index += match.size();
+			index = this->FindItem("<span>", data, index);
+			if (index == -1)
+				return;
+
+			result = this->GetData(index, data, 1);
+		}
+
+		this->PullSectorStocks(index, 1, rows, total, v, data, s, sectorname);
+//		for (auto it = v.rbegin(); it != v.rend(); ++it)
+//			wxString lonlljlk = it->longname;
+//		auto& itb = ++v.rbegin();
+//		auto it = v.rbegin();
+//		wxString t = data.Mid(data.find(itb->longname), 5000);
+		data = "";
+		url = this->industrie_stocks_url_2;
+		start += 100;
+
+		N_offset_count += 100;
+		if (N_offset_count > total)
+			break;
+		offset_count = "";
+		offset_count << N_offset_count;
+
+		rows = start + 100 < total ? 100 : total - start + 1;
+		url.Replace("TICKER", sec);
+		url.Replace("OFFSETCOUNT", offset_count);
+		url.Replace("COUNT", "100");
+		this->PullWebData(url, data);
+	} while (N_offset_count < total);
+}
+
 void Parser::UpDateHistoricalPrices(bool indices)
 {
 	this->UpDate(true, false, indices);
@@ -572,6 +697,196 @@ void Parser::SetLatestDividendDateAndCallBack(wxString div, void (*cb)(void* v, 
 {
 	this->lastDivDate = div;
 	this->CallBackDiv = cb;
+}
+
+bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<SectorStock>& vec, wxString& data, _Sector S, wxString& sectorname)
+{
+	int begin = start;
+	wxString ticker = "", longname = "", price = "", 
+		change = "", change_perc = "", volume = "", avg_volume = "", market_cap = "";
+
+	int endofrow = 0;
+	int inttemp = index;
+	wxString match = "";
+	for (begin; begin <= rows; ++begin)
+	{
+		inttemp = index;
+		index = this->FindItem("data-id=\"portfolio-checkbox", data, index);
+		if (index == -1)
+		{
+			//wxFAIL_MSG("Could not find data-id=\"portfolio-checkbox in Parser::PullSectorStocks!");
+			return false;
+		}
+
+		inttemp = index;
+		index = this->FindItem("title=\"", data, index);
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find title= in Parser::PullSectorStocks!");
+			return false;
+		}
+
+		ticker = this->GetData(index, data, 1);
+		endofrow = this->FindItem("</tr>", data, index);
+		inttemp = index;
+		match = "\"Name\"";
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxString stringtemp = data.Mid(inttemp, 3000);
+			wxFAIL_MSG("Could not find name in Parser::PullSectorStocks!");
+			stringtemp = "";
+			return false;
+		}
+
+		index += match.size();
+		longname = this->GetData(index, data, 1);
+
+		inttemp = index;
+		wxString stringtemp1 = data.Mid(inttemp, 3000);
+		match = "data-field=\"regularMarketPrice\"";
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find regularMarketPrice in Parser::PullSectorStocks!");
+			stringtemp1 = "";
+			return false;
+		}
+
+		index += match.size();
+		price = this->GetData(index, data, 1);
+
+		inttemp = index;
+		match = "data-field=\"regularMarketChange\"";
+		wxString stringtemp2 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find regularMarketChange in Parser::PullSectorStocks!");
+			stringtemp2 = "";
+			return false;
+		}
+
+		inttemp = index;
+		match = "class=\"C";
+		wxString stringtemp3 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+
+		// check to see if it skipped a row...
+		if (index > endofrow)
+		{
+			match = "class=\"\"";
+			index = this->FindItem(match, data, inttemp);
+		}
+
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find class=C in Parser::PullSectorStocks!");
+			stringtemp3 = "";
+			return false;
+		}
+
+		index += match.size();
+		change = this->GetData(index, data, 1);
+
+		inttemp = index;
+		match = "data-field=\"regularMarketChangePercent\"";
+		wxString stringtemp4 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find regularMarketChangePercent in Parser::PullSectorStocks!");
+			stringtemp4 = "";
+			return false;
+		}
+
+		inttemp = index;
+		match = "class=\"C";
+		wxString stringtemp5 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+
+		// check to see if it skipped a row...
+		if (index > endofrow)
+		{
+			match = "class=\"\"";
+			index = this->FindItem(match, data, inttemp);
+		}
+
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find class=C in Parser::PullSectorStocks!");
+			stringtemp5 = "";
+			return false;
+		}
+
+		index += match.size();
+		change_perc = this->GetData(index, data, 1);
+
+		inttemp = index;
+		wxString stringtemp6 = data.Mid(inttemp, 3000);
+		match = "regularMarketVolume";
+		index = this->FindItem("regularMarketVolume", data, index);
+		if (index == -1)
+		{
+			wxFAIL_MSG("Could not find regularMarketVolume in Parser::PullSectorStocks!");
+			stringtemp6 = "";
+			return false;
+		}
+
+		index += match.size();
+		volume = this->GetData(index, data, 1);
+
+		inttemp = index;
+		match = "Avg Vol";
+		wxString stringtemp7 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxString stringtemp = data.Mid(inttemp, 3000);
+			wxFAIL_MSG("Could not find Avg Vol in Parser::PullSectorStocks!");
+			stringtemp = "";
+			return false;
+		}
+
+		index += match.size();
+		avg_volume = this->GetData(index, data, 1);
+
+		inttemp = index;
+		int temp = index;
+		match = "marketCap";
+		wxString secondmatch = "aria-label=\"Market Cap\"><span";
+		wxString stringtemp8 = data.Mid(inttemp, 3000);
+		index = this->FindItem(match, data, index);
+		if (index == -1)
+		{
+			wxString stringtemp = data.Mid(inttemp, 3000);
+			wxFAIL_MSG("Could not find marketCap in Parser::PullSectorStocks!");
+			stringtemp = "";
+			return false;
+		}
+		else if(index > endofrow)
+		{
+			index = this->FindItem(secondmatch, data, temp);
+			market_cap = "N/A";
+			if (index == -1)
+				index = temp;
+		}
+
+		if (market_cap != "N/A")
+		{
+			index += match.size();
+			market_cap = this->GetData(index, data, 1);
+		}
+		
+		if (market_cap.size() > 15)
+		{
+			int Catch = 0;
+		}
+
+		vec.push_back(SectorStock(S, sectorname, ticker, longname, price, change, change_perc, volume, avg_volume, market_cap));
+		market_cap = "";
+	}
+	return true;
 }
 
 bool Parser::ParsePrices(wxString& Data, size_t& index)
@@ -1359,6 +1674,11 @@ bool Parser::PullWebData(wxString& url, wxString& data)
 	web.seturl(url);
 	web.setpages(1);
 	return web.getwebdata(data);
+}
+
+int Parser::FindItem(wxString item, wxString& data, int index)
+{
+	return data.find(item, index);
 }
 
 void Parser::ParseSummaryData(wxString& data)

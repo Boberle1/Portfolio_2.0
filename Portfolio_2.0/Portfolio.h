@@ -149,6 +149,7 @@ public:
 	void Write(DataStream&);
 	wxVector<SubSector>* GetSubSector() { return &this->subsecs; }
 	wxString GetSectorName() { return this->sectorName; }
+	wxVector<SectorStock>* GetSectorStockVec() { return &myvec; }
 private:
 	void m_GetSubSectorData();
 	void m_GetSubSectorPerformance();
@@ -160,6 +161,7 @@ private:
 	wxString url = "";
 	wxString subsecurl = "https://finviz.com/grp_export.ashx?g=industry&sg=INSERTION&v=TYPE&o=name";
 	SectorClass* m_parent = nullptr;
+	wxVector<SectorStock> myvec;
 };
 
 // class defining all the sectors and subsectors...
@@ -178,6 +180,7 @@ public:
 	const wxVector<wxString>* GetSectorString();
 	ParentSector* GetSector(_Sector);
 	wxVector<SubSector>* GetSubSectorVec(_Sector);
+	wxVector<SectorStock>* GetSectorStockVEc(_Sector);
 	bool Read();
 	void Save();
 private:
@@ -461,19 +464,26 @@ struct StockViewerData
 		}
 		// find how many chars are necessary to show to put into wxNumberFormatter...
 		wxString num = "";
+		wxString string_num = "";
+		int string_shares = shares * 1000000;
+		string_num = wxNumberFormatter::ToString(string_shares, 11, 0);
 		num << shares;
-		int end = 0;
-		int decimal = 0;
-		bool enter = false;
+
 		int index = num.find('.');
 		if (index == -1)
 			return;
-		else
+
+		int i = string_num.size() - 1;
+		while (i >= 0 && (string_num[i] == '0' || string_num[i] == '.'))
 		{
-			if (!num.size() || num.size() == 1)
-				return;
-			this->trailing_decimals = (num.size() - 1) - index;
+			char c = string_num[i];
+			--i;
 		}
+		if (i != -1)
+			string_num = string_num.Mid(0, i + 1);
+
+		this->trailing_decimals = string_num.Mid(index + 1).size() + 1;
+		
 	}
 	wxString GetTicker() { return this->ticker; }
 	wxString GetLongName() { return this->longname; }
@@ -787,7 +797,7 @@ public:
 	wxVector<stock_node*> GetAllLotData();
 	wxVector<stock_node*> GetLotData();
 	Pair GetPair();
-	void Calibrate(bool datechange = false);
+	void Calibrate(bool datechange = false, bool force = true);
 	void OnClockChange();
 	void CalcRatiosOfChildren();
 	const StockViewerData* GetStockViewerData() const;
@@ -844,7 +854,7 @@ public:
 	wxDateTime GetEarliestPurchaseDate();
 	const wxVector<StockNode*> GetStockNodeItems();
 	wxVector<Indices*> GetIndices();
-	void Calibrate(bool datechange = false);
+	void Calibrate(bool datechange = false, bool force = false);
 	double CalcRatiosOfAllChildren();
 	StockViewerData* GetStockViewerData();
 	void Save();

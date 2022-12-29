@@ -21,6 +21,14 @@ static size_t setdata(void* buffer, size_t size, size_t nmemb, void* param)
 	return totalsize;
 }
 
+static size_t header_callback(char* buffer, size_t size, size_t nmemb, void* param)
+{
+	wxString* html = static_cast<wxString*>(param);
+	size_t totalsize = size * nmemb;
+	html->Append(static_cast<char*>(buffer));
+	return totalsize;
+}
+
 webdata::webdata(bool redirect) : follow_redirect(redirect)
 {
 
@@ -61,14 +69,20 @@ bool webdata::getwebdata(wxString& data)
 	CURLcode res = CURLE_OK;
 	curl_global_init(CURL_GLOBAL_DEFAULT);
 	CURL* curl = curl_easy_init();
+	
+	wxString headerfile = "";
 	if (curl) {
 		--pages;
 		CURLcode URL = curl_easy_setopt(curl, CURLOPT_URL, url);
 		if (this->follow_redirect)
 			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 		CURLcode writefunc = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, setdata);
+		CURLcode headerfunc = curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 		CURLcode write = curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+		CURLcode header = curl_easy_setopt(curl, CURLOPT_WRITEHEADER, &headerfile);
 		CURLcode verbose = curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+//		CURLcode something = curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+//		CURLcode something2 = curl_easy_setopt(curl, CURLOPT_COOKIEJAR, c);
 		res = curl_easy_perform(curl);
 		curl_easy_cleanup(curl);
 

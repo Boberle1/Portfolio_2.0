@@ -92,6 +92,7 @@ public:
 	wxVector<DayGainersandLosers> GetStockLosers();
 	void PullFinVizOverview(wxString&, wxVector<SectorOverview>&);
 	void PullFinVizPerformance(wxString&, wxVector<SectorPerformance>&);
+	void PullSectorStocks(_Sector, wxVector<SectorStock>&);
 	void UpDateHistoricalPrices(bool indices = false);
 	void UpDateDiv();
 	void SetLastDateAndCallBack(wxString, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType));
@@ -101,6 +102,7 @@ public:
 
 private:
 	
+	bool PullSectorStocks(int, int, int, int, wxVector<SectorStock>&, wxString&, _Sector, wxString&);
 	bool ParsePrices(wxString& Data, size_t&);
 	void ParseStockHistory(wxString&);
 	void ParseDivHistory(wxString&);
@@ -116,6 +118,8 @@ private:
 	bool PullWebData(bool indices = false);
 	bool PullWebData(wxString& url, wxString& data);
 	void ParseSummaryData(wxString&);
+
+	int FindItem(wxString, wxString&, int index = 0);
 
 	//CallBack for StockNode...
 	void (*CallBack)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType) = nullptr;
@@ -223,7 +227,8 @@ private:
 	wxString QQQ_Url_h =
 		"https://query1.finance.yahoo.com/v7/finance/download/%5EIXIC?period1=1638926022&period2=1670462022&interval=1d&events=history&includeAdjustedClose=true";
 	wxString idustrie_stocks_url =
-		"https://finance.yahoo.com/screener/predefined/TICKER/?offset=0&count=100";
+		"https://finance.yahoo.com/screener/predefined/TICKER/?offset=OFFSETCOUNT&count=COUNT";
+	wxString industrie_stocks_url_2 = "https://finance.yahoo.com/screener/predefined/TICKER/?count=COUNT&offset=OFFSETCOUNT";
 	wxString SP500_QUOTE_URL = "https://finance.yahoo.com/quote/%5EGSPC?p=%5EGSPC";
 	wxString QQQ_QUOTE_URL = "https://finance.yahoo.com/quote/%5EIXIC?p=%5EIXIC";
 	wxString DOW_QUOTE_URL = "https://finance.yahoo.com/quote/%5EDJI/";
