@@ -8,6 +8,7 @@
 #include "wx/statline.h"
 #include "wx/graphics.h"
 #include "wx/dcbuffer.h"
+#include <wx/settings.h>
 #include "wx/progdlg.h"
 #include "wx/popupwin.h"
 
@@ -249,6 +250,43 @@ struct GridCanvasData
 };
 
 class mainwindow;
+class ChartControlWin;
+
+class ChartControl : public wxWindow
+{
+public:
+	ChartControl(wxWindow* grandparent, wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, wxString&, wxVector<Day_Prices>*);
+	~ChartControl();
+	wxVector<Day_Prices>* values = NULL;
+	wxString title = "";
+	wxDECLARE_EVENT_TABLE();
+	void OnPaint(wxPaintEvent& evt);
+	void OnClose(wxCloseEvent&);
+	void EnterWindow(wxMouseEvent&);
+	void Motion(wxMouseEvent&);
+	void OnLeftDown(wxMouseEvent&);
+private:
+	std::tuple<int, double, double> calculateChartSegmentCountAndRange(double origLow, double origHigh);
+private:
+	wxWindow* m_parent = NULL;
+	wxWindow* m_grandparent = NULL;
+	wxVector<std::pair<wxPoint2DDouble, Day_Prices>> mypair;
+};
+
+class ChartControlWin : public wxWindow
+{
+public:
+	ChartControlWin(mainwindow*, wxWindowID, const wxPoint&, const wxSize&, wxString&, wxVector<Day_Prices>*, StockViewerData*);
+private:
+	void Create();
+private:
+	ChartControl* chart = NULL;
+	mainwindow* m_parent = NULL;
+	StockViewerData* svd = NULL;
+	wxString ticker = "";
+	wxString rangebegin = "";
+	wxString range_end = "";
+};
 
 class GridView : public wxGridSizer
 {
@@ -359,6 +397,16 @@ private:
 	Portfolio* port = NULL;
 	mainwindow* m_parent = NULL;
 	wxString ticker = "";
+};
+
+class LoadSectorStocksThread : public wxThread
+{
+public:
+	LoadSectorStocksThread(mainwindow*);
+	~LoadSectorStocksThread();
+	wxThread::ExitCode Entry() wxOVERRIDE;
+private:
+	mainwindow* m_parent = NULL;
 };
 
 class PortfolioWin : public wxWindow
@@ -709,10 +757,14 @@ public:
 	void OnSellMenu(wxCommandEvent&);
 	// End of helper functions for OnSellMenu..
 
+	void OnHome(wxCommandEvent&);
+
 	void OnSellPopupClick(wxCommandEvent&);
 	void OnPurchasePopupClick(wxCommandEvent&);
 	void OnAddReInvestSharesPopup(wxCommandEvent&);
 	void OnQuoteLookupPopup(wxCommandEvent&);
+	void OnChartView(wxCommandEvent&);
+	void OnLoadSectorStocks(wxCommandEvent&);
 
 	// thread calls this after OnQuoteLookupPopup...
 	void OnQuoteThread(wxThreadEvent&);
@@ -742,6 +794,7 @@ public:
 public:
 	MyQuoteThread* quotethread = NULL;
 	SummaryData smd;
+	LoadSectorStocksThread* mainwindow_thread = NULL;
 private:
 	wxWindow* GetLeftWin();
 	wxScrolledCanvas* GetRightWin();
@@ -751,6 +804,7 @@ private:
 	void RetrieveFile();
 	void DeletePopupMenu();
 	void DeleteQuoteThread();
+	void DeleteLoadStocksThread();
 	void CreatePopupMenu();
 private:
 	wxScrolledCanvas* grid_panel = NULL;
@@ -760,6 +814,11 @@ private:
 	Dialog* dialog = nullptr;
 	GenericListWin* generic_list = NULL;
 	SectorStockWindow* sectorstockwin = NULL;
+	ChartControl* chart = NULL;
+	wxFrame* chartframe = NULL;
+	ChartControlWin* chartwin = NULL;
+
+	wxBoxSizer* top = NULL;
 
 	// For entering ticker to perform an action on it example: sell, buy add dividend ect...
 	wxTextEntryDialog* generic_entry = NULL;
@@ -780,7 +839,10 @@ private:
 	wxMenuItem* p_add_div = NULL;
 	wxMenuItem* p_view_dividends = NULL;
 	wxMenuItem* p_ohlc = NULL;
+	wxMenuItem* p_graph = NULL;
 	wxMenu* popup = NULL;
 	int counter = 0;
+
+	wxStatusBar* statbar = NULL;
 };
 

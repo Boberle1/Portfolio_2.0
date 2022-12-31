@@ -145,6 +145,7 @@ public:
 	void SetSubSectorPerformance(SectorPerformance&);
 	void SetSubSecData(wxString&, double&, double&, SectorPerformance&);
 	_Sector GetSectorId();
+	void LoadStocks(wxThread* thread = NULL, wxWindow* window = NULL);
 	void Read(DataStream&);
 	void Write(DataStream&);
 	wxVector<SubSector>* GetSubSector() { return &this->subsecs; }
@@ -183,6 +184,7 @@ public:
 	wxVector<SectorStock>* GetSectorStockVEc(_Sector);
 	bool Read();
 	void Save();
+	void LoadAllStocks(wxThread* thread = NULL, wxWindow* window = NULL);
 private:
 	wxString m_GetSubSector(wxVector<_Sub_Sector>&, wxVector<wxString>&, _Sub_Sector);
 	_Sub_Sector m_GetSubSectorID(wxVector<wxString>&, wxVector<_Sub_Sector>&, wxString&);
@@ -498,10 +500,10 @@ struct StockViewerData
 	wxString GetDayGain(){ return wxNumberFormatter::ToString(this->day_gain * 100, 2); }
 //	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
 	wxString GetWeekGain();
-	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2) + "%"; }
-	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2) + "%"; }
+	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2); }
+	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2); }
 	wxString GetTotalGain(){ return wxNumberFormatter::ToString(this->total_gain * 100, 2); }
-	wxString GetPortfolioPerc() { return wxNumberFormatter::ToString(this->m_parent->PortfolioPerc * 100, 2) + "%"; }
+	wxString GetPortfolioPerc() { return wxNumberFormatter::ToString(this->m_parent->PortfolioPerc * 100, 2); }
 	wxString GetCostBasis(){ return wxNumberFormatter::ToString(this->cost_basis, 2); }
 	wxString GetMarketValue(){ return wxNumberFormatter::ToString(this->market_value, 2); }
 	wxString GetDividends(){ return wxNumberFormatter::ToString(this->total_divs, 2); }
@@ -669,6 +671,7 @@ public:
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
 	void GetDivWithAllReInvestmentShares(Dividend&);
+	wxVector<Day_Prices>* GetDayPrices() { return &this->historical_prices; }
 
 	// This function differs from get dividends in that it returns all the dividends including the ones that are elligible for dividend re-investment..
 	wxVector<Dividend> GetAllDividends();
@@ -788,6 +791,7 @@ public:
 	wxVector<Dividend> GetDividendsFromStagedStock();
 	bool IsId(_Sector);
 	bool IsChild(wxString&);
+	StockNode* GetStagedStock();
 	wxString GetLongNameOfStock(wxString&);
 	wxString GetLongNameOfStock();
 	bool IsChild(long&);
@@ -838,6 +842,7 @@ public:
 	// This function finds a stock with the matching ticker amongst the sectors and stages it in the queue for easy lookup later
 	// to make a modification to it such as: selling, buying, adding div shares ect...
 	bool StageStock(wxString&);
+	StockNode* GetStagedStock();
 	wxString StageStockandGetLongName(wxString&);
 	bool RequestSell(wxString&);
 	bool Sell(long&, wxDateTime&, double&, double&);
@@ -852,7 +857,7 @@ public:
 	bool NewDepositSchedule(double, int, wxDateTime);
 	int GetNumItems(_PortfolioType);
 	wxDateTime GetEarliestPurchaseDate();
-	const wxVector<StockNode*> GetStockNodeItems();
+	wxVector<StockNode*> GetStockNodeItems();
 	wxVector<Indices*> GetIndices();
 	void Calibrate(bool datechange = false, bool force = false);
 	double CalcRatiosOfAllChildren();

@@ -334,9 +334,6 @@ ParentSector::ParentSector(SectorClass* parent, _Sector secid, wxString URL, wxS
 void ParentSector::SetAllData(wxString& _name, double& m_cap, double& change, SectorPerformance& sp)
 {
 	_Sector s = m_parent->GetSectorID(_name);
-	wxVector<SectorStock> vecf;
-//	Parser parser;
-//	parser.PullSectorStocks(s, vecf);
 	this->sectorName = _name;
 	this->_SetAllData(m_cap, change, sp);
 }
@@ -389,6 +386,43 @@ _Sector ParentSector::GetSectorId()
 	return this->ID;
 }
 
+void ParentSector::LoadStocks(wxThread* thread, wxWindow* window)
+{
+	auto constexpr second = 1000000;
+	wxStatusBar* bar = NULL;
+	if (thread)
+	{
+		if (window)
+		{
+			bar = (wxStatusBar*)window->FindItem(wxID_BOTTOM);
+//			if (bar)
+//				bar->SetStatusText("Fetching " + this->sectorName + " Stocks...");
+		}
+		if (thread->TestDestroy())
+			thread->Delete();
+	}
+
+	_Sector s = m_parent->GetSectorID(this->sectorName);
+	Parser parser;
+	auto start = std::chrono::high_resolution_clock().now();
+	parser.PullSectorStocks(s, this->myvec);
+	auto end = std::chrono::high_resolution_clock().now();
+
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	long long d = duration.count();
+	wxString status = "";
+	status = "Loaded " + this->sectorName + " stocks in ";
+	long long secs = d / second;
+	long long remaining = d - (secs * second);
+
+	status << secs;
+	status += ".";
+	status << remaining;
+	status += " seconds";
+	if (bar)
+		bar->SetStatusText(status);
+}
+
 void ParentSector::Read(DataStream& ds)
 {
 	ds.Read(this->sectorName);
@@ -405,8 +439,8 @@ void ParentSector::Read(DataStream& ds)
 	}
 
 	_Sector s = m_parent->GetSectorID(this->sectorName);
-	Parser parser;
-	parser.PullSectorStocks(s, this->myvec);
+
+//	ds.ReadSectorStockVector(this->myvec);
 }
 
 void ParentSector::Write(DataStream& ds)
@@ -420,6 +454,8 @@ void ParentSector::Write(DataStream& ds)
 	ds.WriteData(size);
 	for (auto& v : this->subsecs)
 		v.Write(ds);
+
+//	ds.WriteSectorStockVector(this->myvec);
 }
 
 void ParentSector::m_GetSubSectorData()
@@ -1054,6 +1090,30 @@ void SectorClass::Save()
 		v.Write(ds);
 }
 
+void SectorClass::LoadAllStocks(wxThread* thread, wxWindow* window)
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	for (auto& it : this->parentsector)
+		it.LoadStocks(thread, window);
+//	auto stop = std::chrono::high_resolution_clock::now();
+	if (thread)
+	{
+//		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+		if (window)
+		{
+			wxStatusBar* bar = (wxStatusBar*)window->FindItem(wxID_BOTTOM);
+			if (bar)
+			{
+				wxString result = "Finished Loading All Stocks... duration was: ";
+//				long long d = duration.count();
+	//			result << d;
+	//			result += " microseconds...";
+	//			bar->SetStatusText(result);
+			}
+		}
+	}
+}
+
 wxString SectorClass::m_GetSubSector(wxVector<_Sub_Sector>& v, wxVector<wxString>& sv, _Sub_Sector item)
 {
 	for (size_t i = 0; i < v.size(); ++i)
@@ -1200,7 +1260,7 @@ SectorClass& GetSectorClass()
 
 wxString StockViewerData::GetWeekGain()
 {
-	return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%";
+	return wxNumberFormatter::ToString(this->week_gain * 100, 2);
 }
 
 // stock_node functions...
@@ -1997,6 +2057,8 @@ bool StockNode::UpDate(bool force_update)
 {
 	wxDateTime today = wxDateTime::Today();
 	GetWorkDate(today);
+	wxString today_date = today.Format(STANDARD_DATE);
+	wxString date = this->current_Data.date.Format(STANDARD_DATE);
 	if (!this->current_Data.date.IsValid() || this->current_Data.date < today || force_update)
 	{
 		if (!this->parser)
@@ -2382,12 +2444,13 @@ stock_node* StockNode::FindLot(long& id)
 
 Parser* StockNode::NewParser()
 {
+	wxString empty = "";
 	this->DeleteParser();
 	wxDateTime* latest_close_date = this->m_GetLatestCloseDate();
 	wxDateTime* divdate = this->m_GetLatestDividendDate();
-	wxString close_date_string = latest_close_date && !this->purchaseDateSwitch ? latest_close_date->Format(DATE_KEY) : "";
-	wxString div_date = divdate ? divdate->Format(DATE_KEY) : "";
-	wxString enddate = this->historical_prices.size() && this->purchaseDateSwitch ? this->historical_prices[0].date.Format(DATE_KEY) : "";
+	wxString close_date_string = latest_close_date && !this->purchaseDateSwitch ? latest_close_date->Format(DATE_KEY) : empty;
+	wxString div_date = divdate ? divdate->Format(DATE_KEY) : empty;
+	wxString enddate = this->historical_prices.size() && this->purchaseDateSwitch ? this->historical_prices[0].date.Format(DATE_KEY) : empty;
 	return new Parser(this, this->m_ticker, this->GetInitalPurchaseDate().Format(DATE_KEY), close_date_string, 
 		div_date, SetHistoricalDataCB, SetSummaryDataCB, SetDividendsCB, enddate);
 }
@@ -2860,10 +2923,11 @@ bool Indices::UpDate(bool force_update)
 
 Parser* Indices::NewParser()
 {
+	wxString empty = "";
 	this->DeleteParser();
 	wxDateTime latest_close_date = GetLatestCloseDate(this->historical_prices);
-	wxString close_date_string = latest_close_date.IsValid() ? latest_close_date.Format(DATE_KEY) : "";
-	wxString enddate = this->historical_prices.size() ? this->historical_prices[0].date.Format(DATE_KEY) : "";
+	wxString close_date_string = latest_close_date.IsValid() ? latest_close_date.Format(DATE_KEY) : empty;
+	wxString enddate = this->historical_prices.size() ? this->historical_prices[0].date.Format(DATE_KEY) : empty;
 	return new Parser(this, this->ticker, this->start.Format(DATE_KEY), close_date_string, SetHistoricalDataCB, INDICES, SetSummaryDataCB);
 }
 
@@ -3212,6 +3276,11 @@ bool Sector::IsChild(wxString& ticker)
 	return sn ? true : false;
 }
 
+StockNode* Sector::GetStagedStock()
+{
+	return this->sn;
+}
+
 wxString Sector::GetLongNameOfStock(wxString& t)
 {
 	if (IsChild(t))
@@ -3378,6 +3447,11 @@ bool Portfolio::StageStock(wxString& t)
 	sec = this->GetSector(t);
 
 	return sec ? true : false;
+}
+
+StockNode* Portfolio::GetStagedStock()
+{
+	return sec ? this->sec->GetStagedStock() : NULL;
 }
 
 wxString Portfolio::StageStockandGetLongName(wxString& t)
@@ -3550,7 +3624,7 @@ wxDateTime Portfolio::GetEarliestPurchaseDate()
 	return earliest;
 }
 
-const wxVector<StockNode*> Portfolio::GetStockNodeItems()
+wxVector<StockNode*> Portfolio::GetStockNodeItems()
 {
 	wxVector<StockNode*> sn;
 	wxVector<StockNode*> returnvec;

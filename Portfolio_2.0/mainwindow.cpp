@@ -3,6 +3,8 @@
 wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(STOCK_PURCHASE_DIALOG, OnPurchaseMenu)
 	EVT_MENU(wxID_SAVE, OnSave)
+	EVT_MENU(wxID_HOME, OnHome)
+	EVT_MENU(wxID_EXECUTE, OnLoadSectorStocks)
 	EVT_MENU(QUOTE_LOOKUP, OnQuoteLookup)
 	EVT_MENU(_MenuItemIDs::NEW_DEPOSIT, OnAddDeposit)
 	EVT_MENU(_MenuItemIDs::_WITHDRAWL, OnWithdrawl)
@@ -19,6 +21,7 @@ wxBEGIN_EVENT_TABLE(mainwindow, wxFrame)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV_REINVEST, OnAddReInvestSharesPopup)
 	EVT_MENU(_MenuItemIDs::P_ADD_DIV, OnAddDividendPopup)
 	EVT_MENU(_MenuItemIDs::P_VIEW_DIVIDENDS, OnViewDividendPopup)
+	EVT_MENU(_MenuItemIDs::P_GRAPH, OnChartView)
 	EVT_MENU(_MenuItemIDs::VIEW_DEPOSITS, OnViewDeposits)
 wxEND_EVENT_TABLE()
 
@@ -39,6 +42,9 @@ wxBEGIN_EVENT_TABLE(BottomFrame, wxWindow)
 wxEND_EVENT_TABLE()
 
 wxBEGIN_EVENT_TABLE(SectorStockWindow, wxFrame)
+wxEND_EVENT_TABLE()
+
+wxBEGIN_EVENT_TABLE(ChartControl, wxWindow)
 wxEND_EVENT_TABLE()
 
 auto constexpr TICKER = "Ticker";
@@ -450,7 +456,7 @@ void MotionCanvas::OnPaint(wxPaintEvent& evt)
 	return;
 }
 
-GridCanvas::GridCanvas(wxWindow* w, wxSize size, wxString& val, int flags) : wxWindow(w, wxID_ANY, wxDefaultPosition, size),
+GridCanvas::GridCanvas(wxWindow* w, wxSize size, wxString& val, int flags) : wxWindow(w, wxID_ANY, wxDefaultPosition, size, wxFULL_REPAINT_ON_RESIZE),
 	value(val), textcolor(white), flag(flags), textextent(0.0, 0.0)
 {
 	this->Bind(wxEVT_ENTER_WINDOW, &GridCanvas::OnMouseEnter, this);
@@ -475,8 +481,8 @@ void GridCanvas::OnPaint(wxPaintEvent& evt)
 
 	wxPoint rectOrigin = this->FromDIP(wxPoint(0, 0));
 	wxSize rectSize = this->FromDIP(this->GetSize());
-	
-	gc->SetBrush(gc->CreateBrush(wxBrush(this->background, wxBrushStyle::wxBRUSHSTYLE_SOLID)));
+
+	gc->SetBrush(*wxTheBrushList->FindOrCreateBrush(this->background, wxBrushStyle::wxBRUSHSTYLE_SOLID));
 	gc->DrawRoundedRectangle(rectOrigin.x, rectOrigin.y, rectSize.GetWidth(), rectSize.GetHeight(), 5.0);
 
 	// If the value of text is empty, no need to draw text...
@@ -485,7 +491,7 @@ void GridCanvas::OnPaint(wxPaintEvent& evt)
 		delete gc;
 		return;
 	}
-
+	
 	gc->SetFont(gc->CreateFont(this->textfont, this->textcolor));
 
 	gc->GetTextExtent(this->value, &textextent.w, &textextent.h);
@@ -1421,6 +1427,341 @@ void GridNode::InitializeGridNode()
 void VirtualListView::m_SetItemCount()
 {
 	this->SetItemCount(100);
+}
+
+// ChartControl functions...
+// wxFULL_REPAINT_ON_RESIZE needed for Windows
+ChartControl::ChartControl(wxWindow* grandparent, wxWindow* parent, wxWindowID id, 
+	const wxPoint& pos, const wxSize& size, wxString& _title, wxVector<Day_Prices>* v) 
+	: wxWindow(parent, id, pos, size, wxFULL_REPAINT_ON_RESIZE), m_grandparent(grandparent), m_parent(parent), values(v), title(_title)
+{
+	this->SetBackgroundStyle(wxBG_STYLE_PAINT); // needed for windows
+	this->SetBackgroundColour("Black");
+	this->Bind(wxEVT_PAINT, &ChartControl::OnPaint, this);
+	this->Bind(wxEVT_ENTER_WINDOW, &ChartControl::EnterWindow, this);
+	this->Bind(wxEVT_MOTION, &ChartControl::Motion, this);
+	this->Bind(wxEVT_LEFT_DOWN, &ChartControl::OnLeftDown, this);
+//	this->Bind(wxEVT_CLOSE_WINDOW, &ChartControl::OnClose, this);
+
+	this->SetMinSize(size);
+}
+
+ChartControl::~ChartControl()
+{
+	this->m_grandparent->Enable();
+	this->m_grandparent->SetFocus();
+}
+
+
+void ChartControl::OnClose(wxCloseEvent& evt)
+{
+	this->m_grandparent->Enable();
+	evt.Skip();
+}
+
+void ChartControl::EnterWindow(wxMouseEvent& evt)
+{
+	wxPoint p = evt.GetPosition();
+	int range = 2;
+	for (auto& it : this->mypair)
+	{
+		int rangetest_x = p.x < int(it.first.m_x) ? int(it.first.m_x) - p.x : p.x - int(it.first.m_x);
+		if (rangetest_x <= range)
+		{
+			int rangetest_y = p.y < int(it.first.m_y) ? int(it.first.m_y) - p.y : p.y - int(it.first.m_y);
+			if (rangetest_y <= range)
+			{
+				if (this->GetToolTipText().Find(it.second.date.Format(STANDARD_DATE)) != -1)
+					return;
+				wxString msg = it.second.date.Format(STANDARD_DATE) + "\n Close: " + wxNumberFormatter::ToString(it.second.close, 2);
+				this->SetToolTip(msg);
+				return;
+			}
+		}
+	}
+}
+
+void ChartControl::Motion(wxMouseEvent& evt)
+{
+	int range = 2;
+	wxPoint p = evt.GetPosition();
+	for (auto& it : this->mypair)
+	{
+		int rangetest_x = p.x < int(it.first.m_x) ? int(it.first.m_x) - p.x : p.x - int(it.first.m_x);
+		if (rangetest_x <= range)
+		{
+			int rangetest_y = p.y < int(it.first.m_y) ? int(it.first.m_y) - p.y : p.y - int(it.first.m_y);
+			if (rangetest_y <= range)
+			{
+				if (this->GetToolTipText().Find(it.second.date.Format(STANDARD_DATE)) != -1)
+					return;
+				wxString msg = it.second.date.Format(STANDARD_DATE) + "\n Close: " + wxNumberFormatter::ToString(it.second.close, 2);
+				this->SetToolTip(msg);
+				return;
+			}
+		}
+	}
+}
+
+void ChartControl::OnLeftDown(wxMouseEvent& evt)
+{
+	this->SetToolTip(NULL);
+}
+
+void ChartControl::OnPaint(wxPaintEvent& evt)
+{
+	wxAutoBufferedPaintDC dc(this);
+	dc.Clear();
+	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
+
+	if (gc && values->size() > 0)
+	{
+		wxFont titleFont = wxFont(wxNORMAL_FONT->GetPointSize() * 2.0,
+			wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+
+		gc->SetFont(titleFont, *wxWHITE);
+
+		double tw, th;
+		gc->GetTextExtent(this->title, &tw, &th);
+
+		const double titleTopBottomMinimumMargin = this->FromDIP(10);
+
+		wxRect2DDouble fullArea{ 0, 0, static_cast<double>(GetSize().GetWidth()), static_cast<double>(GetSize().GetHeight()) };
+
+		const double marginX = fullArea.GetSize().GetWidth() / 8.0;
+		const double marginTop = std::max(fullArea.GetSize().GetHeight() / 8.0, titleTopBottomMinimumMargin * 2.0 + th);
+		const double marginBottom = fullArea.GetSize().GetHeight() / 8.0;
+		double labelsToChartAreaMargin = this->FromDIP(10);
+
+		wxRect2DDouble chartArea = fullArea;
+		chartArea.Inset(marginX, marginTop, marginX, marginBottom);
+
+		gc->DrawText(this->title, (fullArea.GetSize().GetWidth() - tw) / 2.0, (marginTop - th) / 2.0);
+
+		wxAffineMatrix2D normalizedToChartArea{};
+		normalizedToChartArea.Translate(chartArea.GetLeft(), chartArea.GetTop());
+		normalizedToChartArea.Scale(chartArea.m_width, chartArea.m_height);
+
+		wxVector<double> temp;
+		for (auto it = this->values->begin(); it < this->values->end(); ++it)
+			temp.push_back(it->close);
+
+		double lowValue = *std::min_element(temp.begin(), temp.end());
+		double highValue = *std::max_element(temp.begin(), temp.end());
+//		double lowValue = std::min_element(values->begin(), values->end(), [ascending](Day_Prices* left, Day_Prices* right) {
+//			return genericCompare(left->close < right->close); })->close;
+//		double highValue = std::max_element(values->begin(), values->end(), [](Day_Prices* left, Day_Prices* right) {
+//			return left->close > right->close; })->close;
+
+		//	const std::tuple<int, double, double>& st = [segmentCount, rangeLow, rangeHigh] = calculateChartSegmentCountAndRange(lowValue, highValue);
+		const std::tuple<int, double, double>& st = calculateChartSegmentCountAndRange(lowValue, highValue);
+
+		double yLinesCount = st._Myfirst._Val + 1;
+		double yValueSpan = st._Get_rest()._Get_rest()._Myfirst._Val - st._Get_rest()._Myfirst._Val;
+
+		lowValue = st._Get_rest()._Myfirst._Val;
+		highValue = st._Get_rest()._Get_rest()._Myfirst._Val;
+		/*
+	double yValueSpan = rangeHigh - rangeLow;
+	lowValue = rangeLow;
+	highValue = rangeHigh;
+
+	double yLinesCount = segmentCount + 1;
+	*/
+
+		wxAffineMatrix2D normalizedToValue{};
+		normalizedToValue.Translate(0, highValue);
+		normalizedToValue.Scale(1, -1);
+		normalizedToValue.Scale(static_cast<double>(values->size() - 1), yValueSpan);
+
+		gc->SetPen(*wxThePenList->FindOrCreatePen(wxColor(128, 128, 128)));
+		gc->SetFont(*wxNORMAL_FONT, *wxWHITE);
+
+		for (int i = 0; i < yLinesCount; i++)
+		{
+			double normalizedLineY = static_cast<double>(i) / (yLinesCount - 1);
+
+			auto lineStartPoint = normalizedToChartArea.TransformPoint({ 0, normalizedLineY });
+			auto lineEndPoint = normalizedToChartArea.TransformPoint({ 1, normalizedLineY });
+
+			wxPoint2DDouble linePoints[] = { lineStartPoint, lineEndPoint };
+			gc->StrokeLines(2, linePoints);
+
+			double valueAtLineY = normalizedToValue.TransformPoint({ 0, normalizedLineY }).m_y;
+
+			auto text = wxString::Format("%.2f", valueAtLineY);
+			text = wxControl::Ellipsize(text, dc, wxELLIPSIZE_MIDDLE, chartArea.GetLeft() - labelsToChartAreaMargin);
+
+			double tw, th;
+			gc->GetTextExtent(text, &tw, &th);
+			gc->DrawText(text, chartArea.GetLeft() - labelsToChartAreaMargin - tw, lineStartPoint.m_y - th / 2.0);
+		}
+
+		wxPoint2DDouble leftHLinePoints[] = {
+			normalizedToChartArea.TransformPoint({0, 0}),
+			normalizedToChartArea.TransformPoint({0, 1}) };
+
+		wxPoint2DDouble rightHLinePoints[] = {
+			normalizedToChartArea.TransformPoint({1, 0}),
+			normalizedToChartArea.TransformPoint({1, 1}) };
+
+		gc->StrokeLines(2, leftHLinePoints);
+		gc->StrokeLines(2, rightHLinePoints);
+
+		wxPoint2DDouble* pointArray = new wxPoint2DDouble[values->size()];
+
+		wxAffineMatrix2D valueToNormalized = normalizedToValue;
+		valueToNormalized.Invert();
+		wxAffineMatrix2D valueToChartArea = normalizedToChartArea;
+		valueToChartArea.Concat(valueToNormalized);
+
+		double placeholder = 0;
+		int size = values->size();
+		for (size_t i = 0; i < values->size(); i++)
+		{
+			placeholder = (double)i;
+			wxPoint2DDouble po = valueToChartArea.TransformPoint(wxPoint2DDouble(placeholder, values->at(i).close));
+			pointArray[i] = po;
+
+			mypair.push_back(std::pair<wxPoint2DDouble, Day_Prices>(po, values->at(i)));
+		}
+
+		gc->SetPen(wxPen(*wxCYAN, 3));
+		gc->StrokeLines(values->size(), pointArray);
+
+		delete[] pointArray;
+		delete gc;
+	}
+}
+
+std::tuple<int, double, double> ChartControl::calculateChartSegmentCountAndRange(double origLow, double origHigh)
+{
+	constexpr double rangeMults[] = { 0.2, 0.25, 0.5, 1.0, 2.0, 2.5, 5.0 };
+	constexpr int maxSegments = 6;
+
+	double magnitude = std::floor(std::log10(origHigh - origLow));
+
+	for (auto r : rangeMults)
+	{
+		double stepSize = r * std::pow(10.0, magnitude);
+		double low = std::floor(origLow / stepSize) * stepSize;
+		double high = std::ceil(origHigh / stepSize) * stepSize;
+
+		int segments = round((high - low) / stepSize);
+
+		if (segments <= maxSegments)
+		{
+			return std::make_tuple(segments, low, high);
+		}
+	}
+
+	// return some defaults in case rangeMults and maxSegments are mismatched
+	return std::make_tuple(10, origLow, origHigh);
+}
+
+// ChartControlWin functions...
+ChartControlWin::ChartControlWin(mainwindow* m, wxWindowID id, const wxPoint& p, const wxSize& size, 
+	wxString& s, wxVector<Day_Prices>* v, StockViewerData* _svd)
+	: wxWindow(m, id, p, size), m_parent(m), svd(_svd), ticker(s)
+{
+	if (v->size())
+	{
+		this->rangebegin = v->begin()->date.Format(STANDARD_DATE);
+		this->range_end = v->rbegin()->date.Format(STANDARD_DATE);
+	}
+	wxString chartcontrolname = ticker.Mid(0, ticker.Find(":"));
+	this->chart = new ChartControl(m_parent, this, wxID_ANY, wxDefaultPosition, wxDefaultSize, chartcontrolname, v);
+	this->Create();
+}
+
+void ChartControlWin::Create()
+{
+	this->SetBackgroundColour(wxColour(69, 70, 71));
+
+	wxColour green = wxColour(13, 158, 20);
+	wxColour red = wxColour(217, 7, 28);
+
+	wxBoxSizer* main = new wxBoxSizer(wxHORIZONTAL);
+	wxBoxSizer* ctrls = new wxBoxSizer(wxVERTICAL);
+
+	wxPanel* P = new wxPanel(this, wxID_ANY);
+	P->SetBackgroundColour(wxColour(0, 0, 0));
+
+	wxStaticText* _ticker = new wxStaticText(P, wxID_ANY, ticker.Mid(ticker.Find(":") + 1));
+	wxStaticText* range = new wxStaticText(P, wxID_ANY, "Range:\n" + rangebegin + " - " + range_end);
+
+	// literals...
+	wxStaticText* daygain_literal = new wxStaticText(P, wxID_ANY, "Day Gain:");
+	wxStaticText* weekgain_literal = new wxStaticText(P, wxID_ANY, "Week Gain:");
+	wxStaticText* quartergain_literal = new wxStaticText(P, wxID_ANY, "Quarter Gain:");
+	wxStaticText* yeargain_literal = new wxStaticText(P, wxID_ANY, "Year Gain:");
+	wxStaticText* totalgain_literal = new wxStaticText(P, wxID_ANY, "Total Gain:");
+
+	// actual values...
+	wxStaticText* daygain = new wxStaticText(P, wxID_ANY, svd->GetDayGain() + "%");
+	wxStaticText* weekgain = new wxStaticText(P, wxID_ANY, svd->GetWeekGain() + "%");
+	wxStaticText* quartergain = new wxStaticText(P, wxID_ANY, svd->GetQuarterGain() + "%");
+	wxStaticText* yeargain = new wxStaticText(P, wxID_ANY, svd->GetYearGain() + "%");
+	wxStaticText* totalgain = new wxStaticText(P, wxID_ANY, svd->GetTotalGain() + "%");
+
+	_ticker->SetFont(wxFont(16, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	_ticker->SetBackgroundColour(P->GetBackgroundColour());
+	_ticker->SetForegroundColour(wxColour(255, 255, 255));
+	range->SetFont(wxFont(16, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD));
+	range->SetBackgroundColour(P->GetBackgroundColour());
+	range->SetForegroundColour(wxColour(255, 255, 255));
+
+	daygain_literal->SetForegroundColour(range->GetForegroundColour());
+	weekgain_literal->SetForegroundColour(range->GetForegroundColour());
+	quartergain_literal->SetForegroundColour(range->GetForegroundColour());
+	yeargain_literal->SetForegroundColour(range->GetForegroundColour());
+	totalgain_literal->SetForegroundColour(range->GetForegroundColour());
+
+	daygain_literal->SetFont(range->GetFont());
+	weekgain_literal->SetFont(range->GetFont());
+	quartergain_literal->SetFont(range->GetFont());
+	yeargain_literal->SetFont(range->GetFont());
+	totalgain_literal->SetFont(range->GetFont());
+
+	daygain->SetFont(range->GetFont());
+	weekgain->SetFont(range->GetFont());
+	quartergain->SetFont(range->GetFont());
+	yeargain->SetFont(range->GetFont());
+	totalgain->SetFont(range->GetFont());
+
+	SetStaticTextColor(*daygain, green, red);
+	SetStaticTextColor(*weekgain, green, red);
+	SetStaticTextColor(*quartergain, green, red);
+	SetStaticTextColor(*yeargain, green, red);
+	SetStaticTextColor(*totalgain, green, red);
+
+	daygain->SetLabel(daygain->GetLabelText() + " ($" + svd->GetDayReturn$() + ")");
+	weekgain->SetLabel(weekgain->GetLabelText() + " ($" + svd->GetWeekReturn$() + ")");
+	quartergain->SetLabel(quartergain->GetLabelText() + " ($" + svd->GetQuarterReturn$() + ")");
+	yeargain->SetLabel(yeargain->GetLabelText() + " ($" + svd->GetYearReturn$() + ")");
+	totalgain->SetLabel(totalgain->GetLabelText() + " ($" + svd->GetTotalReturn$() + ")");
+
+	ctrls->Add(_ticker, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP, 10);
+	ctrls->Add(range, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP | wxBOTTOM, 10);
+	ctrls->Add(daygain_literal, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->Add(daygain, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->AddSpacer(20);
+	ctrls->Add(weekgain_literal, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->Add(weekgain, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->AddSpacer(20);
+	ctrls->Add(quartergain_literal, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->Add(quartergain, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->AddSpacer(20);
+	ctrls->Add(yeargain_literal, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->Add(yeargain, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->AddSpacer(20);
+	ctrls->Add(totalgain_literal, 0, wxALIGN_LEFT | wxLEFT, 20);
+	ctrls->Add(totalgain, 0, wxALIGN_LEFT | wxLEFT, 20);
+
+	P->SetSizer(ctrls);
+	main->Add(this->chart, 4, wxEXPAND | wxRIGHT, 5);
+	main->Add(P, 1, wxEXPAND);
+	this->SetSizer(main);
 }
 
 // GridView functions...
@@ -2561,8 +2902,26 @@ wxThread::ExitCode MyQuoteThread::Entry()
 	if (!this->TestDestroy())
 		this->m_parent->smd = port->QuoteLookup(ticker);
 
-	wxPostEvent(this->m_parent, wxThreadEvent());
+	wxPostEvent(this->m_parent, wxThreadEvent(0));
 	return (wxThread::ExitCode)0;
+}
+
+LoadSectorStocksThread::LoadSectorStocksThread(mainwindow* m) : wxThread(wxThreadKind::wxTHREAD_DETACHED), m_parent(m)
+{
+
+}
+
+LoadSectorStocksThread::~LoadSectorStocksThread()
+{
+	this->m_parent->mainwindow_thread = NULL;
+}
+
+wxThread::ExitCode LoadSectorStocksThread::Entry()
+{
+	SectorClass& sc = GetSectorClass();
+	sc.LoadAllStocks(this, this->m_parent);
+	wxPostEvent(this->m_parent, wxThreadEvent(1));
+	return wxThread::ExitCode(0);
 }
 
 PortfolioWin::PortfolioWin(mainwindow* parent, wxWindowID id, wxDateTime* main, StockViewerData* sv, Portfolio* p) 
@@ -2837,6 +3196,7 @@ void PortfolioWin::OnUpdateButtonPress(wxCommandEvent& evt)
 //DivCtrls functions...
 DivCtrls::DivCtrls(wxDialog* parent, Dividend& d) : m_parent(parent), div(d)
 {
+	wxString empty = "";
 	this->sizerH = new wxBoxSizer(wxHORIZONTAL);
 	this->button_sizerH = new wxBoxSizer(wxHORIZONTAL);
 	this->payment_sizerV = new wxBoxSizer(wxVERTICAL);
@@ -2850,7 +3210,7 @@ DivCtrls::DivCtrls(wxDialog* parent, Dividend& d) : m_parent(parent), div(d)
 	this->reInvestmentShares = new wxTextCtrl(m_parent, wxID_ANY);
 
 	this->_ex_div_date = div.ex_Div.Format(STANDARD_DATE);
-	this->_payment_date = div.payment_date.IsValid() ? div.payment_date.Format(STANDARD_DATE) : "";
+	this->_payment_date = div.payment_date.IsValid() ? div.payment_date.Format(STANDARD_DATE) : empty;
 	this->d_amount = div.div;
 	this->d_reInvestmentShares = div.re_invest_shares;
 
@@ -3142,6 +3502,7 @@ void Dialog::CreateStockEntry()
 
 void Dialog::CreateQuoteWin()
 {
+	wxString empty = "";
 	SetColor(*this, wxColour(207, 208, 212));
 
 	wxBoxSizer* mainV = new wxBoxSizer(wxVERTICAL);
@@ -3155,7 +3516,7 @@ void Dialog::CreateQuoteWin()
 	wxString dayreturn = wxNumberFormatter::ToString(sumptr->previousclose ? (sumptr->marketprice / sumptr->previousclose - 1) * 100 : 0.0, 2) + "%";
 	wxString dayreturn$ = "($" + wxNumberFormatter::ToString(sumptr->marketprice - sumptr->previousclose, 2) + ")";
 	wxString earningsdate = "Next Earnings: ";
-	earningsdate += sumptr->earningsdate == "NotFound" ? "" : sumptr->earningsdate;
+	earningsdate += sumptr->earningsdate == "NotFound" ? empty : sumptr->earningsdate;
 
 	wxStaticText* longname = new wxStaticText(this, wxID_ANY, Decipherhtmlcodes(sumptr->Longname));
 	longname->SetForegroundColour(wxColour(74, 99, 224));
@@ -4141,10 +4502,11 @@ void BottomFrame::OnMouseLeave(wxMouseEvent& evt)
 
 void BottomFrame::OnMouseDown(wxMouseEvent& evt)
 {
+	wxString temp = "Sector";
 	int id = evt.GetId();
 	SectorClass& sc = GetSectorClass();
 	ParentSector* ps = sc.GetSector(_Sector(id));
-	wxString name = ps ? ps->GetSectorName() : "Sector";
+	wxString name = ps ? ps->GetSectorName() : temp;
 
 	wxVector<SubSector>* v = NULL;
 	switch (evt.GetId())
@@ -4174,10 +4536,11 @@ void BottomFrame::OnMouseDown(wxMouseEvent& evt)
 
 void BottomFrame::OnMouseRightDown(wxMouseEvent& evt)
 {
+	wxString temp = "Sector";
 	int id = evt.GetId();
 	SectorClass& sc = GetSectorClass();
 	ParentSector* ps = sc.GetSector(_Sector(id));
-	wxString name = ps ? ps->GetSectorName() : "Sector";
+	wxString name = ps ? ps->GetSectorName() : temp;
 
 	wxVector<SectorStock>* v = ps ? ps->GetSectorStockVec() : NULL;
 
@@ -4451,9 +4814,6 @@ void SectorStockWindow::Create()
 		++i;
 	}
 
-	sectortext->IsShownOnScreen();
-	wxPoint point = this->lastticker->GetPosition();
-
 	scrmain->Add(vert1, 1, wxALIGN_CENTER_VERTICAL);
 	scrmain->Add(vert2, 1, wxALIGN_CENTER_VERTICAL);
 	scrmain->Add(vert3, 1, wxALIGN_CENTER_VERTICAL);
@@ -4476,6 +4836,10 @@ void SectorStockWindow::Create()
 mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoint(0, 0), wxSize(wxGetDisplaySize())), main_clock(wxDateTime::Today()),
 	 port(this, 0, &main_clock)
 {
+	wxSize displaysize = wxGetDisplaySize();
+	displaysize.y += -50;
+	this->SetSize(displaysize);
+	this->SetBackgroundColour(wxColour(0, 0, 0));
 	SectorClass& sc = GetSectorClass();
 	sc.ActivateData();
 	Parser parser(this, _Sector::INDUSTRIALS);
@@ -4498,6 +4862,8 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	divs->Append(new wxMenuItem(divs, ADD_DIV_SHARES, "Re-Investment Shares"));
 
 	m->Append(new wxMenuItem(m, wxID_SAVE, "Save"));
+	m->Append(new wxMenuItem(m, wxID_HOME, "Home"));
+	m->Append(new wxMenuItem(m, wxID_EXECUTE, "Load Stock Data"));
 	markets->Append(new wxMenuItem(markets, QUOTE_LOOKUP, "Quote Lookup"));
 	markets->Append(new wxMenuItem(markets, DAY_GAINERS_MENU, "Market Gainers"));
 	markets->Append(new wxMenuItem(markets, DAY_LOSERS_MENU, "Market Losers"));
@@ -4510,17 +4876,18 @@ mainwindow::mainwindow() : wxFrame(nullptr, 10000, "Brando's Investments", wxPoi
 	this->Bind(wxEVT_CLOSE_WINDOW, &mainwindow::CloseEvent, this);
 	this->Bind(wxEVT_THREAD, &mainwindow::OnThreadCompletion, this);
 	this->Bind(wxEVT_THREAD, &mainwindow::OnQuoteThread, this);
-//	this->m_listCtrl = new VirtualListView(this, wxID_ANY, wxDefaultPosition, wxSize(wxSize(this->GetSize().GetWidth() - 10, this->GetSize().GetHeight() - 10)));
-//	this->port.NewDepositSchedule(25.0, 14, wxDateTime(30, wxDateTime::Month::Dec, 2021));
-	//SPY BUY 374.3487 3
-	//NVDA BUY 129.785 3
+
+	statbar = new wxStatusBar(this, wxID_BOTTOM);
+	statbar->SetStatusText("Ready");
+	this->SetStatusBar(statbar);
+
 	this->RetrieveFile();
 	this->portwin = (PortfolioWin*)this->GetLeftWin();
 	this->grid_panel = this->GetRightWin();
 	this->grid_panel->Bind(wxEVT_CLOSE_WINDOW, &mainwindow::ClosePanelEvent, this);
 	this->bottom_frame = (BottomFrame*)this->GetBottomFrame();
 	this->bottom_frame->SetBackgroundColour(wxColour(28, 56, 100));
-	wxBoxSizer* top = new wxBoxSizer(wxHORIZONTAL);
+	this->top = new wxBoxSizer(wxHORIZONTAL);
 	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
 	top->Add(this->portwin, 1, wxEXPAND);
 	top->Add(this->grid_panel, 4, wxEXPAND);
@@ -4578,13 +4945,13 @@ void mainwindow::OnViewDividendWin(wxString& ticker)
 		wxMessageBox("No dividends to list for " + ticker);
 		return;
 	}
-
+	wxString na = "NA";
 	wxArrayString string;
 	for (auto& v : sorted)
 	{
 		wxString item = "";
 		wxString Bool = v.DivReinvest ? "Yes" : "No";
-		wxString payable_date = v.payment_date.IsValid() ? v.payment_date.Format(STANDARD_DATE) : "NA";
+		wxString payable_date = v.payment_date.IsValid() ? v.payment_date.Format(STANDARD_DATE) : na;
 		item = "Ex_Div: " + v.ex_Div.Format(STANDARD_DATE) + "    Payment Date: " + payable_date + "    Amount: " + wxNumberFormatter::ToString(v.div, 4) + "    Re-Invest Elligible: " + Bool +
 			"    Re-Invested amount: " + wxNumberFormatter::ToString(v.re_invest_shares, 4);
 		string.Add(item);
@@ -4769,102 +5136,8 @@ void mainwindow::SectorClick(wxVector<SubSector>* v, wxString& name)
 
 void mainwindow::SectorRightClick(wxVector<SectorStock>* v, wxString& sector)
 {
-
 	this->sectorstockwin = new SectorStockWindow(this, v, sector);
 	this->Disable();
-	return;
-
-	wxColour green = wxColour(5, 166, 10),  red = wxColour(201, 4, 27);
-	wxFont plain = wxFont(14, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
-	wxFont title = wxFont(20, wxFontFamily::wxFONTFAMILY_SWISS, wxFontStyle::wxFONTSTYLE_NORMAL, wxFontWeight::wxFONTWEIGHT_BOLD);
-
-	wxFrame* frame = new wxFrame(this, wxID_ANY, "SectorStocks");
-	wxScrolled<wxWindow>* P = new wxScrolled<wxWindow>(frame, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHSCROLL | wxVSCROLL);
-	P->SetScrollbars(25, 25, 50, 50);
-	P->EnableScrolling(true, true);
-
-	P->SetMinSize(wxSize(wxGetDisplaySize().x / 2, wxGetDisplaySize().y / 2));
-	wxBoxSizer* scrmain = new wxBoxSizer(wxHORIZONTAL);
-	wxBoxSizer* main = new wxBoxSizer(wxVERTICAL);
-
-	wxStaticText* sectortext = new wxStaticText(frame, wxID_ANY, sector);
-	sectortext->SetFont(title);
-
-	main->Add(sectortext, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
-
-	wxBoxSizer* vert1 = new wxBoxSizer(wxVERTICAL);
-	wxBoxSizer* vert2 = new wxBoxSizer(wxVERTICAL);
-	wxBoxSizer* vert3 = new wxBoxSizer(wxVERTICAL);
-	wxBoxSizer* vert4 = new wxBoxSizer(wxVERTICAL);
-	wxBoxSizer* vert5 = new wxBoxSizer(wxVERTICAL);
-
-	int i = 0;
-	for (auto it = v->begin(); it != v->end(); ++it)
-	{
-		if (i > 99)
-			break;
-		if (it == v->begin())
-		{
-			wxStaticText* t = new wxStaticText(P, wxID_ANY, "Ticker");
-			t->SetFont(plain);
-			vert1->Add(t, 0, wxALIGN_LEFT | wxALL, 5);
-			 
-			wxStaticText* p = new wxStaticText(P, wxID_ANY, "Price");
-			p->SetFont(plain);
-			vert2->Add(p, 0, wxALIGN_LEFT | wxALL, 5);
-
-			wxStaticText* c = new wxStaticText(P, wxID_ANY, "Change");
-			c->SetFont(plain);
-			vert3->Add(c, 0, wxALIGN_LEFT | wxALL, 5);
-
-			wxStaticText* pc = new wxStaticText(P, wxID_ANY, "Percent Change");
-			pc->SetFont(plain);
-			vert4->Add(pc, 0, wxALIGN_LEFT | wxALL, 5);
-
-			wxStaticText* mc = new wxStaticText(P, wxID_ANY, "Market Cap");
-			mc->SetFont(plain);
-			vert5->Add(mc, 0, wxALIGN_LEFT | wxALL, 5);
-		}
-
-		wxStaticText* temp = new wxStaticText(P, wxID_ANY, it->ticker);
-		temp->SetFont(plain);
-		vert1->Add(temp, 0, wxALIGN_LEFT | wxALL, 5);
-
-		wxStaticText* price = new wxStaticText(P, wxID_ANY, it->price);
-		price->SetFont(plain);
-		vert2->Add(price, 0, wxALIGN_LEFT | wxALL, 5);
-
-		wxStaticText* change = new wxStaticText(P, wxID_ANY, it->change);
-		change->SetFont(plain);
-		vert3->Add(change, 0, wxALIGN_LEFT | wxALL, 5);
-		SetStaticTextColor(*change, green, red);
-
-		wxStaticText* percent_change = new wxStaticText(P, wxID_ANY, it->percent_change + '%');
-		percent_change->SetFont(plain);
-		vert4->Add(percent_change, 0, wxALIGN_LEFT | wxALL, 5);
-		SetStaticTextColor(*percent_change, green, red);
-
-		wxStaticText* market_cap = new wxStaticText(P, wxID_ANY, it->market_cap);
-		market_cap->SetFont(plain);
-		vert5->Add(market_cap, 1, wxALIGN_LEFT | wxALL, 5);
-		++i;
-	}
-
-	scrmain->Add(vert1, 1, wxALIGN_CENTER_VERTICAL);
-	scrmain->Add(vert2, 1, wxALIGN_CENTER_VERTICAL);
-	scrmain->Add(vert3, 1, wxALIGN_CENTER_VERTICAL);
-	scrmain->Add(vert4, 1, wxALIGN_CENTER_VERTICAL);
-	scrmain->Add(vert5, 1, wxALIGN_CENTER_VERTICAL);
-
-	P->SetSizer(scrmain);
-	scrmain->Fit(P);
-	main->Add(P, 4, wxEXPAND | wxALL, 10);
-
-	frame->SetSizer(main);
-	main->Fit(frame);
-	frame->CenterOnParent();
-	frame->Layout();
-	frame->Show();
 }
 
 void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
@@ -4873,6 +5146,7 @@ void mainwindow::RightClickGrid(wxString& ticker, wxPoint& p)
 	this->p_sell->SetItemLabel("Sell " + ticker);
 	this->p_buy->SetItemLabel("Purchase " + ticker);
 	this->p_view_dividends->SetItemLabel("View " + ticker + " Dividends");
+	this->p_graph->SetItemLabel("View " + ticker + " Chart");
 	bool result = PopupMenu(this->popup, p);
 }
 
@@ -4885,7 +5159,13 @@ void mainwindow::OnThreadCompletion()
 
 void mainwindow::OnThreadCompletion(wxThreadEvent& evt)
 {
-	this->OnThreadCompletion();
+	switch (evt.GetId())
+	{
+	case 1: this->statbar->SetStatusText("Stocks Successfully Loaded..."); return;
+	case 2: this->statbar->SetStatusText(evt.GetString()); return;
+	}
+
+	evt.Skip();
 }
 
 void mainwindow::CloseEvent(wxCloseEvent& evt)
@@ -5045,6 +5325,20 @@ void mainwindow::OnSellMenu(wxCommandEvent& evt)
 	this->UserEnterSellDataWin(stock_n);
 }
 
+void mainwindow::OnHome(wxCommandEvent& evt)
+{
+	if (!this->chartwin)
+		return;
+
+	this->top->Replace(this->chartwin, this->grid_panel);
+	this->chartwin->Hide();
+	this->grid_panel->Show();
+	this->Layout();
+	this->grid_panel->Refresh();
+	this->chartwin->Destroy();
+	this->chartwin = NULL;
+}
+
 void mainwindow::OnSellPopupClick(wxCommandEvent&)
 {
 	wxString ticker = this->grid_view->GetRightClickTicker();
@@ -5086,8 +5380,60 @@ void mainwindow::OnQuoteLookupPopup(wxCommandEvent& evt)
 	this->quotethread->Run();
 }
 
+void mainwindow::OnChartView(wxCommandEvent& evt)
+{
+	wxString tick = this->grid_view->GetRightClickTicker();
+	StockNode* sn = NULL;
+	if (port.StageStock(tick))
+		sn = port.GetStagedStock();
+	else
+		return;
+	
+	if (!sn)
+		return;
+	wxString temp = tick;
+	tick = sn->GetLongName();
+	tick = Decipherhtmlcodes(tick);
+	tick += ":" + temp;
+//	this->chartframe = new wxFrame(this, wxID_ANY, "", wxDefaultPosition, wxSize(600, 500));
+//	this->chartframe->SetMinSize(wxSize(600, 500));
+//	this->chart = new ChartControl(this, this->chartframe, wxID_ANY, wxDefaultPosition, this->FromDIP(wxSize(600, 500)), tick, sn->GetDayPrices());
+	this->grid_panel->Hide();
+//	this->chart = new ChartControl(this, this, wxID_ANY, wxDefaultPosition, this->FromDIP(wxSize(600, 500)), tick, sn->GetDayPrices());
+	this->chartwin = new ChartControlWin(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, tick, sn->GetDayPrices(), sn->GetStockViewerData());
+	this->top->Replace(this->grid_panel, this->chartwin);
+	this->Layout();
+	this->Refresh();
+//	this->chartframe->SetSizer(box);
+//	this->chartframe->CenterOnParent();
+//	this->chartframe->Layout();
+
+//	this->chartframe->Show();
+//	this->Disable();
+}
+
+void mainwindow::OnLoadSectorStocks(wxCommandEvent& evt)
+{
+	this->mainwindow_thread = new LoadSectorStocksThread(this);
+	if (mainwindow_thread->Run() != wxThreadError::wxTHREAD_NO_ERROR)
+	{
+		wxMessageBox("mainwindow_thread failed to run in mainwindow::OnLoadSectorStocks!");
+		delete this->mainwindow_thread;
+		this->mainwindow_thread = NULL;
+		return;
+	}
+
+	this->statbar->SetStatusText("Fetching Stock Data...");
+}
+
 void mainwindow::OnQuoteThread(wxThreadEvent& evt)
 {
+	if (evt.GetId() != 1)
+	{
+		evt.Skip();
+		return;
+	}
+
 	if (smd.Longname == "NotFound")
 	{
 		wxMessageDialog* d = new wxMessageDialog(this, "Data for " + this->grid_view->GetRightClickTicker() + " could not be found!");
@@ -5373,7 +5719,7 @@ void mainwindow::UpdateGridView()
 		return;
 	}
 
-	const wxVector<StockNode*> stocks = this->port.GetStockNodeItems();
+	wxVector<StockNode*> stocks = this->port.GetStockNodeItems();
 	this->grid_view->SetNumOfItems(stocks.size());
 	for (size_t i = 0; i < stocks.size(); ++i)
 	{
@@ -5394,6 +5740,7 @@ void mainwindow::UpdateGridView()
 
 	if (this->portwin)
 		this->portwin->Update();
+
 }
 
 void mainwindow::SaveFile()
@@ -5431,6 +5778,18 @@ void mainwindow::DeleteQuoteThread()
 	}
 }
 
+void mainwindow::DeleteLoadStocksThread()
+{
+	if (this->mainwindow_thread)
+	{
+		this->mainwindow_thread->Delete();
+		while (this->mainwindow_thread)
+		{
+
+		}
+	}
+}
+
 void mainwindow::CreatePopupMenu()
 {
 	this->popup = new wxMenu();
@@ -5440,7 +5799,7 @@ void mainwindow::CreatePopupMenu()
 	this->p_add_div_reinvest = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV_REINVEST, "Add Div Re-invest shares");
 	this->p_add_div = new wxMenuItem(popup, _MenuItemIDs::P_ADD_DIV, "Add Dividend");
 	this->p_view_dividends = new wxMenuItem(popup, _MenuItemIDs::P_VIEW_DIVIDENDS, "Empty");
-	this->p_ohlc = new wxMenuItem(popup, _MenuItemIDs::P_GET_OHLC, "Open High Low Close");
+	this->p_graph = new wxMenuItem(popup, _MenuItemIDs::P_GRAPH, "View");
 
 	this->popup->Append(this->p_buy);
 	this->popup->Append(this->p_sell);
@@ -5448,5 +5807,5 @@ void mainwindow::CreatePopupMenu()
 	this->popup->Append(this->p_add_div_reinvest);
 	this->popup->Append(this->p_add_div);
 	this->popup->Append(this->p_view_dividends);
-	this->popup->Append(this->p_ohlc);
+	this->popup->Append(this->p_graph);
 }

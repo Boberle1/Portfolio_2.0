@@ -547,6 +547,50 @@ void DataStream::ReadSectorDataVector(wxVector<SectorData>& v)
 	}
 }
 
+void DataStream::WriteSectorStockVector(wxVector<SectorStock>& v)
+{
+	size_t size = v.size();
+	this->WriteData(size);
+	for (auto& it : v)
+	{
+		this->Write(it.ticker);
+		this->Write(it.sectorname);
+		this->Write(it.longname);
+		this->Write(it.market_cap);
+		this->WriteData(it.d_avg_vol);
+		this->WriteData(it.d_change);
+		this->WriteData(it.d_change_perc);
+		this->WriteData(it.d_previous_close);
+		this->WriteData(it.d_price);
+		this->WriteData(it.d_vol);
+		this->WriteData(it.sec);
+		this->WriteDayPricesVector(it.days);
+	}
+}
+
+void DataStream::ReadSectorStockVector(wxVector<SectorStock>& v)
+{
+	size_t size;
+	this->ReadData(size);
+	for (size_t i = 0; i < size; ++i)
+	{
+		v.push_back(SectorStock());
+		auto& it = *v.rbegin();
+		this->Read(it.ticker);
+		this->Read(it.sectorname);
+		this->Read(it.longname);
+		this->Read(it.market_cap);
+		this->ReadData(it.d_avg_vol);
+		this->ReadData(it.d_change);
+		this->ReadData(it.d_change_perc);
+		this->ReadData(it.d_previous_close);
+		this->ReadData(it.d_price);
+		this->ReadData(it.d_vol);
+		this->ReadData(it.sec);
+		this->ReadDayPricesVector(it.days);
+	}
+}
+
 void DataStream::WritePair(Pair& p)
 {
 	this->Write(p.ticker);

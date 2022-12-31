@@ -509,6 +509,7 @@ enum _MenuItemIDs
 	DAY_LOSERS_MENU,
 
 	//popup menu ids...
+	P_GRAPH,
 	P_QUOTE,
 	P_ADD_DIV_REINVEST,
 	P_ADD_DIV,

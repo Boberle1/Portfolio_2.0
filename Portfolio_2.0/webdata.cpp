@@ -65,9 +65,12 @@ bool webdata::getwebdata(wxString& data)
 	if (pages == 0) {
 		return true;
 	}
+
 	bool result = false;
 	CURLcode res = CURLE_OK;
+
 	curl_global_init(CURL_GLOBAL_DEFAULT);
+
 	CURL* curl = curl_easy_init();
 	
 	wxString headerfile = "";
@@ -77,7 +80,7 @@ bool webdata::getwebdata(wxString& data)
 		if (this->follow_redirect)
 			curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 		CURLcode writefunc = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, setdata);
-		CURLcode headerfunc = curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
+//		CURLcode headerfunc = curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_callback);
 		CURLcode write = curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
 		CURLcode header = curl_easy_setopt(curl, CURLOPT_WRITEHEADER, &headerfile);
 		CURLcode verbose = curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -98,6 +101,7 @@ bool webdata::getwebdata(wxString& data)
 	}
 
 	curl_global_cleanup();
+
 	return result;
 }
 

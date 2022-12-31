@@ -4,6 +4,9 @@
 #include "wx/wfstream.h"
 #include "wx/wfstream.h"
 #include "Enums.h"
+#include <chrono>
+#include <vector>
+#include <string>
 
 struct MonthNames
 {
@@ -77,6 +80,7 @@ struct Holidays
 struct SectorStock
 {
 	SectorStock(_Sector, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&, wxString&);
+	SectorStock() {}
 
 	wxString ticker = "";
 	wxString longname = "";

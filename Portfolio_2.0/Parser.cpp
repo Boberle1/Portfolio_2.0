@@ -649,11 +649,6 @@ void Parser::PullSectorStocks(_Sector s, wxVector<SectorStock>& v)
 		}
 
 		this->PullSectorStocks(index, 1, rows, total, v, data, s, sectorname);
-//		for (auto it = v.rbegin(); it != v.rend(); ++it)
-//			wxString lonlljlk = it->longname;
-//		auto& itb = ++v.rbegin();
-//		auto it = v.rbegin();
-//		wxString t = data.Mid(data.find(itb->longname), 5000);
 		data = "";
 		url = this->industrie_stocks_url_2;
 		start += 100;
@@ -758,18 +753,18 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 
 		inttemp = index;
 		match = "data-field=\"regularMarketChange\"";
-		wxString stringtemp2 = data.Mid(inttemp, 3000);
+//		wxString stringtemp2 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 		if (index == -1)
 		{
 			wxFAIL_MSG("Could not find regularMarketChange in Parser::PullSectorStocks!");
-			stringtemp2 = "";
+//			stringtemp2 = "";
 			return false;
 		}
 
 		inttemp = index;
 		match = "class=\"C";
-		wxString stringtemp3 = data.Mid(inttemp, 3000);
+//		wxString stringtemp3 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 
 		// check to see if it skipped a row...
@@ -782,7 +777,7 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 		if (index == -1)
 		{
 			wxFAIL_MSG("Could not find class=C in Parser::PullSectorStocks!");
-			stringtemp3 = "";
+//			stringtemp3 = "";
 			return false;
 		}
 
@@ -791,18 +786,18 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 
 		inttemp = index;
 		match = "data-field=\"regularMarketChangePercent\"";
-		wxString stringtemp4 = data.Mid(inttemp, 3000);
+//		wxString stringtemp4 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 		if (index == -1)
 		{
 			wxFAIL_MSG("Could not find regularMarketChangePercent in Parser::PullSectorStocks!");
-			stringtemp4 = "";
+//			stringtemp4 = "";
 			return false;
 		}
 
 		inttemp = index;
 		match = "class=\"C";
-		wxString stringtemp5 = data.Mid(inttemp, 3000);
+//		wxString stringtemp5 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 
 		// check to see if it skipped a row...
@@ -815,7 +810,7 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 		if (index == -1)
 		{
 			wxFAIL_MSG("Could not find class=C in Parser::PullSectorStocks!");
-			stringtemp5 = "";
+//			stringtemp5 = "";
 			return false;
 		}
 
@@ -823,13 +818,13 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 		change_perc = this->GetData(index, data, 1);
 
 		inttemp = index;
-		wxString stringtemp6 = data.Mid(inttemp, 3000);
+//		wxString stringtemp6 = data.Mid(inttemp, 3000);
 		match = "regularMarketVolume";
 		index = this->FindItem("regularMarketVolume", data, index);
 		if (index == -1)
 		{
 			wxFAIL_MSG("Could not find regularMarketVolume in Parser::PullSectorStocks!");
-			stringtemp6 = "";
+//			stringtemp6 = "";
 			return false;
 		}
 
@@ -838,13 +833,13 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 
 		inttemp = index;
 		match = "Avg Vol";
-		wxString stringtemp7 = data.Mid(inttemp, 3000);
+//		wxString stringtemp7 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 		if (index == -1)
 		{
 			wxString stringtemp = data.Mid(inttemp, 3000);
 			wxFAIL_MSG("Could not find Avg Vol in Parser::PullSectorStocks!");
-			stringtemp = "";
+//			stringtemp = "";
 			return false;
 		}
 
@@ -855,7 +850,7 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 		int temp = index;
 		match = "marketCap";
 		wxString secondmatch = "aria-label=\"Market Cap\"><span";
-		wxString stringtemp8 = data.Mid(inttemp, 3000);
+//		wxString stringtemp8 = data.Mid(inttemp, 3000);
 		index = this->FindItem(match, data, index);
 		if (index == -1)
 		{
@@ -876,11 +871,6 @@ bool Parser::PullSectorStocks(int index, int start, int rows, int end, wxVector<
 		{
 			index += match.size();
 			market_cap = this->GetData(index, data, 1);
-		}
-		
-		if (market_cap.size() > 15)
-		{
-			int Catch = 0;
 		}
 
 		vec.push_back(SectorStock(S, sectorname, ticker, longname, price, change, change_perc, volume, avg_volume, market_cap));

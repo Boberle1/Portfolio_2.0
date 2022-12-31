@@ -4,7 +4,7 @@ wxIMPLEMENT_APP(PortfolioApp);
 
 PortfolioApp::PortfolioApp()
 {
-
+	
 }
 
 bool PortfolioApp::OnInit()

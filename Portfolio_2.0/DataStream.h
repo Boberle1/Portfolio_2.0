@@ -378,6 +378,8 @@ public:
 	void ReadLongwxVector(wxVector<long>&);
 	void WriteSectorDataVector(wxVector<SectorData>&);
 	void ReadSectorDataVector(wxVector<SectorData>&);
+	void WriteSectorStockVector(wxVector<SectorStock>&);
+	void ReadSectorStockVector(wxVector<SectorStock>&);
 	void WritePair(Pair&);
 	void ReadPair(Pair&);
 	void CommitMyFile();
