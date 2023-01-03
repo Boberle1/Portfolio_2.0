@@ -225,7 +225,7 @@ bool IsMarketOpen()
 	return false;
 }
 
-wxDateTime::Month inline G_GetQuarterStartMonth(wxDateTime::Month m)
+wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month m)
 {
 	switch (m)
 	{
@@ -248,7 +248,7 @@ wxDateTime::Month inline G_GetQuarterStartMonth(wxDateTime::Month m)
 	return wxDateTime::Month::Inv_Month;
 }
 
-wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month m)
+wxDateTime::Month GetQuarterEndMonth(wxDateTime::Month m)
 {
 	switch (m)
 	{
@@ -268,6 +268,30 @@ wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month m)
 
 	wxString month = "";
 	wxFAIL_MSG("wxDateTime::Month passed to GetQuarterEndMonth did not match any months in the switch statment. Month passed to it is: " + month);
+	return wxDateTime::Month::Inv_Month;
+}
+
+wxDateTime::Month GetPreviousMonth(wxDateTime::Month m)
+{
+	switch (m)
+	{
+	case wxDateTime::Month::Jan: return wxDateTime::Month::Dec;
+	case wxDateTime::Month::Feb: return wxDateTime::Month::Jan;
+	case wxDateTime::Month::Mar: return wxDateTime::Month::Feb;
+	case wxDateTime::Month::Apr: return wxDateTime::Month::Mar;
+	case wxDateTime::Month::May: return wxDateTime::Month::Apr;
+	case wxDateTime::Month::Jun: return wxDateTime::Month::May;
+	case wxDateTime::Month::Jul: return wxDateTime::Month::Jun;
+	case wxDateTime::Month::Aug: return wxDateTime::Month::Jul;
+	case wxDateTime::Month::Sep: return wxDateTime::Month::Aug;
+	case wxDateTime::Month::Oct: return wxDateTime::Month::Sep;
+	case wxDateTime::Month::Nov: return wxDateTime::Month::Oct;
+	case wxDateTime::Month::Dec: return wxDateTime::Month::Nov;
+	}
+
+	wxString month = "";
+	month << m;
+	wxFAIL_MSG("wxDateTime::Month passed to GetPreviousMonth did not match any months in the switch statment. Month passed to it is: " + month);
 	return wxDateTime::Month::Inv_Month;
 }
 
@@ -421,7 +445,7 @@ wxDateTime G_GetQuarterStartDate(wxDateTime* T)
 	if (T)
 		date = *T;
 
-	date = wxDateTime(1, G_GetQuarterStartMonth(date.GetMonth()), date.GetYear());
+	date = wxDateTime(1, GetQuarterStartMonth(date.GetMonth()), date.GetYear());
 	GetForwardWorkDay(date);
 	
 	return date;

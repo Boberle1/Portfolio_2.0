@@ -87,6 +87,7 @@ public:
 	SummaryData PullIndexQuote(int);
 	void UpDateAll();
 	void UpDateSummaryData(bool indices = false);
+	void GetSectorNameForStock(wxString&, wxString& sector, wxString& industry);
 	wxString GetDescription(wxString);
 	wxVector<DayGainersandLosers> GetStockGainers();
 	wxVector<DayGainersandLosers> GetStockLosers();
@@ -222,6 +223,7 @@ private:
 	bool ValidData = true;
 
 	wxString urltemp = "";
+	wxString url_Sectorname = "https://finance.yahoo.com/quote/TICKER/profile?p=TICKER";
 	wxString Normal = "https://query1.finance.yahoo.com/v7/finance/download/TICKER?period1=BEGINDATE&period2=ENDDATE&interval=1d&events=history&includeAdjustedClose=true";
 	wxString indices_url = "https://query1.finance.yahoo.com/v7/finance/download/%5ETICKER?period1=BEGINDATE&period2=ENDDATE&interval=1d&events=history&includeAdjustedClose=true";
 	wxString QQQ_Url_h =

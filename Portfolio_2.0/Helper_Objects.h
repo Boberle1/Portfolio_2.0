@@ -2,11 +2,8 @@
 #include "wx/wx.h"
 #include "wx/txtstrm.h"
 #include "wx/wfstream.h"
-#include "wx/wfstream.h"
 #include "Enums.h"
 #include <chrono>
-#include <vector>
-#include <string>
 
 struct MonthNames
 {
@@ -109,8 +106,9 @@ void GetWorkDate(wxDateTime& T, bool B = false);
 void GetForwardWorkDay(wxDateTime& T);
 bool IsMarketOpen();
 
-wxDateTime::Month inline G_GetQuarterStartMonth(wxDateTime::Month);
-wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month);
+wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month);
+wxDateTime::Month GetQuarterEndMonth(wxDateTime::Month);
+wxDateTime::Month GetPreviousMonth(wxDateTime::Month);
 
 double G_GetClosePrice(wxDateTime*, wxVector<Day_Prices>&);
 double G_GetPreviousClose(wxDateTime*, wxVector<Day_Prices>&);

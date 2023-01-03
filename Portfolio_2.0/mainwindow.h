@@ -8,9 +8,6 @@
 #include "wx/statline.h"
 #include "wx/graphics.h"
 #include "wx/dcbuffer.h"
-#include <wx/settings.h>
-#include "wx/progdlg.h"
-#include "wx/popupwin.h"
 
 struct TextExtent
 {
@@ -70,6 +67,7 @@ public:
 //	MotionCanvas(wxWindow*, wxSize, wxVector<wxString>);
 	MotionCanvas(wxWindow*, wxSize, wxVector<StockViewerData*>);
 	void OnPaint(wxPaintEvent&);
+	void OnEraseBackground(wxEraseEvent&);
 private:
 	wxColour background = wxColour(21, 41, 46);
 	int iter = 0;
@@ -97,6 +95,7 @@ class GridCanvas : public wxWindow
 public:
 	GridCanvas(wxWindow*, wxSize, wxString&, int);
 	void OnPaint(wxPaintEvent&);
+	void OnEraseBackground(wxEraseEvent&);
 	TextExtent* GetTextExtent();
 	bool IsMatch(wxString&);
 	bool IsEmpty();
@@ -273,10 +272,34 @@ private:
 	wxVector<std::pair<wxPoint2DDouble, Day_Prices>> mypair;
 };
 
+class ChartControlWin;
+// class to display an x for exiting window
+class X_Canvas : public wxWindow
+{
+public:
+	X_Canvas(ChartControlWin*, wxPanel*, wxWindowID, const wxPoint, const wxSize, wxColour, wxColour, wxColour);
+	wxDECLARE_EVENT_TABLE();
+	void OnEnterWin(wxMouseEvent&);
+	void OnWinLeave(wxMouseEvent&);
+	void OnLeftDown(wxMouseEvent&);
+	void OnPaint(wxPaintEvent&);
+	void OnErase(wxEraseEvent&);
+private:
+	ChartControlWin* m_grand_parent = NULL;
+	wxPanel* m_parent = NULL;
+	wxColour x_color;
+	wxColour hover;
+	wxColour normal_background;
+	wxColour m_background;
+	wxColour m_foreground;
+	bool _hover = false;
+};
+
 class ChartControlWin : public wxWindow
 {
 public:
 	ChartControlWin(mainwindow*, wxWindowID, const wxPoint&, const wxSize&, wxString&, wxVector<Day_Prices>*, StockViewerData*);
+	void OnExit();
 private:
 	void Create();
 private:
@@ -286,6 +309,7 @@ private:
 	wxString ticker = "";
 	wxString rangebegin = "";
 	wxString range_end = "";
+	X_Canvas* exit = NULL;
 };
 
 class GridView : public wxGridSizer
@@ -316,7 +340,7 @@ private:
 	void FillGrid();
 	void ClickRowOff();
 	void ClickColOff();
-	gridpair GetLabelText(size_t&, StockViewerData*);
+//	gridpair GetLabelText(size_t&, StockViewerData*);
 	wxString GetStringLabel(size_t&, StockViewerData*);
 	wxString GetColTitle(size_t);
 	int GetGridNodeFlags(size_t&, size_t&);
@@ -758,11 +782,14 @@ public:
 	// End of helper functions for OnSellMenu..
 
 	void OnHome(wxCommandEvent&);
+	void SampleStockChartView(wxCommandEvent&);
 
+	void GoToHomeWindow();
 	void OnSellPopupClick(wxCommandEvent&);
 	void OnPurchasePopupClick(wxCommandEvent&);
 	void OnAddReInvestSharesPopup(wxCommandEvent&);
 	void OnQuoteLookupPopup(wxCommandEvent&);
+	void ChartViewHelper(SampleStock*);
 	void OnChartView(wxCommandEvent&);
 	void OnLoadSectorStocks(wxCommandEvent&);
 
@@ -802,6 +829,7 @@ private:
 	void UpdateGridView();
 	void SaveFile();
 	void RetrieveFile();
+	void DeleteSampleStock();
 	void DeletePopupMenu();
 	void DeleteQuoteThread();
 	void DeleteLoadStocksThread();
@@ -817,6 +845,7 @@ private:
 	ChartControl* chart = NULL;
 	wxFrame* chartframe = NULL;
 	ChartControlWin* chartwin = NULL;
+	SampleStock* sample = NULL;
 
 	wxBoxSizer* top = NULL;
 

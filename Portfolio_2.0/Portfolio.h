@@ -25,8 +25,10 @@ wxDEFINE_EVENT(ThreadComplete, wxCommandEvent);
 inline wxDateTime IsValidDate(wxString&, wxString);
 unsigned int inline GetEndMonthDay(wxDateTime::Month, int);
 //wxDateTime::Month inline GetQuarterStartMonth(wxDateTime::Month);
-wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month);
-wxString inline GetSectorName(_Sector);
+//wxDateTime::Month inline GetQuarterEndMonth(wxDateTime::Month);
+//wxString inline GetSectorName(_Sector);
+
+//wxDateTime::Month inline GetPreviousMonth(wxDateTime::Month);
 
 /*
 _Sector inline GetStringToSector(wxString s)
@@ -151,6 +153,7 @@ public:
 	wxVector<SubSector>* GetSubSector() { return &this->subsecs; }
 	wxString GetSectorName() { return this->sectorName; }
 	wxVector<SectorStock>* GetSectorStockVec() { return &myvec; }
+	SectorStock* FindSectorStock(wxString&);
 private:
 	void m_GetSubSectorData();
 	void m_GetSubSectorPerformance();
@@ -185,6 +188,7 @@ public:
 	bool Read();
 	void Save();
 	void LoadAllStocks(wxThread* thread = NULL, wxWindow* window = NULL);
+	SectorStock* FindSectorStock(wxString&);
 private:
 	wxString m_GetSubSector(wxVector<_Sub_Sector>&, wxVector<wxString>&, _Sub_Sector);
 	_Sub_Sector m_GetSubSectorID(wxVector<wxString>&, wxVector<_Sub_Sector>&, wxString&);
@@ -498,12 +502,12 @@ struct StockViewerData
 	wxString GetPrice(){ return wxNumberFormatter::ToString(this->price, 2); }
 	wxString GetPreviousClose(){ return wxNumberFormatter::ToString(this->previous_close, 2); }
 	wxString GetDayGain(){ return wxNumberFormatter::ToString(this->day_gain * 100, 2); }
-//	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2) + "%"; }
-	wxString GetWeekGain();
+	wxString GetWeekGain(){ return wxNumberFormatter::ToString(this->week_gain * 100, 2); }
 	wxString GetQuarterGain() { return wxNumberFormatter::ToString(this->quarter_gain * 100, 2); }
 	wxString GetYearGain(){ return wxNumberFormatter::ToString(this->year_gain * 100, 2); }
 	wxString GetTotalGain(){ return wxNumberFormatter::ToString(this->total_gain * 100, 2); }
 	wxString GetPortfolioPerc() { return wxNumberFormatter::ToString(this->m_parent->PortfolioPerc * 100, 2); }
+	wxString GetSectorPerc() { return wxNumberFormatter::ToString(this->m_parent->SectorPerc * 100, 2); }
 	wxString GetCostBasis(){ return wxNumberFormatter::ToString(this->cost_basis, 2); }
 	wxString GetMarketValue(){ return wxNumberFormatter::ToString(this->market_value, 2); }
 	wxString GetDividends(){ return wxNumberFormatter::ToString(this->total_divs, 2); }
@@ -557,6 +561,9 @@ public:
 	void ShareDivsWithSibling(stock_node*);
 	double GetCostBasis(wxDateTime*);
 	double GetShares(wxDateTime*);
+	double GetWeekShares(wxDateTime&);
+	double GetQuarterShares(wxDateTime&);
+	double GetYearShares(wxDateTime&);
 	double GetRealizedGain(wxDateTime*);
 	bool IdMatch(long&);
 	long GetLotNumber() { return this->m_id; }
@@ -602,7 +609,6 @@ private:
 	wxDateTime m_reinvest_start;
 	double m_price_per_share = 0.0;
 	double m_shares = 0.0;
-	double m_average_sold_price = 0.0;
 
 	// for calculating what percent this lot is of all its siblings...
 	double ratio_of_siblings = 0.0;
@@ -618,6 +624,7 @@ private:
 class Sector;
 class Portfolio;
 class StockNode;
+class SampleStock;
 class Indices;
 
 // CallBackFunctions for StockNode to get info from Parser...
@@ -741,6 +748,32 @@ private:
 	stock_node* lastPurchase = nullptr;
 	bool purchaseDateSwitch = false;
 	_Sector sectorID = _Sector::SECTOR_INVALID;
+};
+
+class SampleStock : Return_node
+{
+public:
+	SampleStock(wxString&, SummaryData&, wxString&, wxString&, wxDateTime&, wxDateTime&, _Sector);
+	void SetHistoricalData(Day_Prices);
+	wxVector<Day_Prices>* GetDayPrices() { return &this->historical_prices; }
+	StockViewerData* GetStockViewerData() { return &this->svd; }
+	wxString GetTicker() { return this->ticker; }
+	wxString GetLongName() { return this->current_Data.Longname; }
+public:
+	double PortfolioPerc = 0.0;
+	double SectorPerc = 0.0;
+private:
+	void Calibrate();
+	wxVector<Day_Prices> historical_prices;
+	wxDateTime start;
+	wxDateTime end;
+	SummaryData current_Data;
+	StockViewerData svd;
+	wxString ticker;
+	_Sector sectorID;
+	Parser parser;
+	wxString sectorname = "N/A";
+	wxString industryname = "N/A";
 };
 
 // class to track the three major indices, sp500, dowjones and nasdaq..
@@ -868,6 +901,7 @@ public:
 	wxVector<DayGainersandLosers> GetDayGainers();
 	wxVector<DayGainersandLosers> GetDayLosers();
 	SummaryData QuoteLookup(wxString);
+	void GetSectorStockIsIn(wxString&, wxString&, wxString&);
 	bool AddDeposit(wxDateTime&, double&);
 	bool AddWithdrawl(wxDateTime&, double&);
 	void ForceUpdate();

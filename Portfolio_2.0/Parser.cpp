@@ -281,6 +281,38 @@ void Parser::UpDateSummaryData(bool indices)
 	this->PullWebData(indices);
 }
 
+void Parser::GetSectorNameForStock(wxString& ticker, wxString& sector, wxString& industry)
+{
+	wxString url = this->url_Sectorname;
+	url.Replace("TICKER", ticker);
+
+	wxString data = "";
+	this->PullWebData(url, data);
+	wxString temp = "";
+
+	wxString sectorspan = "Sector(s)</span>";
+	wxString start = "<span";
+	wxString _industry = "Industry";
+	int index = this->FindItem(sectorspan, data);
+	if (index != -1)
+	{
+		index = this->FindItem(start, data, ++index);
+		if (index == -1)
+			return;
+		++index;
+		sector = this->GetData(index, data, 1);
+		index = this->FindItem(_industry, data, ++index);
+		if (index == -1)
+			return;
+		++index;
+		index = this->FindItem(start, data, index);
+		if (index == -1)
+			return;
+		++index;
+		industry = this->GetData(index, data, 1);
+	}
+}
+
 wxString Parser::GetDescription(wxString t)
 {
 	wxString url = "https://finance.yahoo.com/quote/TICKER/profile?p=TICKER";

@@ -469,6 +469,7 @@ enum _PortfolioType
 	LOT_PURCHASE,
 	SOLD,
 	INDICES,
+	SAMPLESTOCK,
 	OPTIONS
 };
 
@@ -496,6 +497,7 @@ enum _EnterDialog
 enum _MenuItemIDs
 {
 	QUOTE_LOOKUP = SECTORSTOCKWIN + 1,
+	VIEW_CHART,
 	ADD_DIV,
 	REMOVE_DIV,
 	NEW_DEPOSIT,
