@@ -900,7 +900,7 @@ public:
 	double GetFreeCash();
 	wxVector<DayGainersandLosers> GetDayGainers();
 	wxVector<DayGainersandLosers> GetDayLosers();
-	SummaryData QuoteLookup(wxString);
+	SummaryData QuoteLookup(wxString, bool redirect = false, bool description = false);
 	void GetSectorStockIsIn(wxString&, wxString&, wxString&);
 	bool AddDeposit(wxDateTime&, double&);
 	bool AddWithdrawl(wxDateTime&, double&);

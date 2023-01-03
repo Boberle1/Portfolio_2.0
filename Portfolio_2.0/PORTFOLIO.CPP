@@ -4025,11 +4025,12 @@ wxVector<DayGainersandLosers> Portfolio::GetDayLosers()
 	return this->losers;
 }
 
-SummaryData Portfolio::QuoteLookup(wxString ticker)
+SummaryData Portfolio::QuoteLookup(wxString ticker, bool redirect, bool description)
 {
-	Parser parser(ticker);
+	Parser parser(ticker, redirect);
 	SummaryData sd =  parser.GetSummaryData();
-	sd.description = parser.GetDescription(ticker);
+	if (description)
+		sd.description = parser.GetDescription(ticker);
 	return sd;
 }
 

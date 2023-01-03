@@ -1,2 +1,5 @@
-﻿  Portfolio.cpp
+﻿  mainwindow.cpp
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(323,12): warning C4018: '>=': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(417,16): warning C4018: '>=': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(1871,23): warning C4018: '<': signed/unsigned mismatch
   Portfolio_2.0.vcxproj -> C:\Users\brand\source\repos\Portfolio_2.0\Debug\Portfolio_2.0.exe

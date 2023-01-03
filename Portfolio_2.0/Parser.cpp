@@ -236,13 +236,13 @@ Parser::Parser(void* parent, _Sector S) : m_parent(parent), sector_type(S)
 	this->PullWebData(url, data);
 }
 
-Parser::Parser(wxString& data)
+Parser::Parser(wxString& data, bool redirect)
 {
 	if (!data.size())
 		return;
 
 	this->ticker = data;
-	this->UpDateSummaryData();
+	this->UpDateSummaryData(false, redirect);
 }
 
 SummaryData Parser::PullIndexQuote(int selection)
@@ -276,9 +276,9 @@ void Parser::Test()
 	this->PullWebData(link, data);
 }
 
-void Parser::UpDateSummaryData(bool indices)
+void Parser::UpDateSummaryData(bool indices, bool redirect)
 {
-	this->PullWebData(indices);
+	this->PullWebData(indices, redirect);
 }
 
 void Parser::GetSectorNameForStock(wxString& ticker, wxString& sector, wxString& industry)
@@ -1670,14 +1670,14 @@ void Parser::UpDate(bool historical, bool div, bool indices)
 	*/
 }
 
-bool Parser::PullWebData(bool indices)
+bool Parser::PullWebData(bool indices, bool redirect)
 {
 	wxString Data = "";
 	wxString URL = "https://finance.yahoo.com/quote/TICKER?p=TICKER&.tsrc=fin-srch";
 	if (indices)
 		URL = "https://finance.yahoo.com/quote/%5ETICKER?p=%5ETICKER";
 	URL.Replace("TICKER", this->ticker);
-	webdata web;
+	webdata web(redirect);
 	web.setpages(1);
 	web.seturl(URL);
 	if (!web.getwebdata(Data))

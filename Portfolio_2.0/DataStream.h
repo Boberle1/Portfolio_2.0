@@ -99,6 +99,14 @@ struct SummaryData
 	double Open = 0.0;
 	double Beta = 0.0;
 
+	bool IsValid()
+	{
+		if (!this->marketprice && !this->previousclose)
+			return false;
+
+		return true;
+	}
+
 	void ToDoubles()
 	{
 		if (!curr_price.ToDouble(&marketprice))

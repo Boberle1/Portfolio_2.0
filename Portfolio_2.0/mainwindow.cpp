@@ -5481,10 +5481,10 @@ void mainwindow::SampleStockChartView(wxCommandEvent& evt)
 		if (!scs)
 		{
 			wxBell();
-			if (wxYES == wxMessageBox("Could not find in stocks on file. Would you like me to check online?", "", wxYES_NO))
+			if (wxYES == wxMessageBox("Could not find in stocks on file. Would you like to check online?", "", wxYES_NO))
 			{
 				sd = port.QuoteLookup(user);
-				if (sd.Longname == "NotFound")
+				if (!sd.IsValid())
 				{
 					wxBell();
 					wxMessageDialog* d = new wxMessageDialog(this, "Data for " + user + " could not be found!");

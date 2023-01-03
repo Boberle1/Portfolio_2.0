@@ -81,12 +81,12 @@ public:
 	Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), _PortfolioType
 		,void (*cbs)(void*, SummaryData, _PortfolioType));
 	Parser(void* parent, _Sector S);
-	Parser(wxString&);
+	Parser(wxString&, bool redirect = false);
 	Parser() {}
 	void Test();
 	SummaryData PullIndexQuote(int);
 	void UpDateAll();
-	void UpDateSummaryData(bool indices = false);
+	void UpDateSummaryData(bool indices = false, bool redirect = false);
 	void GetSectorNameForStock(wxString&, wxString& sector, wxString& industry);
 	wxString GetDescription(wxString);
 	wxVector<DayGainersandLosers> GetStockGainers();
@@ -116,7 +116,7 @@ private:
 
 	void InsertDates(wxString& start, wxString& end, bool indices = false);
 	void UpDate(bool historical = true, bool div = true, bool indices = false);
-	bool PullWebData(bool indices = false);
+	bool PullWebData(bool indices = false, bool redirect = false);
 	bool PullWebData(wxString& url, wxString& data);
 	void ParseSummaryData(wxString&);
 
