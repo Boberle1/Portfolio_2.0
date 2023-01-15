@@ -1,8 +1,10 @@
-﻿  mainwindow.cpp
+﻿  PortfolioApp.cpp
+  mainwindow.cpp
 C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(323,12): warning C4018: '>=': signed/unsigned mismatch
 C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(417,16): warning C4018: '>=': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2603,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2643,24): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2680,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(3060,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(1993,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2033,24): warning C4018: '<': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2063,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\brand\source\repos\Portfolio_2.0\Portfolio_2.0\mainwindow.cpp(2443,23): warning C4018: '<': signed/unsigned mismatch
+  Generating Code...
   Portfolio_2.0.vcxproj -> C:\Users\brand\source\repos\Portfolio_2.0\Debug\Portfolio_2.0.exe
