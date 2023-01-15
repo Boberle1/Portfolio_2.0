@@ -204,11 +204,12 @@ Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd,
 }
 
 Parser::Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType _type)
-	, _PortfolioType _type, void (*cbs)(void*, SummaryData, _PortfolioType))
-	: m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), CallBack(cb), type(_type), CallBackSummary(cbs)
+	, _PortfolioType _type, void (*cbs)(void*, SummaryData, _PortfolioType), wxString enddate)
+	: m_parent(parent), ticker(t), purchaseDate(pd), lastdate(ld), CallBack(cb), type(_type), CallBackSummary(cbs), m_enddate(enddate)
 {
 	this->PurchaseDate.ParseDate(this->purchaseDate);
 	this->startDate.ParseDate(this->lastdate);
+	this->end_Date.ParseDate(this->m_enddate);
 }
 
 Parser::Parser(void* parent, _Sector S) : m_parent(parent), sector_type(S)

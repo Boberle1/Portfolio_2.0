@@ -36,6 +36,39 @@ struct MonthNames
 	wxDateTime::Month GetMonth(wxString);
 };
 
+template <typename T>
+class SmartPointer
+{
+public:
+	SmartPointer(T* t) : ptr(t)
+	{
+
+	}
+
+	~SmartPointer()
+	{
+		if (this->ptr)
+			delete this->ptr;
+	}
+
+	T& operator*()
+	{
+		return *this->ptr;
+	}
+
+	T*& operator->()
+	{
+		return this->ptr;
+	}
+
+	bool operator!()
+	{
+		return !this->ptr;
+	}
+
+private:
+	T* ptr = NULL;
+};
 
 struct Day_Prices
 {

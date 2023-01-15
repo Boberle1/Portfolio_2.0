@@ -147,8 +147,12 @@ struct DayGainersandLosers
 
 		if (change.find('+') != -1)
 			change = change.Mid(1);
+		if (change.find(',') != -1)
+			change = change.Mid(0, change.find(',')) + change.Mid(change.find(',') + 1);
 		if (marketprice.find('+') != -1 || marketprice.find('-') != -1)
 			marketprice = marketprice.Mid(1);
+		if (marketprice.find(',') != -1)
+			marketprice = marketprice.Mid(0, marketprice.find(',')) + marketprice.Mid(marketprice.find(',') + 1);
 
 		if (!this->change.ToDouble(&this->_change))
 			wxMessageBox("ToDouble failed on change in DayGainersandLosers::ToDoubles; string was: " + this->change);

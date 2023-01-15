@@ -51,6 +51,7 @@ private:
 };
 
 class GridView;
+class GridView2;
 
 //simple struct for GridNode SetNewValue
 struct gridpair
@@ -84,16 +85,129 @@ private:
 	TextExtent textextent2;
 	TextExtent textextent3;
 	int top_distance = -21000;
+	double top_distance_double = -21000.0;
 	int bottom_distance = -21000;
+	double bottom_distance_double = -21000.0;
 	int iteminfo_iter = 0;
 };
 
-struct GridCanvasData;
+struct GridValData;
 
+class GridVal
+{
+public:
+	GridVal(wxWindow*, wxString&, int, wxSize);
+	void CopyGridValData(GridValData&);
+	bool IsMatch(wxString&);
+	bool IsEmpty();
+	void SetValue(wxString&);
+	void SetHover();
+	void RemoveHover();
+	bool IsDataCell() { return this->isDataCell; }
+	bool IsTotalRow() { return this->isTotalRow; }
+	bool IsRowHead() { return this->isHeaderRow; }
+	bool IsColHeader() { return this->isHeaderCol; }
+	// Passing a point to this function will check if this point lands on the rectangle that encases this window...
+	bool IsMyPixel(const wxPoint&);
+
+	// Setting whether it is shown onscreen or not...
+	void SetVisibility(bool b) { this->isShown = b; }
+	bool IsShown() { return this->isShown; }
+
+	wxColour& GetBackColour() { return this->background; }
+	wxColour& GetTextColour() { return this->textcolor; }
+	wxString& GetTextValue() { return this->value; }
+	wxFont& GetTextFont() { return this->textfont; }
+	void SetMyPosition(wxPoint& p) { this->myPosition = p; }
+	void SetMyRelativePosition(wxPoint& p) { this->relativePosition = p; }
+	wxPoint& GetMyPosition() { return this->myPosition; }
+	wxPoint& GetMyRelativePosition() { return this->relativePosition; }
+	wxSize& GetMySize() { return this->mySize; }
+	int Getflags() { return this->flag; }
+	double GetDoubleValue() { return this->double_val; }
+
+private:
+	void Initialize();
+	void CalcDoubleValue();
+	void SetTextColor(int);
+	void SetBackgroundColor();
+	void SetToTotalCanvas();
+	void SetTotTotalStartRowCanvas();
+	void SetToHeader();
+	void SetToRowStartCanvas();
+	void SetToDataCellColor();
+	void SetToNormalBackground();
+	void SetToMediumFont();
+	void SetToLargeFont();
+	void ResetBools();
+protected:
+	void CopyGridVal(const GridVal&);
+	void Clear(int flags = -1);
+
+
+protected:
+
+	wxString value = "";
+
+	// textfont used in the paint method
+	// Its just a place holder for any of the fonts below...
+	wxFont textfont;
+
+	// textcolour used in the paint method
+	// Its just a place holder for any of the text colours below...
+	wxColour textcolor;
+
+	// backgroud color is used in the paint method...
+	// It is just a place holder for any of the background colors below...
+	wxColour background;
+
+	wxPoint myPosition;
+	wxPoint relativePosition;
+	wxSize mySize;
+	bool isShown = false;
+	double double_val = 0.0;
+
+private:
+
+	// This string stores the value that was replaced when a new value was copied over...
+	wxString backup_value = "";
+
+	// this flag value is used to determine how to display the data...
+	int flag = 0;
+
+	// This flag stores the value that was replaced when a new value was copied over...
+	int backup_flag = 0;
+
+	// Possible fonts..
+	wxFont rowStartFont = wxFont(14, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD);
+	wxFont normalFont = wxFont(13, wxFontFamily::wxFONTFAMILY_ROMAN, wxFontStyle::wxFONTSTYLE_NORMAL, wxFONTWEIGHT_MEDIUM);
+
+	// Possible text colours...
+	wxColour green = wxColour(13, 158, 20);
+	wxColour red = wxColour(217, 7, 28);
+	wxColour yellow = wxColour(176, 194, 16);
+	wxColour colHeaderColour = wxColour(213, 220, 227);
+	wxColour rowHeaderColour = wxColour(182, 203, 242);
+	wxColour white = wxColour(255, 255, 255);
+
+
+	// Possible background colours...
+	wxColour normal = wxColour(13, 10, 36);
+	wxColour totalRowColor = wxColour(21, 41, 46);
+	wxColour onClick;
+	wxColour hover = wxColour(11, 117, 143);
+
+	int isTotalRow = false;
+	int isHeaderRow = false;
+	int isHeaderCol = false;
+	int isDataCell = false;
+};
+/*
 class GridCanvas : public wxWindow
 {
 public:
 	GridCanvas(wxWindow*, wxSize, wxString&, int);
+	~GridCanvas();
 	void OnPaint(wxPaintEvent&);
 	void OnEraseBackground(wxEraseEvent&);
 	TextExtent* GetTextExtent();
@@ -132,6 +246,10 @@ protected:
 	double GetCanvasDoubleValue();
 	wxString GetCanvasStringBackupValue();
 	double GetCanvasDoubleBackupValue();
+	wxFont& GetTextFont() { return this->textfont; }
+	wxColour& GetBackColour() { return this->background; }
+	wxColour& GetTextColour() { return this->textcolor; }
+	wxString& GetTextValue() { return this->value; }
 private:
 	void Initialize();
 	void SetTextColor(int);
@@ -181,12 +299,53 @@ private:
 	TextExtent textextent;
 	int distance = 4;
 };
+*/
+class GridCanvas2;
 
+class Gnode2 : public GridVal
+{
+public:
+	Gnode2(GridView2*, wxWindow*, wxSize, size_t, size_t, Gnode2*, Gnode2*, Gnode2*, Gnode2*, wxString&, int);
+	Gnode2(GridView2*, wxWindow*, wxSize, size_t, size_t, Gnode2*, Gnode2*, Gnode2*, Gnode2*, int);
+	// Copies everything..
+	void CopyGnode2(const Gnode2&);
+	void SetUP(Gnode2*);
+	void SetRight(Gnode2*);
+	void SetDown(Gnode2*);
+	void SetLeft(Gnode2*);
+	Gnode2* GetUP();
+	Gnode2* GetRight();
+	Gnode2* GetDown();
+	Gnode2* GetLeft();
+	Gnode2* GetFarthestLeft();
+	void CopyFromTopNeighbor();
+	void CopyFromBottomNeighbor();
+	void CopyGnodeData(wxVector<GridValData>&, GridValData*);
+	void GetRowData(wxVector<GridValData>&);
+	void ClearSelf(bool from_bottom = false);
+	void ClearSelf(Gnode2*);
+	GridView2* GetParent() { return this->m_parent; }
+	
+private:
+	GridView2* m_parent = NULL;
+	Gnode2* m_up = nullptr;
+	Gnode2* m_right = nullptr;
+	Gnode2* m_down = nullptr;
+	Gnode2* m_left = nullptr;
+	wxString emptystring = "";
+	int rows = 0;
+	int cols = 0;
+};
+
+/*
 class Gnode : public GridCanvas
 {
 public:
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, wxString&, int);
 	Gnode(GridView*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, int);
+//	Gnode(GridView2*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, wxString&, int);
+//	Gnode(GridView2*, wxWindow*, wxSize, size_t, size_t, Gnode*, Gnode*, Gnode*, Gnode*, int);
+
 
 	// Copies everything..
 	void CopyGnode(const Gnode&);
@@ -208,6 +367,8 @@ public:
 	void SetRight(Gnode*);
 	void SetDown(Gnode*);
 	void SetLeft(Gnode*);
+	void SetPosition(wxPoint& p) { this->myPosition = p; }
+	wxPoint GetMyPosition() { return this->myPosition; }
 	Gnode* GetUP();
 	Gnode* GetRight();
 	Gnode* GetDown();
@@ -217,6 +378,10 @@ public:
 	double GetDoubleBackupValue();
 	wxString GetStringValue();
 	double GetDoubleValue();
+	wxColour& _GetBackColour() { return this->GetBackColour(); }
+	wxColour& _GetTextColour() { return this->GetTextColour(); }
+	wxString& _GetTextValue() { return this->GetTextValue(); }
+	wxFont& _GetTextFont() { return this->GetTextFont(); }
 
 	void OnRightClick(wxMouseEvent&);
 	void OnSortClick(wxMouseEvent&);
@@ -231,24 +396,82 @@ private:
 	Gnode* m_right = nullptr;
 	Gnode* m_down = nullptr;
 	Gnode* m_left = nullptr;
-
+	wxPoint myPosition;
 	GridView* m_parent = NULL;
+	GridView2* m_parent2 = NULL;
+};
+*/
+class mainwindow;
+
+class GridCanvas2 : public wxWindow
+{
+public:
+	GridCanvas2(mainwindow*, int, int, wxPoint, wxSize, Gnode2*&, wxSize);
+	~GridCanvas2();
+	void SetHeadNode(Gnode2*);
+	void OnPaint(wxPaintEvent&);
+	void ScrollChanged(wxScrollEvent&);
+	void OnLineChanged(wxScrollEvent&);
+	void OnScrollTop(wxScrollEvent&);
+	void OnScrollBottom(wxScrollEvent&);
+	void OnSizeChange(wxSizeEvent&);
+	void OnMouseEnter(wxMouseEvent&);
+	void OnMouseMove(wxMouseEvent&);
+	void OnMouseLeave(wxMouseEvent&);
+	void OnRightDown(wxMouseEvent&);
+	void OnLeftDown(wxMouseEvent&);
+	void SetScrollBars();
+	void Initialize();
+	wxDECLARE_EVENT_TABLE();
+private:
+	void PaintChild(wxGraphicsContext*, wxString&, wxPoint&, wxSize&);
+	void OnDynamicPaint();
+
+	// The second param will send a null Gnode2 after getting to the end of the row
+	// You would set this true when you only want to cycle through the current row the 
+	// Gnode2 you sent in as a paramater...
+	Gnode2* GetNextElem(Gnode2*, bool row = false);
+	Gnode2* FindMyFocus(wxPoint&);
+	void SetMyToolTip();
+	bool IsFocus(Gnode2*, wxPoint&);
+	bool CheckNeighborsForFocus(wxPoint&);
+private:
+	mainwindow* m_parent = NULL;
+	Gnode2* head = NULL;
+	Gnode2* focus = NULL;
+	wxSize child_size = wxSize(204, 30);
+	int rows = 0;
+	int cols = 0;
+	wxColour background;
+	wxColour textcolor;
+	wxFont textfont;
+	int distance = 4;
+	TextExtent textextent;
+	wxScrollBar* m_vrtcl = NULL;
+	wxScrollBar* m_hrzntl = NULL;
+	int y_position = 0;
+	int x_position = 0;
+	int horizontalrange = 0;
+	int verticalrange = 0;
+	int maxScrollPosH = 0;
+	int minScrollPosH = 0;
+	int maxScrollPosV = 0;
+	int minScrollPosV = 0;
 };
 
-struct GridCanvasData
+struct GridValData
 {
-	GridCanvasData(Gnode* g) : gn(g)
+	GridValData(Gnode2* g) : gn(g)
 	{
-		this->flags = gn->GetMyFlags();
-		this->value = gn->GetStringValue();
+		this->flags = gn->Getflags();
+		this->value = gn->GetTextValue();
 	}
 
-	Gnode* gn = NULL;
+	Gnode2* gn = NULL;
 	int flags = 0;
 	wxString value = "";
 };
 
-class mainwindow;
 class ChartControlWin;
 
 class ChartControl : public wxWindow
@@ -258,6 +481,7 @@ public:
 	~ChartControl();
 	wxVector<Day_Prices>* values = NULL;
 	wxString title = "";
+	void SetNewVector(wxVector<Day_Prices>*);
 	wxDECLARE_EVENT_TABLE();
 	void OnPaint(wxPaintEvent& evt);
 	void OnClose(wxCloseEvent&);
@@ -273,6 +497,7 @@ private:
 };
 
 class ChartControlWin;
+
 // class to display an x for exiting window
 class X_Canvas : public wxWindow
 {
@@ -298,20 +523,75 @@ private:
 class ChartControlWin : public wxWindow
 {
 public:
-	ChartControlWin(mainwindow*, wxWindowID, const wxPoint&, const wxSize&, wxString&, wxVector<Day_Prices>*, StockViewerData*);
+	ChartControlWin(mainwindow*, wxWindowID, const wxPoint&, const wxSize&, wxString&, wxVector<Day_Prices>*, StockViewerData*, _ChartControlType);
+	void SetNewValues(wxVector<Day_Prices>*, StockViewerData*);
 	void OnExit();
+	wxDECLARE_EVENT_TABLE();
+	void OnClickPanel(wxMouseEvent&);
+	void OnPressEnter(wxCommandEvent&);
 private:
 	void Create();
+	void ReCalibratePanelData();
 private:
 	ChartControl* chart = NULL;
 	mainwindow* m_parent = NULL;
 	StockViewerData* svd = NULL;
+	wxTextCtrl* start_range = NULL;
+	wxTextCtrl* end_range = NULL;
 	wxString ticker = "";
+	wxString rangebegin_temp = "";
+	wxString range_end_temp = "";
 	wxString rangebegin = "";
 	wxString range_end = "";
 	X_Canvas* exit = NULL;
+
+	wxStaticText* shares = NULL;
+	wxStaticText* daygain = NULL;
+	wxStaticText* weekgain = NULL;
+	wxStaticText* quartergain = NULL;
+	wxStaticText* yeargain = NULL;
+	wxStaticText* totalgain = NULL;
+	_ChartControlType type = UNOWNED;
 };
 
+class GridView2 : public GridCanvas2
+{
+public:
+	GridView2(wxWindow*, mainwindow*, int, int, wxSize);
+	~GridView2();
+	void SetNumOfItems(int);
+	void SetNewRow(StockViewerData*);
+	void UpdateRow(StockViewerData*);
+	bool ItemExist(wxString&);
+	virtual void OnSortClick(Gnode2*);
+	virtual bool RemoveRow(wxString&);
+protected:
+	void SortStrings(Gnode2*);
+	void SortDouble(Gnode2*);
+	void SetTitleRow();
+	void FillGrid();
+private:
+	wxString GetColTitle(size_t);
+	Gnode2* GetEmptyRow();
+	wxString GetStringLabel(size_t&, StockViewerData*);
+	int GetGridNodeFlags(size_t&, size_t&);
+	Gnode2* GetFarthestRight(Gnode2*);
+	Gnode2* GetRight(Gnode2*, size_t, size_t start = 0);
+	Gnode2* GetMatch(wxString&);
+protected:
+	wxVector<wxString> headers;
+	Gnode2* head = NULL;
+	mainwindow* m_parent = NULL;
+	int cols = 0;
+	int rows = 0;
+	int filledNodes = 0;
+	int gridnode_Size = 0;
+	int itemsize = 1;
+	Gnode2* summaryrow = NULL;
+	bool acending = false;
+};
+
+/*
 class GridView : public wxGridSizer
 {
 public:
@@ -324,7 +604,6 @@ public:
 //	void UpdateRow(StockViewerData*, bool total_row = false);
 	bool DoesItemExist(wxString);
 	bool ItemExist(wxString&);
-	void Cleanup();
 	void OnClickColItem(Gnode*);
 	void OnClickRowItem(Gnode*);
 	void OnClickItem(Gnode*);
@@ -333,7 +612,7 @@ public:
 	wxString GetRightClickTicker();
 	bool RemoveRow(wxString&);
 	void virtual SetTitleRow();
-	void OnSortClick(Gnode*);
+	virtual void OnSortClick(Gnode*);
 private:
 	void SortStrings(Gnode*);
 	void SortDouble(Gnode*);
@@ -386,15 +665,7 @@ protected:
 	int itemsize = 0;
 	bool acending = false;
 };
-
-class GridItemView : public GridView
-{
-public:
-	GridItemView(wxWindow*, _PortfolioType, int, int);
-private:
-	_PortfolioType type = STOCK;
-	wxWindow* m_parent = NULL;
-};
+*/
 
 class PortfolioWin;
 
@@ -438,7 +709,6 @@ class PortfolioWin : public wxWindow
 public:
 	PortfolioWin(mainwindow*, wxWindowID, wxDateTime*, StockViewerData*, Portfolio*);
 	void Update();
-	void OnClick(wxString&);
 	void ClosingSoon();
 private:
 	void Create();
@@ -593,6 +863,7 @@ public:
 	wxString GetTicker();
 	int GetDivChoice();
 	Dividend GetDividend();
+	void GetChartViewData(wxString&, wxDateTime&, wxDateTime&);
 	wxDECLARE_EVENT_TABLE();
 private:
 	void CreateStockEntry();
@@ -610,7 +881,7 @@ private:
 	void CreateChoiceControls();
 	void CreateDayGainers_LosersWin(bool gainers = true);
 	void CreateSubSectorWin();
-	void CreateSectorStockWin();
+	void CreateChart_View_Data_Entry();
 	void OnCheckClick(wxCommandEvent&);
 	void OnCancelDialog(wxCommandEvent&);
 	void OnCloseDialog(wxCloseEvent&);
@@ -633,6 +904,7 @@ private:
 	bool HandleSellStockOkClick();
 	void HandleAddDividendOkClick();
 	bool HandleReInvestSharesOkClick();
+	bool HandleChartViewDataEntry();
 	bool OnEditDivWinOK();
 private:
 	mainwindow* m_parent = nullptr;
@@ -671,7 +943,6 @@ private:
 	GenericKit* sellkit = NULL;
 	wxVector<DayGainersandLosers>* gainers = nullptr;
     wxVector<SubSector>* sub = NULL;
-	wxVector<SectorStock>* secstock = NULL;
 	string_three string_t;
 	GenericKitTemplate<Dividend, wxString>* generic_kit_template = NULL;
 
@@ -761,6 +1032,7 @@ public:
 	void SectorClick(wxVector<SubSector>*, wxString&);
 	void SectorRightClick(wxVector<SectorStock>*, wxString&);
 	void RightClickGrid(wxString&, wxPoint&);
+	void OnChartWinChangeDateRange(wxString&, wxDateTime&, wxDateTime&);
 
 	// OnThreadCompletion callback function for portfolio to call after it retrieves all of its data...
 	void OnThreadCompletion();
@@ -783,17 +1055,21 @@ public:
 
 	void OnHome(wxCommandEvent&);
 	void SampleStockChartView(wxCommandEvent&);
+//	void SampleStockChartView(wxCommandEvent&);
 
 	void GoToHomeWindow();
 	void OnSellPopupClick(wxCommandEvent&);
 	void OnPurchasePopupClick(wxCommandEvent&);
 	void OnAddReInvestSharesPopup(wxCommandEvent&);
 	void OnQuoteLookupPopup(wxCommandEvent&);
-	void ChartViewHelper(SampleStock*);
+	void ChartViewHelper(const wxString&, const wxString&, wxVector<Day_Prices>*, StockViewerData*, _ChartControlType);
+//	void ChartViewHelper(SampleStock*);
 	void OnChartView(wxCommandEvent&);
+	void OnChartView(wxString&);
 	void OnLoadSectorStocks(wxCommandEvent&);
 
 	// thread calls this after OnQuoteLookupPopup...
+	void OnQuoteThread();
 	void OnQuoteThread(wxThreadEvent&);
 	void OnAddDividendPopup(wxCommandEvent&);
 	void OnViewDividendPopup(wxCommandEvent&);
@@ -825,6 +1101,7 @@ public:
 private:
 	wxWindow* GetLeftWin();
 	wxScrolledCanvas* GetRightWin();
+	void GetRightWin(bool);
 	wxWindow* GetBottomFrame();
 	void UpdateGridView();
 	void SaveFile();
@@ -836,7 +1113,7 @@ private:
 	void CreatePopupMenu();
 private:
 	wxScrolledCanvas* grid_panel = NULL;
-	GridView* grid_view = NULL;
+	GridView2* grid_canvas= NULL;
 	PortfolioWin* portwin = nullptr;
 	BottomFrame* bottom_frame = nullptr;
 	Dialog* dialog = nullptr;

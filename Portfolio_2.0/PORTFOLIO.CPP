@@ -949,6 +949,10 @@ wxString SectorClass::GetSectorString(_Sector s)
 			return this->_sec[i];
 	}
 
+	// CHECK TO MAKE SURE ITS NOT EQUAL TO ETF. ETF IS A SUB_SECTOR IN THIS PROGRAME WHICH IT SHOULD BE A SECTRO
+	if (s == _Sub_Sector::ETF)
+		return _ETF;
+
 	wxMessageBox("Could not find a match in SectorClass::GetSectorString! Returning Invalid Sector!");
 	return _SECTOR_INVALID;
 }
@@ -992,6 +996,9 @@ _Sector SectorClass::GetSectorID(wxString s)
 		if (this->_sec[i] == s)
 			return this->sec[i];
 	}
+
+	if (s == _ETF)
+		return (_Sector)_Sub_Sector::ETF;
 
 	wxFAIL_MSG("wxString sent to SectorClass::GetSectorID has not match! String was: " + s);
 	return SECTOR_INVALID;
@@ -1967,9 +1974,9 @@ bool StockNode::IsActive() const
 	return this->m_active;
 }
 
-void StockNode::Calibrate(bool force)
+void StockNode::Calibrate(bool force, wxDateTime* temp)
 {
-	if (this->UpToDate && !force)
+	if (this->UpToDate && !force && !temp)
 		return;
 	else
 		this->UpDate(force);
@@ -1978,7 +1985,7 @@ void StockNode::Calibrate(bool force)
 	this->_90dayDeviation = this->GetDeviation(90);
 	this->_30dayDeviation = this->GetDeviation(30);
 
-	wxDateTime T = *this->m_parentclock;
+	wxDateTime T = temp ? *temp : *this->m_parentclock;
 
 	double _shares = this->m_GetShares(&T);
 	double divshares = this->GetDividendShares();
@@ -2024,6 +2031,9 @@ void StockNode::Calibrate(bool force)
 		marketvalue, this->GetDividends(), this->current_Data.Beta, 0.0, ex_div);
 
 	this->UpToDate = 1;
+	
+	if (temp)
+		this->UpToDate = 0;
 }
 
 void StockNode::ClockChange()
@@ -2866,6 +2876,24 @@ void StockNode::GetDivWithAllReInvestmentShares(Dividend& d)
 		v.AddDivSharesToDiv(d);
 }
 
+wxVector<Day_Prices>* StockNode::GetSubVector(wxDateTime& a, wxDateTime& b)
+{
+	this->h_p_temp.clear();
+	if (!a.IsValid() || !b.IsValid())
+	{
+		wxMessageBox("Sent invalid date to StockNode::GetSubVector");
+		return &this->h_p_temp;
+	}
+
+	for (auto& v : this->historical_prices)
+	{
+		if (v.date >= a && v.date <= b)
+			this->h_p_temp.push_back(v);
+	}
+
+	return &this->h_p_temp;
+}
+
 wxVector<Dividend> StockNode::GetAllDividends()
 {
 	wxVector<Dividend> vec;
@@ -2980,7 +3008,7 @@ void StockNode::SetHistoricalData(Day_Prices day)
 // SampleStock functions...
 SampleStock::SampleStock(wxString& _ticker, SummaryData& smd, wxString& sector, wxString& industry, wxDateTime& _start, wxDateTime& _end, _Sector id)
 	: Return_node(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), start(_start), end(_end), ticker(_ticker), sectorID(id), current_Data(smd),
-	sectorname(sector), industryname(industry), parser(this, this->ticker, this->start.Format(DATE_KEY), "", SetHistoricalDataCB, _PortfolioType::SAMPLESTOCK, SetSummaryDataCB)
+	sectorname(sector), industryname(industry), parser(this, this->ticker, this->start.Format(DATE_KEY), "", SetHistoricalDataCB, _PortfolioType::SAMPLESTOCK, SetSummaryDataCB, _end.Format(DATE_KEY))
 {
 	parser.UpDateHistoricalPrices();
 	this->Calibrate();
@@ -3003,6 +3031,15 @@ void SampleStock::Calibrate()
 		return;
 
 	double daycostbasis = G_GetPreviousClose(&this->end, this->historical_prices);
+	if (!daycostbasis)
+	{
+		// check to see on the rare occasion that this->end date is today and yahoo finance does not have todays closes.
+		// In which gettin the day gain would be hard considering todays date is not on the historical prices...
+		if (this->end == wxDateTime::Today())
+		{
+			daycostbasis = this->historical_prices.rbegin()->close;
+		}
+	}
 	wxDateTime temp = this->end;
 	temp = G_GetFirstDayOfTheWeekDate(&temp);
 	double weekcostbasis = G_GetClosePrice(&temp, this->historical_prices);
@@ -3011,12 +3048,17 @@ void SampleStock::Calibrate()
 	temp = this->end;
 	temp = G_GetQuarterStartDate(&temp);
 	double quartercostbasis = G_GetClosePrice(&temp, this->historical_prices);
+	quartercostbasis = !quartercostbasis ? this->historical_prices.begin()->close : quartercostbasis;
+
 	temp = this->end;
-	double yearcostbasis = this->historical_prices.begin()->close;
+	double yearcostbasis = GetYearStartClose(&this->end, &this->start, this->historical_prices);
+	if (!yearcostbasis)
+		yearcostbasis = this->historical_prices.begin()->close;
+
 	wxDateTime initial = this->start;
 	double originalcostbasis = this->historical_prices.begin()->close;
 	double marketvalue = 0.0;
-	marketvalue = this->historical_prices.rbegin()->close;
+	marketvalue = this->end == wxDateTime::Today() ? this->current_Data.marketprice : this->historical_prices.rbegin()->close;
 
 	this->SetNewValues(originalcostbasis, daycostbasis, weekcostbasis, quartercostbasis, yearcostbasis, marketvalue, 1.0, 0.0, 0.0);
 	this->beta = current_Data.Beta;

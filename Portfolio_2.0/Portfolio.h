@@ -665,7 +665,7 @@ public:
 	SummaryData GetSummaryData() { return this->current_Data; }
 	wxString GetNextEarningsDate();
 	bool IsActive() const;
-	void Calibrate(bool force = false);
+	void Calibrate(bool force = false, wxDateTime* temp = NULL);
 	void ClockChange();
 	void SetHistoricalData(Day_Prices);
 	void SetSummaryData(SummaryData);
@@ -678,6 +678,9 @@ public:
 	double GetDividends();
 	wxVector<Dividend> GetDividendVec();
 	void GetDivWithAllReInvestmentShares(Dividend&);
+
+	// Fills a vector with all the day_prices in between those two date, including both start and end dates...
+	wxVector<Day_Prices>* GetSubVector(wxDateTime&, wxDateTime&);
 	wxVector<Day_Prices>* GetDayPrices() { return &this->historical_prices; }
 
 	// This function differs from get dividends in that it returns all the dividends including the ones that are elligible for dividend re-investment..
@@ -731,10 +734,14 @@ private:
 private:
 	wxVector<stock_node> bought;
 	wxVector<Day_Prices> historical_prices;
+	wxVector<Day_Prices> h_p_temp;
 	const wxString m_ticker = "";
 	StockViewerData svd;
 	SummaryData current_Data;
 	const wxDateTime* m_parentclock = nullptr;
+
+	// clock used for temperary calibration when being displayed in chart...
+	wxDateTime* temp_clock = NULL;
 	wxDateTime inital_purchase;
 	Parser* parser = nullptr;
 	double m_beta = 0.0;
@@ -759,6 +766,10 @@ public:
 	StockViewerData* GetStockViewerData() { return &this->svd; }
 	wxString GetTicker() { return this->ticker; }
 	wxString GetLongName() { return this->current_Data.Longname; }
+	_Sector GetSectorId() { return this->sectorID; }
+	SummaryData& GetSummaryData() { return this->current_Data; }
+	wxString& GetSectorName() { return this->sectorname; }
+	wxString& GetIndustryName() { return this->industryname; }
 public:
 	double PortfolioPerc = 0.0;
 	double SectorPerc = 0.0;

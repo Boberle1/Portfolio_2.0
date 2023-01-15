@@ -86,7 +86,7 @@ bool Holidays::IsHoliday(wxDateTime& T)
 	Holiday_Pair* it = this->Find(T.GetYear());
 	if (!it)
 	{
-		wxMessageBox("Could not find year in Holidays::IsHoliday!");
+//		wxMessageBox("Could not find year in Holidays::IsHoliday!");
 		return false;
 	}
 
@@ -456,10 +456,10 @@ double GetYearStartClose(wxDateTime* T, wxDateTime* purchaseDate, wxVector<Day_P
 	wxDateTime date = wxDateTime::Today();
 	if (T)
 		date = *T;
-
 	date = wxDateTime(2, wxDateTime::Month::Jan, date.GetYear());
+	
 	GetForwardWorkDay(date);
-
+	
 	if (date < *purchaseDate)
 		return G_GetClosePrice(purchaseDate, vec);
 	else

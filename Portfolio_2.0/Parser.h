@@ -79,7 +79,7 @@ public:
 	Parser(void* parent, wxString t, wxString pd, wxString ld, wxString ldd, void (*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), 
 		void (*cbs)(void*, SummaryData, _PortfolioType), void (*cbd)(void*, Dividend), wxString enddate);
 	Parser(void* parent, wxString t, wxString pd, wxString ld, void(*cb)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType), _PortfolioType
-		,void (*cbs)(void*, SummaryData, _PortfolioType));
+		,void (*cbs)(void*, SummaryData, _PortfolioType), wxString enddate = "");
 	Parser(void* parent, _Sector S);
 	Parser(wxString&, bool redirect = false);
 	Parser() {}
@@ -121,7 +121,6 @@ private:
 	void ParseSummaryData(wxString&);
 
 	int FindItem(wxString, wxString&, int index = 0);
-
 	//CallBack for StockNode...
 	void (*CallBack)(void* v, double o, double h, double l, double c, wxDateTime d, _PortfolioType) = nullptr;
 	// CallBack for StockNode SummaryData...
